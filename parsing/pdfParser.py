@@ -92,6 +92,25 @@ class PdfParser:
         print(f"Parsing finished. Total records: {len(records)}")
 
         return records
+    
+    def parse_text(self, file_path):
+        pdf_path = Path(file_path)
+
+        if not pdf_path.exists():
+            raise FileNotFoundError(f"PDF file not found: {pdf_path}")
+
+        pages_text = []
+
+        with pdfplumber.open(pdf_path) as pdf:
+            for page_number, page in enumerate(pdf.pages, start=1):
+                text = page.extract_text() or ""
+
+                if text.strip():
+                    pages_text.append(
+                        f"\n--- PAGE {page_number} ---\n{text.strip()}"
+                    )
+
+        return "\n".join(pages_text)
 
     def _row_to_record(self, row, headers):
         """

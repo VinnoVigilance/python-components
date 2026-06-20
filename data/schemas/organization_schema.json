@@ -1,0 +1,126 @@
+{
+  "EntityId": "",
+  "UnifiedEntityID": "",
+  "EntityType": "",
+  "Action": "",
+  "DateAdded": "",
+  "DateUpdated": "",
+  "Sources": [
+    {
+      "ListName": "",
+      "SourceName": "",
+      "SourceLink": "",
+      "SourceRecordId": "",
+      "Note": ""
+    }
+  ],
+  "Names": [
+    {
+      "NameType": "",
+      "Name": "",
+      "Language": "",
+      "Note": ""
+    }
+  ],
+  "Countries": [
+    {
+      "CountryType": "",
+      "Country": "",
+      "Note": ""
+    }
+  ],
+  "Addresses": [
+    {
+      "FullAddress": "",
+      "AddressLine1": "",
+      "AddressLine2": "",
+      "AddressLine3": "",
+      "City": "",
+      "Province": "",
+      "Country": "",
+      "PostalCode": "",
+      "Note": ""
+    }
+  ],
+  "Aliases": [
+    {
+      "AliasType": "",
+      "Alias": "",
+      "Note": ""
+    }
+  ],
+  "Programs": [
+    {
+      "ProgramType": "",
+      "Program": "",
+      "Authority": "",
+      "Note": ""
+    }
+  ],
+  "Relationships": [
+    {
+      "RelationType": "",
+      "RelatedEntityID": "",
+      "RelatedEntityName": "",
+      "StartDate": "",
+      "EndDate": "",
+      "Note": ""
+    }
+  ],
+  "Identifiers": [
+    {
+      "Type": "",
+      "Number": "",
+      "IssuingCountry": "",
+      "IssuedDate": "",
+      "ExpiryDate": "",
+      "Note": ""
+    }
+  ],
+  "Contacts": [
+    {
+      "Type": "",
+      "Value": "",
+      "Note": ""
+    }
+  ],
+  "BusinessActivities": [
+    {
+      "Category": "",
+      "Description": "",
+      "Note": ""
+    }
+  ],
+  "Measures": [
+    {
+      "MeasureType": "",
+      "EffectiveDate": "",
+      "EndDate": "",
+      "Status": "",
+      "Note": ""
+    }
+  ],
+  "comments": [
+    {
+      "type": "",
+      "text": ""
+    }
+  ],
+  "Images": [
+    {
+      "Type": "",
+      "FileName": ""
+    }
+  ],
+  "RiskCategories": [
+    {
+      "Category": "",
+      "SubCategory": "",
+      "Active": false,
+      "SinceDay": 0,
+      "SinceMonth": 0,
+      "SinceYear": 0,
+      "Note": ""
+    }
+  ]
+}
