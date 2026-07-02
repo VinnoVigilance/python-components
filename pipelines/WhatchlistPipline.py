@@ -4,6 +4,7 @@ import sys
 import json
 
 import pandas as pd
+from datetime import datetime, time
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -37,11 +38,11 @@ PREPROCESSING_HANDLERS = {
     "clean_atc_profile_name_fields": clean_atc_profile_name_fields,    
 }
 
-# from database.inserts import (
-#     insert_watchlist_file,
-#     insert_watchlist_raw_record,
-#     insert_watchlist_staging_record,
-# )
+from database.inserts import (
+     insert_raw_watchlist_file,
+     insert_per_raw_unparsed_watchlist_payload,
+     insert_staging_watchlist_record_staging,
+ )
 
 
 class WatchlistPipeline:
@@ -56,6 +57,7 @@ class WatchlistPipeline:
     ):
         self.config = config
         self.source_name = config["source_name"]
+        self.external_id_path = config["external_id_path"]
         self.downloader = downloader
         self.pre_normalizer = pre_normalizer
         self.mapper = mapper
@@ -115,14 +117,18 @@ class WatchlistPipeline:
         else:
             downloaded_file_path = self.downloader.download(download_task)
 
-        # file_id = insert_watchlist_file(
-        #     source_name=self.source_name,
-        #     url=self.config.get("url"),
-        #     file_path=downloaded_file_path,
-        #     file_type=self.config.get("file_type"),
-        #     downloaded_at=datetime.now(),
-        #     schedule=self.config.get("schedule"),
-        # )
+        results = insert_raw_watchlist_file(
+             source_name=self.source_name,
+             url=self.config.get("url"),
+             file_path=downloaded_file_path,
+             file_type=self.config.get("file_type"),
+             downloaded_at=datetime.now(),
+             schedule=self.config.get("schedule"),
+         )
+        
+        file_id = results["file_id"]
+        source_id = results["source_id"]
+        list_type_id = results["list_type_id"]
 
         print(downloaded_file_path)
 
@@ -160,15 +166,15 @@ class WatchlistPipeline:
                         rules=self.config.get("enrichment", [])
                         )
             
-            # raw_record_id = insert_watchlist_raw_record(
-            #     file_id=file_id,
-            #     source_name=self.source_name,
-            #     raw_json=raw_record,
-            #     created_at=datetime.now(),
-            # )
+            insert_per_raw_unparsed_watchlist_payload(
+                 file_id=file_id,
+                 source_name=self.source_name,
+                 raw_json=raw_record,
+                 created_at=datetime.now(),
+             )
 
             current_record = raw_record
-
+            external_id = current_record.get(self.external_id_path)
             current_record = self.apply_preprocessing(current_record)
             # print("AFTER PREPROCESSING:", current_record)
             current_record = self.pre_normalizer.pre_normalize_record(
@@ -187,13 +193,17 @@ class WatchlistPipeline:
 
             final_records.append(current_record)
 
-            # insert_watchlist_staging_record(
-            #     file_id=file_id,
-            #     raw_record_id=raw_record_id,
-            #     source_name=self.source_name,
-            #     final_json=current_record,
-            #     created_at=datetime.now(),
-            # )
+            insert_staging_watchlist_record_staging(
+                 file_id=file_id,
+                 source_id=source_id,
+                 list_type_id=list_type_id,
+                 #raw_record_id=raw_record_id,
+                 #source_name=self.source_name,
+                 #final_json=current_record,
+                 raw_json=current_record,
+                 created_at=datetime.now(),
+                 external_id=external_id,
+             )
 
             staging_count += 1
 
