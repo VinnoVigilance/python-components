@@ -1096,16 +1096,16 @@ def load_rules(
 
         rule = Rule(
             entity_type=""
-            if pd.isna(row.get("Entity Type"))
-            else str(row.get("Entity Type")).strip(),
+            if pd.isna(row.get("Entity Category"))
+            else str(row.get("Entity Category")).strip(),
 
             target_path=""
-            if pd.isna(row.get("Final Json Path"))
-            else str(row.get("Final Json Path")).strip(),
+            if pd.isna(row.get("Field"))
+            else str(row.get("Field")).strip(),
 
             target_type=""
-            if pd.isna(row.get("Final Json Path Type"))
-            else str(row.get("Final Json Path Type")).strip(),
+            if pd.isna(row.get("Field Type"))
+            else str(row.get("Field Type")).strip(),
 
             group=None
             if pd.isna(row.get("Group"))
