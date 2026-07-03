@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from typing import Any, Optional, List
 from collections import defaultdict
 
+from pathlib import Path
+
+RULES_DIR = Path(__file__).resolve().parent.parent / "data" / "rules"
+LOOKUP_FILE = RULES_DIR / "lookupTables.xlsx"
+
 
 # =========================================================
 # MODEL
@@ -143,6 +148,43 @@ def values_equal(a: Any, b: Any) -> bool:
     return normalize_bool(a) == normalize_bool(b)
 
 
+
+
+def get_expected_values(expected_expr: str):
+    """
+    Supports both old fixed values and new lookup-based values.
+
+    Old format:
+        Alias
+
+    Multiple fixed values:
+        AKA, Former Name, Native Name
+
+    Lookup format:
+        lookup:Aliases.AliasType
+    """
+    expected_expr = unquote(expected_expr).strip()
+
+    if expected_expr.startswith("lookup:"):
+        sheet_name = expected_expr.replace("lookup:", "", 1).strip()
+        df = pd.read_excel(LOOKUP_FILE, sheet_name=sheet_name)
+
+        if "Value" not in df.columns:
+            raise ValueError(f"Sheet '{sheet_name}' must have a 'Value' column")
+
+        return [
+            str(x).strip().lower()
+            for x in df["Value"].dropna().tolist()
+            if str(x).strip()
+        ]
+
+    return [
+        str(x).strip().lower()
+        for x in expected_expr.split(",")
+        if x.strip()
+    ]
+
+
 def normalize_scalar(value: Any, fallback=""):
     if value is None:
         return fallback
@@ -170,7 +212,7 @@ def detect_entity_type(raw_json: dict) -> str:
         return "Individual"
 
     if val in ["entity", "organization", "organisation"]:
-        return "Organization"
+        return "Entity"
 
     if val == "vessel":
         return "Vessel"
@@ -302,11 +344,7 @@ def has_meaningful_data(obj: dict) -> bool:
 
 
 def has_real_source_data(rules: List[Rule], raw_json: dict) -> bool:
-    """
-    برای groupهای ساده مثل comments:
-    اگر فقط مقدارهای constant مثل type=other پر شده باشند، آیتم آرایه ساخته نشود.
-    آیتم فقط وقتی ساخته می‌شود که حداقل یک مقدار واقعی از سورس، غیرخالی باشد.
-    """
+
     for rule in rules:
         st = (rule.source_type or "").lower()
 
@@ -396,65 +434,6 @@ class PathExpandHandler(BaseHandler):
         return resolve_all_in_context(raw_json, rule.source_value, item, anchor)
 
 
-# class ConditionalPathHandler(BaseHandler):
-#     def handle(self, rule, raw_json, item=None, anchor=None):
-#         if not rule.source_value:
-#             return None
-
-#         blocks = [
-#             b.strip()
-#             for b in str(rule.source_value).split("OR")
-#             if b.strip()
-#         ]
-
-#         for block in blocks:
-#             parts = [x.strip() for x in block.split("|")]
-
-#             if len(parts) != 3:
-#                 continue
-
-#             cond_path, cond_value, return_expr = parts
-
-#             expected = unquote(cond_value)
-
-#             actual_values = resolve_all_in_context(
-#                 raw_json,
-#                 cond_path,
-#                 item,
-#                 anchor
-#             )
-
-#             if not actual_values:
-#                 actual_values = [
-#                     resolve_in_context(
-#                         raw_json,
-#                         cond_path,
-#                         item,
-#                         anchor
-#                     )
-#                 ]
-
-#             matched = any(
-#                 values_equal(v, expected)
-#                 for v in actual_values
-#                 if v is not None
-#             )
-
-#             if not matched:
-#                 continue
-
-#             if return_expr.startswith('"') and return_expr.endswith('"'):
-#                 return unquote(return_expr)
-
-#             return resolve_in_context(
-#                 raw_json,
-#                 return_expr,
-#                 item,
-#                 anchor
-#             )
-
-#         return None
-
 class ConcatPathHandler(BaseHandler):
     def handle(self, rule, raw_json, item=None, anchor=None):
         if not rule.source_value:
@@ -522,59 +501,8 @@ class ExplodeHandler(BaseHandler):
 
         return results
 
-# class ConditionalPathHandler(BaseHandler):
-    
-#     def handle(self, rule, raw_json, item=None, anchor=None):
-
-#         if not rule.source_value:
-#             return None
-
-#         blocks = [
-#             b.strip()
-#             for b in str(rule.source_value).split("OR")
-#             if b.strip()
-#         ]
-
-#         for block in blocks:
-
-#             parts = [x.strip() for x in block.split("|")]
-
-#             if len(parts) != 3:
-#                 continue
-
-#             cond_path, cond_value, return_expr = parts
-
-#             expected = unquote(cond_value)
-
-#             # -----------------------------------
-#             # NEW LOGIC
-#             # -----------------------------------
-
-#             base_path = cond_path.split("[]")[0]
-
-#             items = JsonPath.get_all(raw_json, base_path + "[]")
-
-#             for current_item in items:
-
-#                 short_cond = strip_anchor_prefix(cond_path, base_path + "[]")
-#                 short_return = strip_anchor_prefix(return_expr, base_path + "[]")
-
-#                 actual = JsonPath.get(current_item, short_cond)
-
-#                 if values_equal(actual, expected):
-
-#                     if (
-#                         return_expr.startswith('"')
-#                         and return_expr.endswith('"')
-#                     ):
-#                         return unquote(return_expr)
-
-#                     return JsonPath.get(current_item, short_return)
-
-#         return None
-
 class ConditionalPathHandler(BaseHandler):
-    
+
     def handle(self, rule, raw_json, item=None, anchor=None):
 
         if not rule.source_value:
@@ -594,10 +522,9 @@ class ConditionalPathHandler(BaseHandler):
                 continue
 
             cond_path, cond_value, return_expr = parts
-            expected = unquote(cond_value)
+            expected_values = get_expected_values(cond_value)
 
-            # حالت ۱: وقتی داخل path_expand هستیم
-            # مثلا item = {"Name6": "...", "NameType": "Primary Name"}
+
             if item is not None:
                 actual = resolve_in_context(
                     raw_json,
@@ -606,7 +533,9 @@ class ConditionalPathHandler(BaseHandler):
                     anchor=anchor
                 )
 
-                if values_equal(actual, expected):
+                actual_value = str(actual or "").strip().lower()
+
+                if actual_value in expected_values:
 
                     if return_expr.startswith('"') and return_expr.endswith('"'):
                         return unquote(return_expr)
@@ -618,7 +547,6 @@ class ConditionalPathHandler(BaseHandler):
                         anchor=anchor
                     )
 
-            # حالت ۲: وقتی path شامل [] است
             if "[]" in cond_path:
                 base_path = cond_path.split("[]")[0]
                 items = JsonPath.get_all(raw_json, base_path + "[]")
@@ -636,8 +564,83 @@ class ConditionalPathHandler(BaseHandler):
                     )
 
                     actual = JsonPath.get(current_item, short_cond)
+                    actual_value = str(actual or "").strip().lower()
 
-                    if values_equal(actual, expected):
+                    if actual_value in expected_values:
+
+                        if return_expr.startswith('"') and return_expr.endswith('"'):
+                            return unquote(return_expr)
+
+                        return JsonPath.get(current_item, short_return)
+
+        return None
+
+
+class ConditionalExcludePathHandler(BaseHandler):
+
+    def handle(self, rule, raw_json, item=None, anchor=None):
+
+        if not rule.source_value:
+            return None
+
+        blocks = [
+            b.strip()
+            for b in str(rule.source_value).split("OR")
+            if b.strip()
+        ]
+
+        for block in blocks:
+
+            parts = [x.strip() for x in block.split("|")]
+
+            if len(parts) != 3:
+                continue
+
+            cond_path, cond_value, return_expr = parts
+            expected_values = get_expected_values(cond_value)
+
+            if item is not None:
+                actual = resolve_in_context(
+                    raw_json,
+                    cond_path,
+                    item=item,
+                    anchor=anchor
+                )
+
+                actual_value = str(actual or "").strip().lower()
+
+                if actual_value and actual_value not in expected_values:
+
+                    if return_expr.startswith('"') and return_expr.endswith('"'):
+                        return unquote(return_expr)
+
+                    return resolve_in_context(
+                        raw_json,
+                        return_expr,
+                        item=item,
+                        anchor=anchor
+                    )
+
+            if "[]" in cond_path:
+                base_path = cond_path.split("[]")[0]
+                items = JsonPath.get_all(raw_json, base_path + "[]")
+
+                for current_item in items:
+
+                    short_cond = strip_anchor_prefix(
+                        cond_path,
+                        base_path + "[]"
+                    )
+
+                    short_return = strip_anchor_prefix(
+                        return_expr,
+                        base_path + "[]"
+                    )
+
+                    actual = JsonPath.get(current_item, short_cond)
+                    actual_value = str(actual or "").strip().lower()
+
+                    if actual_value and actual_value not in expected_values:
 
                         if return_expr.startswith('"') and return_expr.endswith('"'):
                             return unquote(return_expr)
@@ -656,6 +659,7 @@ HANDLERS = {
     "parallel_path": ParallelPathHandler(),
     "path_expand": PathExpandHandler(),
     "conditional_path": ConditionalPathHandler(),
+    "conditional_exclude_path": ConditionalExcludePathHandler(),
     "concat_path": ConcatPathHandler(),
 }
 
@@ -738,35 +742,9 @@ class SchemaBuilder:
 
 class GroupProcessor:
 
-    # def process(self, rules: List[Rule], raw_json: dict) -> List[dict]:
 
-    #     path_expand_rule = self._find_rule(rules, "path_expand")
-    #     expand_rule = self._find_rule(rules, "expand")
-
-    #     if path_expand_rule:
-    #         return self._process_path_expand_group(
-    #             rules,
-    #             raw_json,
-    #             path_expand_rule
-    #         )
-
-    #     if expand_rule:
-    #         return self._process_expand_group(
-    #             rules,
-    #             raw_json,
-    #             expand_rule
-    #         )
-
-    #     obj = self._build_single_object(rules, raw_json)
-
-    #     if has_meaningful_data(obj):
-    #         return [obj]
-
-    #     return []
     def process(self, rules: List[Rule], raw_json: dict) -> List[dict]:
     
-        # اگر در اکسل TYPE با * جدا شده باشد
-        # مثلا: path_expand * path_expand
         if any("*" in str(r.source_type or "") for r in rules):
 
             type_parts_list = []
