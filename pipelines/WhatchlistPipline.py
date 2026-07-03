@@ -3,7 +3,8 @@ from pathlib import Path
 import sys
 import json
 import pandas as pd
-from datetime import datetime, time
+from datetime import datetime
+import time
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -11,7 +12,7 @@ sys.path.append(str(ROOT_DIR))
 
 from transforms.preNormalization import PreNormalizationEngine
 from transforms.fieldMapper import load_rules, MappingEngine
-from transforms.postNormalization import post_normalize_record
+from transforms.postNormalization import PostNormalizationEngine
 from ingestion.downloader import interface as downloader
 from pipelines.whatchlistConfigs import WATCHLIST_CONFIGS
 from parsing.xmlParser import XmlParser
@@ -112,18 +113,7 @@ class WatchlistPipeline:
             records=raw_records,
             rules=self.config.get("preprocessing", [])
         )
-        preprocessed_dir = ROOT_DIR / "data" / "preprocessed"
-        preprocessed_dir.mkdir(parents=True, exist_ok=True)
 
-        preprocessed_file_path = (
-            preprocessed_dir / f"{self.source_name}_preprocessed.jsonl"
-        )
-
-        with open(preprocessed_file_path, "w", encoding="utf-8") as f:
-            for record in raw_records:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-        print(f"Preprocessed output saved at: {preprocessed_file_path}")
 
         raw_count = 0
         staging_count = 0
@@ -209,7 +199,10 @@ class WatchlistPipeline:
         print(f"Final output saved at: {output_file_path}")
 
 
+
 if __name__ == "__main__":
+    start_time = time.perf_counter()
+
     rules_dir = ROOT_DIR / "data" / "rules"
 
     prenorm_df = pd.read_excel(rules_dir / "preNormalization.xlsx")
@@ -230,11 +223,7 @@ if __name__ == "__main__":
 
     mapper = MappingEngine(mapping_rules)
 
-    class PostNormalizerAdapter:
-        def post_normalize_record(self, record):
-            return post_normalize_record(record, post_rules_df)
-
-    post_normalizer = PostNormalizerAdapter()
+    post_normalizer = PostNormalizationEngine(post_rules_df)
 
     pipeline = WatchlistPipeline(
         config=config,
@@ -245,3 +234,6 @@ if __name__ == "__main__":
     )
 
     pipeline.run()
+
+    elapsed = time.perf_counter() - start_time
+    print(f"Total execution time: {elapsed:.2f} seconds")
