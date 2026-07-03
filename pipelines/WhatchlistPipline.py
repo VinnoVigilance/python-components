@@ -2,7 +2,6 @@
 from pathlib import Path
 import sys
 import json
-
 import pandas as pd
 from datetime import datetime, time
 
@@ -20,29 +19,13 @@ from parsing.pdfParser import PdfParser
 from parsing.htmlParser import HtmlParser
 from parsing.tabularParser import TabularParser
 from ingestion.downloader.models import DownloadTask
-from transforms.preProcessing import (
-    detect_entity_type,
-    generate_atc_unique_id,
-    extract_name_from_url,
-    split_atc_date_and_place_of_birth,
-    clean_atc_profile_name_fields,
-)
+from transforms.preProcessingEngine import PreProcessingEngine
 from transforms.enrichmentEngine import EnrichmentEngine
-
-
-PREPROCESSING_HANDLERS = {
-    "detect_entity_type": detect_entity_type,
-    "generate_atc_unique_id": generate_atc_unique_id,
-    "extract_name_from_url": extract_name_from_url,
-    "split_atc_date_and_place_of_birth": split_atc_date_and_place_of_birth,
-    "clean_atc_profile_name_fields": clean_atc_profile_name_fields,    
-}
-
-from database.inserts import (
-     insert_raw_watchlist_file,
-     insert_per_raw_unparsed_watchlist_payload,
-     insert_staging_watchlist_record_staging,
- )
+# from database.inserts import (
+#      insert_raw_watchlist_file,
+#      insert_per_raw_unparsed_watchlist_payload,
+#      insert_staging_watchlist_record_staging,
+#  )
 
 
 class WatchlistPipeline:
@@ -63,6 +46,7 @@ class WatchlistPipeline:
         self.mapper = mapper
         self.post_normalizer = post_normalizer
         self.parser = self.get_parser()
+        self.preprocessing_engine = PreProcessingEngine()
         self.enrichment_engine = EnrichmentEngine()
 
     def get_parser(self):
@@ -82,23 +66,6 @@ class WatchlistPipeline:
 
         raise ValueError(f"Unsupported file type: {file_type}")
 
-    def apply_preprocessing(self, record):
-        preprocessing_steps = self.config.get("preprocessing", [])
-
-        for step in preprocessing_steps:
-            handler_name = step["handler"]
-            handler_config = step.get("config", {})
-
-            handler = PREPROCESSING_HANDLERS.get(handler_name)
-
-            if handler is None:
-                raise ValueError(
-                    f"Unknown preprocessing handler: {handler_name}"
-                )
-
-            record = handler(record, handler_config)
-
-        return record
 
     def run(self):
         print(f"Starting watchlist pipeline: {self.source_name}")
@@ -117,18 +84,18 @@ class WatchlistPipeline:
         else:
             downloaded_file_path = self.downloader.download(download_task)
 
-        results = insert_raw_watchlist_file(
-             source_name=self.source_name,
-             url=self.config.get("url"),
-             file_path=downloaded_file_path,
-             file_type=self.config.get("file_type"),
-             downloaded_at=datetime.now(),
-             schedule=self.config.get("schedule"),
-         )
+        # results = insert_raw_watchlist_file(
+        #      source_name=self.source_name,
+        #      url=self.config.get("url"),
+        #      file_path=downloaded_file_path,
+        #      file_type=self.config.get("file_type"),
+        #      downloaded_at=datetime.now(),
+        #      schedule=self.config.get("schedule"),
+        #  )
         
-        file_id = results["file_id"]
-        source_id = results["source_id"]
-        list_type_id = results["list_type_id"]
+        # file_id = results["file_id"]
+        # source_id = results["source_id"]
+        # list_type_id = results["list_type_id"]
 
         print(downloaded_file_path)
 
@@ -140,6 +107,23 @@ class WatchlistPipeline:
             records=raw_records,
             rules=self.config.get("enrichment", [])
         )
+
+        raw_records = self.preprocessing_engine.apply_dataset(
+            records=raw_records,
+            rules=self.config.get("preprocessing", [])
+        )
+        preprocessed_dir = ROOT_DIR / "data" / "preprocessed"
+        preprocessed_dir.mkdir(parents=True, exist_ok=True)
+
+        preprocessed_file_path = (
+            preprocessed_dir / f"{self.source_name}_preprocessed.jsonl"
+        )
+
+        with open(preprocessed_file_path, "w", encoding="utf-8") as f:
+            for record in raw_records:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+        print(f"Preprocessed output saved at: {preprocessed_file_path}")
 
         raw_count = 0
         staging_count = 0
@@ -166,16 +150,19 @@ class WatchlistPipeline:
                         rules=self.config.get("enrichment", [])
                         )
             
-            insert_per_raw_unparsed_watchlist_payload(
-                 file_id=file_id,
-                 source_name=self.source_name,
-                 raw_json=raw_record,
-                 created_at=datetime.now(),
-             )
+            # insert_per_raw_unparsed_watchlist_payload(
+            #      file_id=file_id,
+            #      source_name=self.source_name,
+            #      raw_json=raw_record,
+            #      created_at=datetime.now(),
+            #  )
 
             current_record = raw_record
             external_id = current_record.get(self.external_id_path)
-            current_record = self.apply_preprocessing(current_record)
+            current_record = self.preprocessing_engine.apply_record(
+                record=current_record,
+                rules=self.config.get("preprocessing", [])
+            )
             # print("AFTER PREPROCESSING:", current_record)
             current_record = self.pre_normalizer.pre_normalize_record(
                 source=self.source_name,
@@ -193,17 +180,17 @@ class WatchlistPipeline:
 
             final_records.append(current_record)
 
-            insert_staging_watchlist_record_staging(
-                 file_id=file_id,
-                 source_id=source_id,
-                 list_type_id=list_type_id,
-                 #raw_record_id=raw_record_id,
-                 #source_name=self.source_name,
-                 #final_json=current_record,
-                 raw_json=current_record,
-                 created_at=datetime.now(),
-                 external_id=external_id,
-             )
+            # insert_staging_watchlist_record_staging(
+            #      file_id=file_id,
+            #      source_id=source_id,
+            #      list_type_id=list_type_id,
+            #      #raw_record_id=raw_record_id,
+            #      #source_name=self.source_name,
+            #      #final_json=current_record,
+            #      raw_json=current_record,
+            #      created_at=datetime.now(),
+            #      external_id=external_id,
+            #  )
 
             staging_count += 1
 
@@ -229,7 +216,7 @@ if __name__ == "__main__":
     source_config_df = pd.read_excel(rules_dir / "sourceConfig.xlsx")
     post_rules_df = pd.read_excel(rules_dir / "postNormalization.xlsx")
 
-    config = WATCHLIST_CONFIGS["EU-TRAVEL-BAN"]
+    config = WATCHLIST_CONFIGS["DFAT"]
 
     pre_normalizer = PreNormalizationEngine(
         prenormalization_df=prenorm_df,

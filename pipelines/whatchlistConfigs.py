@@ -1,5 +1,19 @@
 # pipelines/watchlist_configs.py
 WATCHLIST_CONFIGS = {
+    
+       "DFAT": {
+        "source_name": "DFAT",
+        "url": "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx",
+        "file_type": "xlsx",
+        "external_id_path":"Reference",
+        "schedule": "daily",
+        "preprocessing": [
+            {
+                "handler": "merge_dfat_split_records",
+                "level": "dataset"
+            }
+        ]
+    },
 
     "UKSL": {
         "source_name": "UKSL",
@@ -29,13 +43,6 @@ WATCHLIST_CONFIGS = {
         "schedule": "daily",
     },
 
-    "DFAT": {
-        "source_name": "DFAT",
-        "url": "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx",
-        "file_type": "xlsx",
-        "external_id_path":"Reference",
-        "schedule": "daily",
-    },
     
     "AMLC-DNFBP": {
     "source_name": "DNFBP",
