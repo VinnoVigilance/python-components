@@ -12,7 +12,9 @@ def generate(prompt, model_name, schema=None):
         ],
         format=schema if schema else "json",
         options={
-            "temperature": 0
+            "temperature": 0,
+            "num_thread": 14
+
         }
     )
 
