@@ -3,6 +3,7 @@ WATCHLIST_CONFIGS = {
     
        "DFAT": {
         "source_name": "DFAT",
+        "list_name": "DFAT",
         "url": "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx",
         "file_type": "xlsx",
         "external_id_path":"Reference",
@@ -15,6 +16,16 @@ WATCHLIST_CONFIGS = {
         ]
     },
 
+    "OFAC-SDN": {
+        "source_name": "OFAC",
+        "list_name": "OFAC-SDN",
+        "url": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN_ENHANCED.XML",
+        "file_type": "xml",
+        "root_tag": "entity",
+        "external_id_path":"id",
+        "schedule": "daily",
+    },
+
     "UKSL": {
         "source_name": "UKSL",
         "url": "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml",
@@ -25,14 +36,7 @@ WATCHLIST_CONFIGS = {
         
     },
 
-    "OFAC-SDN": {
-        "source_name": "OFAC",
-        "url": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN_ENHANCED.XML",
-        "file_type": "xml",
-        "root_tag": "entity",
-        "external_id_path":"id",
-        "schedule": "daily",
-    },
+
 
     "OFAC-NON-SDN": {
         "source_name": "OFAC-NON-SDN",
