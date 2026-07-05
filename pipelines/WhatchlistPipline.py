@@ -41,6 +41,7 @@ class WatchlistPipeline:
     ):
         self.config = config
         self.source_name = config["source_name"]
+        self.list_name = config.get("list_name", self.source_name)
         self.external_id_path = config["external_id_path"]
         self.downloader = downloader
         self.pre_normalizer = pre_normalizer
@@ -155,7 +156,7 @@ class WatchlistPipeline:
             )
             # print("AFTER PREPROCESSING:", current_record)
             current_record = self.pre_normalizer.pre_normalize_record(
-                source=self.source_name,
+                source=self.list_name,
                 raw_json=current_record,
             )
             # print("AFTER PRE_NORMALIZER:", current_record)
@@ -187,7 +188,7 @@ class WatchlistPipeline:
         final_dir = ROOT_DIR / "data" / "final"
         final_dir.mkdir(parents=True, exist_ok=True)
 
-        output_file_path = final_dir / f"{self.source_name}_final.jsonl"
+        output_file_path = final_dir / f"{self.list_name}_final.jsonl"
 
         with open(output_file_path, "w", encoding="utf-8") as f:
             for record in final_records:
@@ -217,8 +218,8 @@ if __name__ == "__main__":
     )
 
     mapping_rules = load_rules(
-        mapping_file=rules_dir / "mapping.xlsx",
-        source_name=config["source_name"],
+    mapping_file=rules_dir / "mapping.xlsx",
+    source_name=config.get("list_name", config["source_name"]),
     )
 
     mapper = MappingEngine(mapping_rules)
