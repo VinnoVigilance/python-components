@@ -8,7 +8,10 @@ from collections import defaultdict
 from pathlib import Path
 
 RULES_DIR = Path(__file__).resolve().parent.parent / "data" / "rules"
-LOOKUP_FILE = RULES_DIR / "lookupTables.xlsx"
+LOOKUP_FILE = RULES_DIR / "pickLists.xlsx"
+
+_LOOKUP_DF = None
+_LOOKUP_CACHE = {}
 
 
 # =========================================================
@@ -148,43 +151,47 @@ def values_equal(a: Any, b: Any) -> bool:
     return normalize_bool(a) == normalize_bool(b)
 
 
-
-
 def get_expected_values(expected_expr: str):
-    """
-    Supports both old fixed values and new lookup-based values.
+    global _LOOKUP_DF
 
-    Old format:
-        Alias
-
-    Multiple fixed values:
-        AKA, Former Name, Native Name
-
-    Lookup format:
-        lookup:Aliases.AliasType
-    """
     expected_expr = unquote(expected_expr).strip()
 
     if expected_expr.startswith("lookup:"):
-        sheet_name = expected_expr.replace("lookup:", "", 1).strip()
-        df = pd.read_excel(LOOKUP_FILE, sheet_name=sheet_name)
+        lookup_path = expected_expr.replace("lookup:", "", 1).strip().lower()
 
-        if "Value" not in df.columns:
-            raise ValueError(f"Sheet '{sheet_name}' must have a 'Value' column")
+        if lookup_path in _LOOKUP_CACHE:
+            return _LOOKUP_CACHE[lookup_path]
 
-        return [
+        if _LOOKUP_DF is None:
+            _LOOKUP_DF = pd.read_excel(LOOKUP_FILE)
+
+            required_columns = {"Path", "Value"}
+            missing_columns = required_columns - set(_LOOKUP_DF.columns)
+
+            if missing_columns:
+                raise ValueError(
+                    f"pickLists.xlsx must have these columns: {missing_columns}"
+                )
+
+        matched = _LOOKUP_DF[
+            _LOOKUP_DF["Path"].astype(str).str.strip().str.lower()
+            == lookup_path
+        ]
+
+        values = [
             str(x).strip().lower()
-            for x in df["Value"].dropna().tolist()
+            for x in matched["Value"].dropna().tolist()
             if str(x).strip()
         ]
+
+        _LOOKUP_CACHE[lookup_path] = values
+        return values
 
     return [
         str(x).strip().lower()
         for x in expected_expr.split(",")
         if x.strip()
     ]
-
-
 def normalize_scalar(value: Any, fallback=""):
     if value is None:
         return fallback
