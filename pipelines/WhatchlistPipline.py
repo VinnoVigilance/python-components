@@ -115,6 +115,18 @@ class WatchlistPipeline:
             rules=self.config.get("preprocessing", [])
         )
 
+        raw_dir = ROOT_DIR / "data" / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+
+        raw_output_file_path = raw_dir / f"{self.list_name}_RAW.jsonl"
+
+        with open(raw_output_file_path, "w", encoding="utf-8") as f:
+            for record in raw_records:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+        print(f"RAW output saved at: {raw_output_file_path}")
+
+
 
         raw_count = 0
         staging_count = 0

@@ -26,6 +26,16 @@ WATCHLIST_CONFIGS = {
         "schedule": "daily",
     },
 
+        "OFAC-NON-SDN": {
+        "source_name": "OFAC",
+        "list_name": "OFAC-NON-SDN",
+        "url": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/CONS_ENHANCED.XML",
+        "file_type": "xml",
+        "root_tag": "entity",
+        "external_id_path":"id",
+        "schedule": "daily",
+    },
+
     "UKSL": {
         "source_name": "UKSL",
         "url": "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml",
@@ -37,15 +47,6 @@ WATCHLIST_CONFIGS = {
     },
 
 
-
-    "OFAC-NON-SDN": {
-        "source_name": "OFAC-NON-SDN",
-        "url": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/CONS_ENHANCED.XML",
-        "file_type": "xml",
-        "root_tag": "entity",
-        "external_id_path":"id",
-        "schedule": "daily",
-    },
 
     
     "AMLC-DNFBP": {
