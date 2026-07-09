@@ -147,7 +147,8 @@ WATCHLIST_CONFIGS = {
         ]
     },
     "EU-DESIGNATED-VESSELS": {
-        "source_name": "EU-DESIGNATED-VESSELS",
+        "list_name": "EU-DESIGNATED-VESSELS",
+        "source_name": "EU",
         "url": "https://dk9q89lxhn3e0.cloudfront.net/EU+designated+vessels+consolidated.xlsx",
         "file_type": "xlsx",
         "external_id_path": "IMO number",

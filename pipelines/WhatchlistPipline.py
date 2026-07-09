@@ -222,7 +222,7 @@ if __name__ == "__main__":
     source_config_df = pd.read_excel(rules_dir / "sourceConfig.xlsx")
     post_rules_df = pd.read_excel(rules_dir / "postNormalization.xlsx")
 
-    config = WATCHLIST_CONFIGS["DNFBP"]
+    config = WATCHLIST_CONFIGS["EU-DESIGNATED-VESSELS"]
 
     pre_normalizer = PreNormalizationEngine(
         prenormalization_df=prenorm_df,
