@@ -139,7 +139,7 @@ class PreProcessingEngine:
         ]
 
         if any(keyword in name_upper for keyword in org_keywords):
-            record[output_field] = "Organization"
+            record[output_field] = "Entity"
             return record
 
         parsed_name = HumanName(name)
@@ -147,7 +147,7 @@ class PreProcessingEngine:
         if parsed_name.first and parsed_name.last:
             record[output_field] = "Individual"
         else:
-            record[output_field] = "Organization"
+            record[output_field] = "Entity"
 
         return record
 

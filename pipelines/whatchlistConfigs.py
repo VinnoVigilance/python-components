@@ -1,7 +1,7 @@
 # pipelines/watchlist_configs.py
 WATCHLIST_CONFIGS = {
     
-       "DFAT": {
+    "DFAT": {
         "source_name": "DFAT",
         "list_name": "DFAT",
         "url": "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx",
@@ -26,7 +26,7 @@ WATCHLIST_CONFIGS = {
         "schedule": "daily",
     },
 
-        "OFAC-NON-SDN": {
+    "OFAC-NON-SDN": {
         "source_name": "OFAC",
         "list_name": "OFAC-NON-SDN",
         "url": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/CONS_ENHANCED.XML",
@@ -37,7 +37,8 @@ WATCHLIST_CONFIGS = {
     },
 
     "UKSL": {
-        "source_name": "UKSL",
+        "source_name": "OFSI",
+        "list_name": "UKSL",
         "url": "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml",
         "file_type": "xml",
         "root_tag": "Designation",
@@ -46,13 +47,12 @@ WATCHLIST_CONFIGS = {
         
     },
 
-
-
-    
-    "AMLC-DNFBP": {
-    "source_name": "DNFBP",
+    "DNFBP": {
+    "source_name": "AMLC",
+    "list_name": "DNFBP",
     "external_id_path": "unique_id",
-    "url": "http://www.amlc.gov.ph/images/PDFs/Main/DNFBP033126.pdf",
+    "local_path": "data/downloads/a3923f9e-5afc-4102-9899-8fc5a8f07f41_Registered Designated Non-Financial Businesses and Professions (DNFBPs) as of 31 March 2026.pdf",
+    "url": r"https://www.amlc.gov.ph/storage/v1/object/public/random-uploads/documents/a3923f9e-5afc-4102-9899-8fc5a8f07f41_Registered%20Designated%20Non-Financial%20Businesses%20and%20Professions%20(DNFBPs)%20as%20of%2031%20March%202026.pdf",
     "file_type": "pdf",
     "schedule": "daily",
 
@@ -60,17 +60,18 @@ WATCHLIST_CONFIGS = {
         {
             "handler": "detect_entity_type",
             "config": {
-                "input_field": "INSTITUTION CODE",
+                "input_field": "INSTITUTION NAME",
                 "output_field": "entity_type"
             }
         }
     ]
 },
     "ATC-DESIGNATED-TERRORIST-INDIVIDUALS": {
-        "source_name": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS",
+        "source_name": "ATC",
+        "list_name": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS",
         "url": "https://atc.gov.ph/individuals/",
         "file_type": "html",
-        "external_id": "unique_id",
+        "external_id_path": "unique_id",
         "schedule": "daily",
         "local_path": "data/downloads/Designated Terrorist Individuals _ Anti-Terrorism Council.html",
         "profile_dir": "data/downloads/profiles",
@@ -125,7 +126,8 @@ WATCHLIST_CONFIGS = {
         ]
     },
     "ATC-DESIGNATED-TERRORIST-GROUPS": {
-        "source_name": "ATC-DESIGNATED-TERRORIST-GROUPS",
+        "source_name": "ATC",
+        "list_name": "ATC-DESIGNATED-TERRORIST-GROUPS",
         "url": "https://atc.gov.ph/groups/",
         "file_type": "html",
         "external_id_path": "unique_id",

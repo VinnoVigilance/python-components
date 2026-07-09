@@ -64,6 +64,7 @@ def date_normalization_handler(entity, rule):
     seen = set()
 
     for item in values:
+        item_type = item.get("Type") or item.get("type") or ""
         raw_text = (
             item.get("Note")
             or item.get("note")
@@ -98,7 +99,7 @@ def date_normalization_handler(entity, rule):
                         "Day": "",
                         "Month": "",
                         "Year": "",
-                        "Type": "",
+                        "Type": item_type,
                         "IsApproximate": "",
                         "Note": part,
                     })
@@ -193,7 +194,7 @@ def date_normalization_handler(entity, rule):
                         "Day": day,
                         "Month": month,
                         "Year": year,
-                        "Type": "",
+                        "Type": item_type,
                         "IsApproximate": (
                             "true"
                             if "approx" in part.lower()

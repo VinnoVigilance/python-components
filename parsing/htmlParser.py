@@ -11,17 +11,17 @@ class HtmlParser:
         It is intentionally similar to TabularParser.parse(file_path, config),
         so the pipeline can call all parsers in the same way.
         """
-        source_name = config.get("source_name")
+        list_name = config.get("list_name")
 
         handlers = {
             "ATC-DESIGNATED-TERRORIST-INDIVIDUALS": self.parse_atc_designated_terrorist_individuals,
             "ATC-DESIGNATED-TERRORIST-GROUPS": self.parse_atc_designated_terrorist_groups,
         }
 
-        handler = handlers.get(source_name)
+        handler = handlers.get(list_name)
 
         if handler is None:
-            raise ValueError(f"No HTML handler found for source: {source_name}")
+            raise ValueError(f"No HTML handler found for source: {list_name}")
 
         return handler(file_path)
 
@@ -87,7 +87,7 @@ class HtmlParser:
                 continue
 
             records.append({
-                "entity_type": "Organization",
+                "entity_type": "Entity",
                 "name": name,
                 "category": category,
                 "atc_resolution_no": resolution,

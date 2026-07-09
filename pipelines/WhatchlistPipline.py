@@ -101,10 +101,10 @@ class WatchlistPipeline:
 
         print(downloaded_file_path)
 
-        raw_records = self.parser.parse(
+        raw_records = list(self.parser.parse(
             file_path=downloaded_file_path,
             config=self.config,
-        )
+        ))
         raw_records = self.enrichment_engine.enrich_dataset(
             records=raw_records,
             rules=self.config.get("enrichment", [])
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     source_config_df = pd.read_excel(rules_dir / "sourceConfig.xlsx")
     post_rules_df = pd.read_excel(rules_dir / "postNormalization.xlsx")
 
-    config = WATCHLIST_CONFIGS["DFAT"]
+    config = WATCHLIST_CONFIGS["DNFBP"]
 
     pre_normalizer = PreNormalizationEngine(
         prenormalization_df=prenorm_df,

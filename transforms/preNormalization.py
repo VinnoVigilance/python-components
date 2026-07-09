@@ -88,6 +88,54 @@ class BeforeParenthesisHandler(BaseHandler):
         value = value.replace(":", "")
 
         return value.strip()
+    
+# =========================================================
+# DATE
+# =========================================================
+    
+class DateFormatHandler(BaseHandler):
+
+    """
+    Rule examples:
+
+    MM/DD/YYYY
+    DD/MM/YYYY
+    """
+
+    def normalize(self, value, rule):
+
+        if value is None:
+            return value
+
+        value = str(value).strip()
+
+        if not value:
+            return value
+
+        if not re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", value):
+            return value
+
+        first, second, year = value.split("/")
+
+        first = int(first)
+        second = int(second)
+
+        rule = str(rule).strip().upper()
+
+        # MM/DD/YYYY
+        if rule == "MM/DD/YYYY":
+            month = first
+            day = second
+
+        # DD/MM/YYYY
+        elif rule == "DD/MM/YYYY":
+            day = first
+            month = second
+
+        else:
+            return value
+
+        return f"{year}-{month:02}-{day:02}"
 
 
 # =========================================================
@@ -98,6 +146,7 @@ HANDLERS = {
     "enum": EnumHandler(),
     "before_parenthesis": BeforeParenthesisHandler(),
     "remove_list_markers": RemoveListMarkersHandler(),
+    "date_format": DateFormatHandler(),
 }
 
 
@@ -243,7 +292,7 @@ class PreNormalizationEngine:
             result[source] = entity_field
 
         return result
-
+    
     # -----------------------------------------------------
     # Detect Entity Type
     # -----------------------------------------------------
