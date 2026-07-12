@@ -46,7 +46,7 @@ class XmlParser:
         self,
         xml_file,
         output_file=None,
-        root_tag="Designation"
+        root_tags=["Designation"]
     ):
 
         if output_file is None:
@@ -71,8 +71,7 @@ class XmlParser:
 
             for _, elem in context:
 
-                if elem.tag.endswith(root_tag):
-
+                if any(elem.tag.endswith(tag) for tag in root_tags):
                     data = self.elem_to_dict(elem)
 
                     f.write(
@@ -83,7 +82,6 @@ class XmlParser:
                     )
 
                     count += 1
-
                     elem.clear()
 
         print(f"Done: {count}")
@@ -92,7 +90,7 @@ class XmlParser:
 
     def parse(self, file_path, config):
 
-        root_tag = config.get("root_tag", "Designation")
+        root_tags = config.get("root_tags", ["Designation"])
 
         context = etree.iterparse(
             file_path,
@@ -102,7 +100,7 @@ class XmlParser:
 
         for _, elem in context:
 
-            if elem.tag.endswith(root_tag):
+            if elem.tag.endswith(root_tags):
 
                 data = self.elem_to_dict(elem)
 
