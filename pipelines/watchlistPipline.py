@@ -14,7 +14,7 @@ from transforms.preNormalization import PreNormalizationEngine
 from transforms.fieldMapper import load_rules, MappingEngine
 from transforms.postNormalization import PostNormalizationEngine
 from ingestion.downloader import interface as downloader
-from pipelines.whatchlistConfigs import WATCHLIST_CONFIGS
+from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
 from parsing.xmlParser import XmlParser
 from parsing.pdfParser import PdfParser
 from parsing.htmlParser import HtmlParser
