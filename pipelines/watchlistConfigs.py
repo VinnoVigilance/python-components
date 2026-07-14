@@ -162,7 +162,8 @@ WATCHLIST_CONFIGS = {
         ]
     },
     "EU-TRAVEL-BAN": {
-        "source_name": "EU-TRAVEL-BAN",
+        "list_name": "EU-TRAVEL-BAN",
+        "source_name": "EU",
         "url": "https://www.sanctionsmap.eu/api/v1/travelbans/file/101",
         "file_type": "xml",
         "external_id_path": "logicalId",
