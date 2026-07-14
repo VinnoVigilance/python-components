@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-
+# Add project root to path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
@@ -16,10 +16,16 @@ from parsing.xmlParser import XmlParser
 from parsing.tabularParser import TabularParser
 from schemaExtractor import extract_schema, schema_to_rows
 
+# Import watchlist configs
+from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
 
 DATA_DIR = ROOT_DIR / "data"
 SEC_DATA_DIR = DATA_DIR / "sec"
 
+
+# ============================================================================
+# PAGE CONFIGURATION
+# ============================================================================
 
 st.set_page_config(
     page_title="VPAT",
@@ -59,6 +65,10 @@ st.title("VV Production Analyst Tools - VPAT")
 st.caption("Production helper tools for analysts")
 
 
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
 def ensure_sec_directories(base_dir: Path = SEC_DATA_DIR) -> None:
     for sub_dir in [
         "pdf/raw",
@@ -76,7 +86,6 @@ def load_json_file(path: Path) -> Any:
 
 def save_json_file(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
@@ -84,9 +93,7 @@ def save_json_file(path: Path, data: Any) -> None:
 def show_pdf(path: Path) -> None:
     with open(path, "rb") as f:
         pdf_bytes = f.read()
-
     base64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
-
     st.markdown(
         f"""
         <iframe
@@ -104,10 +111,8 @@ def display_value(value: Any) -> str:
     if isinstance(value, (dict, list)):
         text = json.dumps(value, ensure_ascii=False)
         return "—" if text.strip() in ["{}", "[]"] else text
-
     if value is None:
         return "—"
-
     text = str(value).strip()
     return "—" if text == "" else text
 
@@ -115,52 +120,112 @@ def display_value(value: Any) -> str:
 def edit_value(original_value: Any, edited_text: str) -> Any:
     if isinstance(original_value, (dict, list)):
         return json.loads(edited_text)
-
     if original_value is None:
         return None if edited_text.strip() == "" else edited_text
-
     if isinstance(original_value, bool):
         return edited_text.lower() in ["true", "1", "yes"]
-
     if isinstance(original_value, int):
         try:
             return int(edited_text)
         except ValueError:
             return edited_text
-
     if isinstance(original_value, float):
         try:
             return float(edited_text)
         except ValueError:
             return edited_text
-
     return edited_text
 
 
 def normalize_entities(data: Any) -> list[dict]:
     if isinstance(data, list):
         return data
-
     if isinstance(data, dict):
         return [data]
-
     return []
 
 
 def get_entity_display_name(entity: dict, index: int) -> str:
     names = entity.get("Names", [])
-
     if isinstance(names, list) and names:
         first_name = names[0]
-
         if isinstance(first_name, dict):
             name = first_name.get("Name", "")
-
             if name:
                 return f"{index + 1}. {name}"
-
     return f"{index + 1}. Entity {index + 1}"
 
+
+def parse_root_tags(input_value: str) -> list:
+    """
+    Parse root tags from comma-separated input.
+    Returns a list of trimmed tags.
+    """
+    if not input_value or not input_value.strip():
+        return ["Designation"]
+    
+    # Split by comma and clean each tag
+    tags = [tag.strip() for tag in input_value.split(",") if tag.strip()]
+    return tags if tags else ["Designation"]
+
+def get_xml_sources():
+    return {
+        name: config
+        for name, config in WATCHLIST_CONFIGS.items()
+        if config.get("file_type") == "xml"
+    }
+
+
+def detect_source_for_file(filename: str, xml_sources: dict):
+    # Try exact match
+    for source_name in xml_sources.keys():
+        if source_name in filename.upper():
+            return source_name, xml_sources[source_name]
+
+    # Pattern-based matching
+    patterns = {
+        "OFAC": "OFAC-SDN",
+        "OFSI": "UKSL",
+        "UKSL": "UKSL",
+        "UN": "UN",
+        "EU": "EU-TRAVEL-BAN",
+        "TRAVEL": "EU-TRAVEL-BAN",
+        "SDN": "OFAC-SDN",
+        "NON-SDN": "OFAC-NON-SDN",
+    }
+
+    for pattern, source_name in patterns.items():
+        if pattern in filename.upper():
+            if source_name in xml_sources:
+                return source_name, xml_sources[source_name]
+
+    return None, {}
+
+def normalize_dataframe_data(records: list) -> list:
+    """
+    Normalize records to ensure all values of the same column have consistent types.
+    Converts list values to strings for display.
+    """
+    normalized = []
+    for record in records:
+        normalized_record = {}
+        for key, value in record.items():
+            if isinstance(value, list):
+                # Convert list to JSON string for display
+                normalized_record[key] = json.dumps(value, ensure_ascii=False)
+            elif isinstance(value, dict):
+                # Convert dict to JSON string for display
+                normalized_record[key] = json.dumps(value, ensure_ascii=False)
+            elif value is None:
+                normalized_record[key] = ""
+            else:
+                normalized_record[key] = value
+        normalized.append(normalized_record)
+    return normalized
+
+# ============================================================================
+# SIDEBAR - TOOL SELECTION
+# ============================================================================
 
 tool = st.sidebar.selectbox(
     "Select Tool",
@@ -173,9 +238,9 @@ tool = st.sidebar.selectbox(
 )
 
 
-# =========================================================
-# Tool 1: Source File Parser
-# =========================================================
+# ============================================================================
+# TOOL 1: SOURCE FILE PARSER
+# ============================================================================
 
 if tool == "Source File Parser":
 
@@ -196,25 +261,50 @@ if tool == "Source File Parser":
             ["Auto Detect", "XML", "Excel / CSV"]
         )
 
-        config = {}
+        xml_sources = get_xml_sources()
+        _, config = detect_source_for_file(uploaded_file.name, xml_sources)
 
+        if config is None:
+            config = {}
+
+        # ====================================================================
+        # XML CONFIGURATION - SIMPLE ROOT TAGS INPUT
+        # ====================================================================
+        
         if file_type == "XML" or suffix == ".xml":
-            config["root_tag"] = st.text_input(
-                "Root Tag",
-                value="Designation"
+            
+            st.subheader("XML Configuration")
+            
+            root_tags_input = st.text_input(
+                "Root Tags (Optional - leave empty to use watchlist config/default)",
+                value="",
+                help="Example: Designation, sanctionEntity, entity"
             )
 
+            root_tags = (
+                parse_root_tags(root_tags_input)
+                if root_tags_input.strip()
+                else None
+            )
+
+        # ====================================================================
+        # EXCEL / CSV CONFIGURATION
+        # ====================================================================
+        
         if file_type == "Excel / CSV" or suffix in [".xlsx", ".xls", ".csv"]:
             sheet_name = st.text_input(
                 "Sheet Name / Index",
                 value="0"
             )
-
             try:
                 config["sheet_name"] = int(sheet_name)
             except ValueError:
                 config["sheet_name"] = sheet_name
 
+        # ====================================================================
+        # PARSE BUTTON
+        # ====================================================================
+        
         if st.button("Parse File"):
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -227,18 +317,28 @@ if tool == "Source File Parser":
                 if file_type == "Auto Detect":
                     if suffix == ".xml":
                         parser = XmlParser()
-                        records = list(parser.parse(input_path, config))
-
+                        records = list(
+                            parser.parse(
+                                input_path,
+                                config=config,
+                                root_tags=root_tags
+                            )
+                        )
                     elif suffix in [".xlsx", ".xls", ".csv"]:
                         parser = TabularParser(output_dir="output")
                         records = list(parser.parse(input_path, config))
-
                     else:
                         st.error(f"Unsupported file type: {suffix}")
 
                 elif file_type == "XML":
                     parser = XmlParser()
-                    records = list(parser.parse(input_path, config))
+                    records = list(
+                        parser.parse(
+                            input_path,
+                            config=config,
+                            root_tags=root_tags
+                        )
+                    )
 
                 elif file_type == "Excel / CSV":
                     parser = TabularParser(output_dir="output")
@@ -247,9 +347,11 @@ if tool == "Source File Parser":
                 if records:
                     st.success(f"Parsed {len(records)} records successfully.")
 
+                    # Normalize the records for display
+                    normalized_records = normalize_dataframe_data(records[:50])
                     st.dataframe(
-                        records[:50],
-                        use_container_width=True
+                        normalized_records,
+                        width="stretch"
                     )
 
                     jsonl_output = "\n".join(
@@ -270,9 +372,9 @@ if tool == "Source File Parser":
                 st.error(f"Error while parsing file: {e}")
 
 
-# =========================================================
-# Tool 2: Schema Explorer
-# =========================================================
+# ============================================================================
+# TOOL 2: SCHEMA EXPLORER
+# ============================================================================
 
 elif tool == "Schema Explorer":
 
@@ -300,7 +402,7 @@ elif tool == "Schema Explorer":
 
             st.dataframe(
                 schema_rows,
-                use_container_width=True
+                width="stretch"
             )
 
             schema_json = json.dumps(
@@ -324,9 +426,9 @@ elif tool == "Schema Explorer":
             st.error(f"Error while extracting schema: {e}")
 
 
-# =========================================================
-# Tool 3: Value Explorer
-# =========================================================
+# ============================================================================
+# TOOL 3: VALUE EXPLORER
+# ============================================================================
 
 elif tool == "Value Explorer":
 
@@ -356,12 +458,9 @@ elif tool == "Value Explorer":
                 for value in values:
                     if value is None:
                         continue
-
                     if isinstance(value, (dict, list)):
                         continue
-
                     clean_value = str(value).strip()
-
                     if clean_value:
                         unique_values.add(clean_value)
 
@@ -374,7 +473,7 @@ elif tool == "Value Explorer":
 
         st.dataframe(
             [{"value": value} for value in sorted_values],
-            use_container_width=True
+            width="stretch"
         )
 
         st.download_button(
@@ -389,9 +488,9 @@ elif tool == "Value Explorer":
                 st.write(errors)
 
 
-# =========================================================
-# Tool 4: SEC PDF JSON Review
-# =========================================================
+# ============================================================================
+# TOOL 4: SEC PDF JSON REVIEW
+# ============================================================================
 
 elif tool == "SEC PDF JSON Review":
 
@@ -439,11 +538,11 @@ elif tool == "SEC PDF JSON Review":
                 approved_json_path = selected_year_approved_dir / f"{pdf_path.stem}.json"
 
                 if approved_json_path.exists():
-                    label = f"✅ {pdf_path.name}"
+                    label = f"[Approved] {pdf_path.name}"
                 elif extracted_json_path.exists():
-                    label = f"🟡 {pdf_path.name}"
+                    label = f"[Extracted] {pdf_path.name}"
                 else:
-                    label = f"⚪ {pdf_path.name}"
+                    label = f"[New] {pdf_path.name}"
 
                 pdf_options[label] = pdf_path
 
@@ -594,7 +693,7 @@ elif tool == "SEC PDF JSON Review":
                                 if st.button(
                                     "✏️",
                                     key=f"edit_{field_key}",
-                                    use_container_width=True
+                                    width="stretch"
                                 ):
                                     st.session_state[editing_key][field_key] = True
                                     st.session_state[approved_key][field_key] = False
@@ -604,7 +703,7 @@ elif tool == "SEC PDF JSON Review":
                                 if st.button(
                                     "✅",
                                     key=f"approve_{field_key}",
-                                    use_container_width=True
+                                    width="stretch"
                                 ):
                                     st.session_state[approved_key][field_key] = True
                                     st.session_state[editing_key][field_key] = False
@@ -636,7 +735,7 @@ elif tool == "SEC PDF JSON Review":
                                     if st.button(
                                         "Save",
                                         key=f"save_{field_key}",
-                                        use_container_width=True
+                                        width="stretch"
                                     ):
                                         try:
                                             new_value = edit_value(
@@ -657,7 +756,7 @@ elif tool == "SEC PDF JSON Review":
                                     if st.button(
                                         "Cancel",
                                         key=f"cancel_{field_key}",
-                                        use_container_width=True
+                                        width="stretch"
                                     ):
                                         st.session_state[editing_key][field_key] = False
                                         st.rerun()
@@ -687,7 +786,7 @@ elif tool == "SEC PDF JSON Review":
                             "Save Final Approved JSON",
                             type="primary",
                             key=f"final_approve_{pdf_key}",
-                            use_container_width=True
+                            width="stretch"
                         ):
                             save_json_file(
                                 approved_json_path,
@@ -707,5 +806,5 @@ elif tool == "SEC PDF JSON Review":
                             ),
                             file_name=f"{selected_pdf_path.stem}.json",
                             mime="application/json",
-                            use_container_width=True
+                            width="stretch"
                         )

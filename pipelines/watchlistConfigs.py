@@ -21,7 +21,7 @@ WATCHLIST_CONFIGS = {
         "list_name": "OFAC-SDN",
         "url": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN_ENHANCED.XML",
         "file_type": "xml",
-        "root_tag": "entity",
+        "root_tags": ["entity"],
         "external_id_path":"id",
         "schedule": "daily",
     },
@@ -31,7 +31,7 @@ WATCHLIST_CONFIGS = {
         "list_name": "OFAC-NON-SDN",
         "url": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/CONS_ENHANCED.XML",
         "file_type": "xml",
-        "root_tag": "entity",
+        "root_tags": ["entity"],
         "external_id_path":"id",
         "schedule": "daily",
     },
@@ -41,7 +41,7 @@ WATCHLIST_CONFIGS = {
         "list_name": "UKSL",
         "url": "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml",
         "file_type": "xml",
-        "root_tag": "Designation",
+        "root_tags": ["Designation"],
         "external_id_path":"UniqueID",
         "schedule": "daily",
         
@@ -166,7 +166,11 @@ WATCHLIST_CONFIGS = {
         "url": "https://www.sanctionsmap.eu/api/v1/travelbans/file/101",
         "file_type": "xml",
         "external_id_path": "logicalId",
-        "root_tag": "sanctionEntity",
+        "root_tags": ["sanctionEntity"],
         "schedule": "daily",
     },
+    "UN": {
+        "file_type": "xml",
+        "root_tags": ["INDIVIDUAL", "ENTITY", "sanctionEntity"],
+    }
 }
