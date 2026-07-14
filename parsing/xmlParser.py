@@ -46,8 +46,18 @@ class XmlParser:
         self,
         xml_file,
         output_file=None,
-        root_tags=["Designation"]
+        config=None,
+        root_tags=None
     ):
+        # Priority:
+        # 1. Explicit root_tags argument
+        # 2. root_tags from config
+        # 3. Default
+        if root_tags is None:
+            if config is not None:
+                root_tags = config.get("root_tags", ["Designation"])
+            else:
+                root_tags = ["Designation"]
 
         if output_file is None:
 
@@ -88,9 +98,21 @@ class XmlParser:
 
         return output_file
 
-    def parse(self, file_path, config):
-
-        root_tags = config.get("root_tags", ["Designation"])
+    def parse(
+        self,
+        file_path,
+        config=None,
+        root_tags=None
+    ):
+        # Priority:
+        # 1. Explicit root_tags argument
+        # 2. root_tags from config
+        # 3. Default
+        if root_tags is None:
+            if config is not None:
+                root_tags = config.get("root_tags", ["Designation"])
+            else:
+                root_tags = ["Designation"]
 
         context = etree.iterparse(
             file_path,
@@ -100,7 +122,7 @@ class XmlParser:
 
         for _, elem in context:
 
-            if elem.tag.endswith(root_tags):
+            if any(elem.tag.endswith(tag) for tag in root_tags):
 
                 data = self.elem_to_dict(elem)
 
@@ -116,7 +138,7 @@ if __name__ == "__main__":
     output_file = parser.run_xml_ingestion(
         xml_file="/Users/mac/Desktop/VV_Python_Project/20260430-FULL-1_1(xsd).xml",
         output_file="EU_full.jsonl",
-        root_tag="sanctionEntity"
+        root_tags=["sanctionEntity"]
     )
 
     print(f"Output: {output_file}")

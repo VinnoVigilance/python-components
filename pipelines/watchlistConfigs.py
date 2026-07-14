@@ -171,6 +171,6 @@ WATCHLIST_CONFIGS = {
     },
     "UN": {
         "file_type": "xml",
-        "root_tags": ["INDIVIDUAL", "ENTITY"],
+        "root_tags": ["INDIVIDUAL", "ENTITY", "sanctionEntity"],
     }
 }
