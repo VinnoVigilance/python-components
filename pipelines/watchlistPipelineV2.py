@@ -1,258 +1,110 @@
 # pipelines/watchlistPipelineV2.py
 
-"""
-High-level orchestration for the Raw-to-Core watchlist ingestion flow.
-
-This module intentionally contains only the main pipeline stages.
-The detailed implementation of acquisition, persistence, logging,
-normalization, versioning, and transactions will be completed in
-their dedicated tasks.
-"""
-
-from __future__ import annotations
-
+from pprint import pprint
 from time import perf_counter
 from typing import Any
+from pathlib import Path
+import sys
 
-from parsing.parserFactory import create_parser
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT_DIR))
+
+from ingestion.downloader import interface as downloader
+from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+from services.watchlistPipeline import watchlistFileService
 
 
-class WatchlistPipelineV2:
-    """
-    Coordinates the main watchlist ingestion stages.
+def run_watchlist_pipeline(
+    watchlist_name: str,
+) -> dict[str, Any]:
+    """Run the implemented watchlist pipeline stages."""
 
-    Pipeline flow:
-
-        Acquire Source File
-                ↓
-        Register Source File
-                ↓
-        Validate Source File
-                ↓
-        Parse Source Entities
-                ↓
-        Store Immutable Raw Entities
-                ↓
-        Normalize Raw Dataset
-                ↓
-        Detect and Store Core Member Versions
-                ↓
-        Complete Pipeline
-
-    This class should remain a high-level orchestrator.
-    Detailed business and persistence logic must be added in the
-    corresponding tasks without changing the overall execution flow.
-    """
-
-    def __init__(
-        self,
-        config: dict[str, Any],
-        downloader: Any,
-    ) -> None:
-        self.config = config
-        self.downloader = downloader
-
-        self.source_name = config["source_name"]
-        self.list_name = config.get("list_name", self.source_name)
-        self.file_type = config["file_type"]
-
-    def run(self) -> dict[str, Any]:
-        """Execute the complete watchlist ingestion flow."""
-
-        started_at = perf_counter()
-
-        source_file_path = self.acquire_source_file()
-
-        raw_file_id = self.register_source_file(
-            source_file_path=source_file_path,
+    if watchlist_name not in WATCHLIST_CONFIGS:
+        available_watchlists = ", ".join(
+            sorted(WATCHLIST_CONFIGS)
         )
 
-        self.validate_source_file(
-            source_file_path=source_file_path,
-            raw_file_id=raw_file_id,
+        raise ValueError(
+            f"Unknown watchlist: {watchlist_name}. "
+            f"Available watchlists: {available_watchlists}"
         )
 
-        raw_entities = self.parse_source_entities(
-            source_file_path=source_file_path,
-        )
+    started_at = perf_counter()
+    config: dict[str, Any] = WATCHLIST_CONFIGS[watchlist_name]
 
-        stored_raw_entities = self.store_raw_entities(
-            raw_file_id=raw_file_id,
-            entities=raw_entities,
-        )
-
-        canonical_entities = self.normalize_raw_dataset(
-            raw_file_id=raw_file_id,
-            entities=stored_raw_entities,
-        )
-
-        core_result = self.persist_core_members(
-            raw_file_id=raw_file_id,
-            entities=canonical_entities,
-        )
-
-        self.complete_pipeline(
-            raw_file_id=raw_file_id,
-        )
-
-        return {
-            "source_name": self.source_name,
-            "list_name": self.list_name,
-            "raw_file_id": raw_file_id,
-            "raw_record_count": len(stored_raw_entities),
-            "core_result": core_result,
-            "elapsed_seconds": round(
-                perf_counter() - started_at,
-                2,
-            ),
-        }
-
-    def acquire_source_file(self):
-        """
-        Acquire the source file.
-
-        TODO:
-            Complete in:
-            Implement Unified File Acquisition for Manual and
-            Automatically Downloaded Sources.
-        """
-        raise NotImplementedError(
-            "Source file acquisition is not implemented yet."
-        )
-
-    def register_source_file(
-        self,
-        source_file_path,
-    ):
-        """
-        Register the downloaded or manually provided source file.
-
-        TODO:
-            Complete in:
-            Implement Source File Registration, Metadata Extraction,
-            Hashing, and Duplicate Detection.
-        """
-        raise NotImplementedError(
-            "Source file registration is not implemented yet."
-        )
-
-    def validate_source_file(
-        self,
-        source_file_path,
-        raw_file_id,
-    ) -> None:
-        """
-        Validate the source file before parsing.
-
-        TODO:
-            Complete in:
-            Implement Source File Validation and Error Handling Workflow.
-        """
-        raise NotImplementedError(
-            "Source file validation is not implemented yet."
-        )
-
-    def parse_source_entities(
-        self,
-        source_file_path,
-    ) -> list[dict[str, Any]]:
-        """
-        Parse the source file into independent logical entities.
-
-        Parser selection is delegated to parserFactory.
-        """
-
-        parser = create_parser(self.file_type)
-
-        return list(
-            parser.parse(
-                file_path=source_file_path,
-                config=self.config,
-            )
-        )
-
-    def store_raw_entities(
-        self,
-        raw_file_id,
-        entities,
-    ):
-        """
-        Store immutable source entities in the Raw Layer.
-
-        TODO:
-            Complete in:
-            Implement Immutable Raw Entity Storage in
-            raw.unparsed_watchlist_payload.
-        """
-        raise NotImplementedError(
-            "Raw entity persistence is not implemented yet."
-        )
-
-    def normalize_raw_dataset(
-        self,
-        raw_file_id,
-        entities,
-    ):
-        """
-        Normalize the complete Raw dataset.
-
-        The final implementation may use record-level processing,
-        dataset-level processing, batching, or a combination of them.
-
-        TODO:
-            Complete in:
-            Integrate Existing Enrichment, Preprocessing, Mapping,
-            and Normalization Engines with the Raw Layer.
-        """
-        raise NotImplementedError(
-            "Raw dataset normalization is not implemented yet."
-        )
-
-    def persist_core_members(
-        self,
-        raw_file_id,
-        entities,
-    ):
-        """
-        Detect versions and persist Core members.
-
-        TODO:
-            Complete in:
-            Implement Core Watchlist Member Version Detection and
-            Version History Management.
-        """
-        raise NotImplementedError(
-            "Core member persistence is not implemented yet."
-        )
-
-    def complete_pipeline(
-        self,
-        raw_file_id,
-    ) -> None:
-        """
-        Mark the pipeline execution as completed.
-
-        TODO:
-            Complete in:
-            Implement Watchlist File Processing Status Management
-            and Event Logging.
-        """
-        raise NotImplementedError(
-            "Pipeline completion handling is not implemented yet."
-        )
-
-
-if __name__ == "__main__":
-    from ingestion.downloader import interface as downloader
-    from pipelines.whatchlistConfigs import WATCHLIST_CONFIGS
-
-    watchlist_name = "EU-DESIGNATED-VESSELS"
-
-    pipeline = WatchlistPipelineV2(
-        config=WATCHLIST_CONFIGS[watchlist_name],
+    source_file_path = watchlistFileService.acquire_source_file(
+        config=config,
         downloader=downloader,
     )
 
-    result = pipeline.run()
+    file_metadata = watchlistFileService.calculate_file_metadata(
+        file_path=source_file_path,
+    )
 
-    print(result)
+    lookup_values = watchlistFileService.resolve_lookup_values(
+    config=config,
+    )
+
+    download_method = config["download_method"]
+
+    duplicate_status = watchlistFileService.check_duplicate(
+        source_id=lookup_values["source_id"],
+        list_type_id=lookup_values["list_type_id"],
+        file_hash=file_metadata["file_hash"],
+    )
+
+
+    result = {
+        "watchlist_name": watchlist_name,
+        "source_name": config["source_name"],
+        "list_name": config.get(
+            "list_name",
+            config["source_name"],
+        ),
+        "source_file_path": str(source_file_path),
+        "file_metadata": file_metadata,
+        "lookup_values": lookup_values,
+        "download_method": download_method,
+        "duplicate_status": duplicate_status,
+    }
+
+    if duplicate_status == "DUPLICATE":
+        result["pipeline_result"] = "SKIPPED"
+        result["storage_path"] = None
+        result["elapsed_seconds"] = round(
+            perf_counter() - started_at,
+            2,
+        )
+
+        return result
+
+    if duplicate_status in {"FIRST_DOWNLOAD","NEW_VERSION",}:
+        storage_path = (
+            watchlistFileService.store_source_file(
+                config=config,
+                file_path=source_file_path,
+            )
+        )
+
+        result["pipeline_result"] = "CONTINUE"
+        result["storage_path"] = storage_path
+        result["elapsed_seconds"] = round(
+            perf_counter() - started_at,
+            2,
+        )
+
+        return result
+
+    raise RuntimeError(
+        f"Unknown duplicate status: {duplicate_status}"
+    )
+
+    
+
+
+if __name__ == "__main__":
+    result = run_watchlist_pipeline(
+        watchlist_name="EU-DESIGNATED-VESSELS",
+    )
+
+    pprint(result)
