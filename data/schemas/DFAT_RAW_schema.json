@@ -1,0 +1,152 @@
+{
+    "Reference": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Names": {
+        "type": "array",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Names[]": {
+        "type": "array",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Names[].Name of Individual or Entity": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 11026
+    },
+    "Names[].Name Type": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 11026
+    },
+    "Names[].Alias Strength": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 11026
+    },
+    "Type": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Date of Birth": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 2413
+    },
+    "Date of Birth[]": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 2413
+    },
+    "Place of Birth": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 1389
+    },
+    "Place of Birth[]": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 1389
+    },
+    "Citizenship": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 2128
+    },
+    "Citizenship[]": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 2128
+    },
+    "Address": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 1362
+    },
+    "Address[]": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 1362
+    },
+    "Additional Information": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 3284
+    },
+    "Additional Information[]": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 3284
+    },
+    "Listing Information": {
+        "type": "array",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Listing Information[]": {
+        "type": "array",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Committees": {
+        "type": "array",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Committees[]": {
+        "type": "array",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Control Date": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Instrument of Designation": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 3828
+    },
+    "Instrument of Designation[]": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 3828
+    },
+    "Targeted Financial Sanction": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Travel Ban": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Arms Embargo": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "Maritime Restriction": {
+        "type": "string",
+        "optional": false,
+        "occurrences": 3838
+    },
+    "IMO Number": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 261
+    },
+    "IMO Number[]": {
+        "type": "array",
+        "optional": true,
+        "occurrences": 261
+    }
+}

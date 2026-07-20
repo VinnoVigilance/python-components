@@ -248,6 +248,25 @@ def default_value(target_type: str):
     return ""
 
 
+# Words a source uses to say "there is nothing here". They carry no more
+# information than an empty cell, and glued into a concatenated string
+# they read as data: "Baghdad UNKNOWN". Treated as a missing value so the
+# existing "keep the default" guards handle them.
+#
+# Note: pickLists.xlsx defines "Unknown" as a legitimate value for Gender
+# and Measures.Status. No source currently produces it there, but if one
+# ever does it will be dropped by this and needs an exception.
+PLACEHOLDER_VALUES = {"N/A", "NA", "NONE", "NULL", "UNKNOWN", "-", "--"}
+
+
+def drop_placeholder(value: Any) -> Any:
+    """Turn a source's word for "nothing" into an actual nothing."""
+    if isinstance(value, str) and value.strip().upper() in PLACEHOLDER_VALUES:
+        return None
+
+    return value
+
+
 def strip_anchor_prefix(path: str, anchor: Optional[str]) -> str:
     if not path or not anchor:
         return path
@@ -276,7 +295,7 @@ def resolve_in_context(raw_json: dict, expr: str, item: Any = None, anchor: Opti
         return item if item is not None else None
 
     if item is not None:
-        value = JsonPath.get(item, expr)
+        value = drop_placeholder(JsonPath.get(item, expr))
 
         if value is not None:
             return value
@@ -287,12 +306,12 @@ def resolve_in_context(raw_json: dict, expr: str, item: Any = None, anchor: Opti
             if short_expr == "":
                 return item
 
-            value = JsonPath.get(item, short_expr)
+            value = drop_placeholder(JsonPath.get(item, short_expr))
 
             if value is not None:
                 return value
 
-    return JsonPath.get(raw_json, expr)
+    return drop_placeholder(JsonPath.get(raw_json, expr))
 
 
 def resolve_all_in_context(
@@ -310,8 +329,14 @@ def resolve_all_in_context(
 
         return JsonPath._as_list(item)
 
+    def keep(values):
+        return [
+            value for value in values
+            if drop_placeholder(value) is not None
+        ]
+
     if item is not None:
-        values = JsonPath.get_all(item, expr)
+        values = keep(JsonPath.get_all(item, expr))
 
         if values:
             return values
@@ -322,12 +347,12 @@ def resolve_all_in_context(
             if short_expr == "":
                 return JsonPath._as_list(item)
 
-            values = JsonPath.get_all(item, short_expr)
+            values = keep(JsonPath.get_all(item, short_expr))
 
             if values:
                 return values
 
-    return JsonPath.get_all(raw_json, expr)
+    return keep(JsonPath.get_all(raw_json, expr))
 
 
 def is_empty_value(v):
@@ -446,7 +471,7 @@ class ConcatPathHandler(BaseHandler):
         if not rule.source_value:
             return ""
 
-        paths = [
+        parts = [
             p.strip()
             for p in str(rule.source_value).split("|")
             if p.strip()
@@ -454,16 +479,25 @@ class ConcatPathHandler(BaseHandler):
 
         values = []
 
-        for p in paths:
-            value = resolve_in_context(raw_json, p, item, anchor)
-
-            if value is None:
-                continue
-
-            value = str(value).strip()
-
-            if value:
-                values.append(value)
+        for part in parts:
+            # Check if it's a literal string (enclosed in quotes)
+            if (part.startswith('"') and part.endswith('"')) or \
+               (part.startswith("'") and part.endswith("'")):
+                # It's a constant/literal string
+                literal_value = part[1:-1]  # Remove the quotes
+                if literal_value:
+                    values.append(literal_value)
+            else:
+                # It's a path - resolve it from context
+                value = resolve_in_context(raw_json, part, item, anchor)
+                
+                if value is None:
+                    continue
+                
+                value = str(value).strip()
+                
+                if value:
+                    values.append(value)
 
         return " ".join(values)
 
