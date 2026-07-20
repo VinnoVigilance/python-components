@@ -176,30 +176,62 @@ def get_xml_sources():
     }
 
 
-def detect_source_for_file(filename: str, xml_sources: dict):
-    # Try exact match
-    for source_name in xml_sources.keys():
-        if source_name in filename.upper():
-            return source_name, xml_sources[source_name]
+def source_aliases(source_name: str, config: dict) -> set:
+    """
+    Names a downloaded file might carry for this source.
 
-    # Pattern-based matching
-    patterns = {
-        "OFAC": "OFAC-SDN",
-        "OFSI": "UKSL",
-        "UKSL": "UKSL",
-        "UN": "UN",
-        "EU": "EU-TRAVEL-BAN",
-        "TRAVEL": "EU-TRAVEL-BAN",
-        "SDN": "OFAC-SDN",
-        "NON-SDN": "OFAC-NON-SDN",
+    Everything is read from the config itself, so renaming a source
+    renames its aliases with it. Extra names for files that predate a
+    rename can be listed under "filename_aliases".
+    """
+    aliases = {
+        source_name,
+        config.get("source_name"),
+        config.get("list_name"),
+        *config.get("filename_aliases", []),
     }
 
-    for pattern, source_name in patterns.items():
-        if pattern in filename.upper():
-            if source_name in xml_sources:
-                return source_name, xml_sources[source_name]
+    return {str(a).upper() for a in aliases if a}
 
-    return None, {}
+
+def detect_source_for_file(filename: str, xml_sources: dict):
+    """
+    Match an uploaded filename against the configured sources.
+
+    The longest matching alias wins, so OFAC-NON-SDN beats OFAC. When
+    several sources tie, they only conflict if they disagree on root
+    tags -- otherwise the parse is identical and either will do.
+    Returns (None, {}) when nothing matches or the tie is real.
+    """
+    name = filename.upper()
+
+    scores = {}
+
+    for source_name, config in xml_sources.items():
+        matched = [
+            alias for alias in source_aliases(source_name, config)
+            if alias in name
+        ]
+
+        if matched:
+            scores[source_name] = max(len(a) for a in matched)
+
+    if not scores:
+        return None, {}
+
+    best = max(scores.values())
+    winners = sorted(s for s, score in scores.items() if score == best)
+
+    if len(winners) > 1:
+        root_tags = {
+            tuple(xml_sources[w].get("root_tags", []))
+            for w in winners
+        }
+
+        if len(root_tags) > 1:
+            return None, {}
+
+    return winners[0], xml_sources[winners[0]]
 
 def normalize_dataframe_data(records: list) -> list:
     """
@@ -262,10 +294,26 @@ if tool == "Source File Parser":
         )
 
         xml_sources = get_xml_sources()
-        _, config = detect_source_for_file(uploaded_file.name, xml_sources)
+        detected, config = detect_source_for_file(
+            uploaded_file.name,
+            xml_sources
+        )
 
         if config is None:
             config = {}
+
+        if suffix == ".xml":
+            if detected:
+                st.success(
+                    f"Detected source: {detected} "
+                    f"(root tags: {', '.join(config.get('root_tags', []))})"
+                )
+            else:
+                st.warning(
+                    "Could not detect the source from the filename. "
+                    "Enter the root tags below, otherwise the parser "
+                    "falls back to 'Designation' and may return nothing."
+                )
 
         # ====================================================================
         # XML CONFIGURATION - SIMPLE ROOT TAGS INPUT
