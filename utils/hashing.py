@@ -1,4 +1,6 @@
 import hashlib
+import json
+from typing import Any
 
 def calculate_file_hash(file_path):
 
@@ -11,10 +13,17 @@ def calculate_file_hash(file_path):
     return sha256.hexdigest()
 
 
-def calculate_record_hash(record_path):
-    if record_path is None:
-        return None
+def calculate_record_hash(
+    canonical_record: dict[str, Any],
+) -> str:
+    canonical_json = json.dumps(
+        canonical_record,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
 
     return hashlib.sha256(
-        str(record_path).encode("utf-8")
+        canonical_json.encode("utf-8")
     ).hexdigest()

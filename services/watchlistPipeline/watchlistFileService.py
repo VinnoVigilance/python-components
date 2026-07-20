@@ -1,16 +1,14 @@
-from pathlib import Path
-from typing import Any
 import mimetypes
+from datetime import datetime
 from pathlib import Path
 from typing import Any
-from datetime import datetime
 
-
-from ingestion.downloader.models import DownloadTask
-from utils.hashing import calculate_file_hash
-from infrastructure.storage import seaweedClient
 from infrastructure.database.connection import connection_pool
+from infrastructure.storage import seaweedClient
+from ingestion.downloader.models import DownloadTask
+from repositories import watchlistFileLogRepository
 from repositories import watchlistFileRepository
+from utils.hashing import calculate_file_hash
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -244,7 +242,7 @@ def check_duplicate(
     source_id: int,
     list_type_id: int,
     file_hash: str,
-) -> str:
+) -> dict[str, Any]:
     connection = connection_pool.getconn()
 
     try:
@@ -257,14 +255,194 @@ def check_duplicate(
                         list_type_id=list_type_id,
                     )
                 )
-
     finally:
         connection_pool.putconn(connection)
 
     if existing_file is None:
-        return "FIRST_DOWNLOAD"
+        return {
+            "duplicate_status": "FIRST_DOWNLOAD",
+        }
 
-    if existing_file["file_hash"] == file_hash:
-        return "DUPLICATE"
+    if existing_file["file_hash"] != file_hash:
+        return {
+            "duplicate_status": "NEW_VERSION",
+        }
 
-    return "NEW_VERSION"
+    result = {
+        "watchlist_file_id": existing_file["id"],
+        "file_version": existing_file["file_version"],
+        "storage_path": existing_file["storage_path"],
+        "file_status": existing_file["status"],
+    }
+
+    if existing_file["normalization_completed"]:
+        result["duplicate_status"] = (
+            "DUPLICATE_COMPLETED"
+        )
+
+    elif existing_file["has_raw_payloads"]:
+        result["duplicate_status"] = (
+            "RESUME_NORMALIZATION"
+        )
+
+    else:
+        result["duplicate_status"] = (
+            "RESUME_PROCESSING"
+        )
+
+    return result
+
+def determine_file_version(
+    config: dict[str, Any],
+    duplicate_status: str,
+    source_id: int,
+    list_type_id: int,
+) -> str | None:
+    versioning_strategy = config["versioning_strategy"]
+
+    if versioning_strategy == "independent":
+        return None
+
+    if duplicate_status == "DUPLICATE":
+        raise ValueError(
+            "Duplicate files must not receive a new version."
+        )
+
+    if duplicate_status == "FIRST_DOWNLOAD":
+        return "1"
+
+    connection = connection_pool.getconn()
+
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                latest_version = (
+                    watchlistFileRepository.find_latest_file_version(
+                        cursor=cursor,
+                        source_id=source_id,
+                        list_type_id=list_type_id,
+                    )
+                )
+    finally:
+        connection_pool.putconn(connection)
+
+    if latest_version is None:
+        raise ValueError(
+            "Latest file version was not found."
+        )
+
+    try:
+        return str(int(latest_version) + 1)
+    except ValueError as error:
+        raise ValueError(
+            f"Invalid latest file version: {latest_version}"
+        ) from error
+    
+def insert_watchlist_file(
+    config: dict[str, Any],
+    file_metadata: dict[str, Any],
+    source_id: int,
+    list_type_id: int,
+    storage_path: str,
+    file_version: str | None,
+) -> int:
+    file_data = {
+        "source_id": source_id,
+        "list_type_id": list_type_id,
+        "list_url": config.get("url"),
+        "storage_path": storage_path,
+        "file_name": file_metadata["file_name"],
+        "file_type": file_metadata["file_type"],
+        "mime_type": file_metadata["mime_type"],
+        "file_size": file_metadata["file_size"],
+        "file_hash": file_metadata["file_hash"],
+        "file_version": file_version,
+        "download_method": config["download_method"],
+    }
+
+    connection = connection_pool.getconn()
+
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                watchlist_file_id = (
+                    watchlistFileRepository.insert_watchlist_file(
+                        cursor=cursor,
+                        file_data=file_data,
+                    )
+                )
+
+                watchlistFileLogRepository.insert_file_log(
+                    cursor=cursor,
+                    file_id=watchlist_file_id,
+                    step="DOWNLOAD",
+                    status="SUCCESS",
+                    message=(
+                        "Source file downloaded and "
+                        "registered successfully."
+                    ),
+                )
+
+        return watchlist_file_id
+
+    finally:
+        connection_pool.putconn(connection)
+
+
+def mark_watchlist_file_as_failed(
+    watchlist_file_id: int,
+    step: str,
+    error: Exception,
+    duration_ms: int | None = None,
+) -> None:
+    connection = connection_pool.getconn()
+
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                watchlistFileRepository.mark_file_as_failed(
+                    cursor=cursor,
+                    watchlist_file_id=watchlist_file_id,
+                )
+
+                watchlistFileLogRepository.insert_file_log(
+                    cursor=cursor,
+                    file_id=watchlist_file_id,
+                    step=step,
+                    status="FAILED",
+                    message=f"{step} step failed.",
+                    error_code=type(error).__name__,
+                    error_details=str(error),
+                    duration_ms=duration_ms,
+                )
+    finally:
+        connection_pool.putconn(connection)
+        
+def insert_file_log(
+    file_id: int,
+    step: str,
+    status: str,
+    message: str | None = None,
+    error_code: str | None = None,
+    error_details: str | None = None,
+    duration_ms: int | None = None,
+) -> int:
+    connection = connection_pool.getconn()
+
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                return (
+                    watchlistFileLogRepository.insert_file_log(
+                        cursor=cursor,
+                        file_id=file_id,
+                        step=step,
+                        status=status,
+                        message=message,
+                        error_code=error_code,
+                        error_details=error_details,
+                        duration_ms=duration_ms,
+                    )
+                )
+    finally:
+        connection_pool.putconn(connection)

@@ -14,13 +14,13 @@ from transforms.preNormalization import PreNormalizationEngine
 from transforms.fieldMapper import load_rules, MappingEngine
 from transforms.postNormalization import PostNormalizationEngine
 from ingestion.downloader import interface as downloader
-from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+from pipelines.watchlistConfigsOld import WATCHLIST_CONFIGS
 from parsing.xmlParser import XmlParser
 from parsing.pdfParser import PdfParser
 from parsing.htmlParser import HtmlParser
 from parsing.tabularParser import TabularParser
 from ingestion.downloader.models import DownloadTask
-from transforms.preProcessingEngine import PreProcessingEngine
+from transforms.preProcessingEngineOld import PreProcessingEngine
 from transforms.enrichmentEngine import EnrichmentEngine
 # from database.inserts import (
 #      insert_raw_watchlist_file,

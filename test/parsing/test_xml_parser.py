@@ -19,7 +19,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from parsing.xmlParser import XmlParser
-from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+from pipelines.watchlistConfigsOld import WATCHLIST_CONFIGS
 
 
 # ============================================================================
