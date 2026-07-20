@@ -3,6 +3,7 @@ WATCHLIST_CONFIGS = {
     
     "DFAT": {
         "source_name": "DFAT",
+        "date_order": "DMY",
         "list_name": "DFAT",
         "url": "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx",
         "file_type": "xlsx",
@@ -18,6 +19,7 @@ WATCHLIST_CONFIGS = {
 
     "OFAC-SDN": {
         "source_name": "OFAC",
+        "date_order": "DMY",
         "list_name": "OFAC-SDN",
         "url": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN_ENHANCED.XML",
         "file_type": "xml",
@@ -28,6 +30,7 @@ WATCHLIST_CONFIGS = {
 
     "OFAC-NON-SDN": {
         "source_name": "OFAC",
+        "date_order": "DMY",
         "list_name": "OFAC-NON-SDN",
         "url": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/CONS_ENHANCED.XML",
         "file_type": "xml",
@@ -38,17 +41,19 @@ WATCHLIST_CONFIGS = {
 
     "UKSL": {
         "source_name": "OFSI",
+        "date_order": "DMY",
         "list_name": "UKSL",
         "url": "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml",
         "file_type": "xml",
         "root_tags": ["Designation"],
         "external_id_path":"UniqueID",
         "schedule": "daily",
-        
+        "filename_aliases": ["UK-Sanctions-List"],
     },
 
     "DNFBP": {
     "source_name": "AMLC",
+    "date_order": "MDY",
     "list_name": "DNFBP",
     "external_id_path": "unique_id",
     "local_path": "data/downloads/a3923f9e-5afc-4102-9899-8fc5a8f07f41_Registered Designated Non-Financial Businesses and Professions (DNFBPs) as of 31 March 2026.pdf",
@@ -68,6 +73,7 @@ WATCHLIST_CONFIGS = {
 },
     "ATC-DESIGNATED-TERRORIST-INDIVIDUALS": {
         "source_name": "ATC",
+        "date_order": "DMY",
         "list_name": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS",
         "url": "https://atc.gov.ph/individuals/",
         "file_type": "html",
@@ -127,6 +133,7 @@ WATCHLIST_CONFIGS = {
     },
     "ATC-DESIGNATED-TERRORIST-GROUPS": {
         "source_name": "ATC",
+        "date_order": "DMY",
         "list_name": "ATC-DESIGNATED-TERRORIST-GROUPS",
         "url": "https://atc.gov.ph/groups/",
         "file_type": "html",
@@ -149,6 +156,7 @@ WATCHLIST_CONFIGS = {
     "EU-DESIGNATED-VESSELS": {
         "list_name": "EU-DESIGNATED-VESSELS",
         "source_name": "EU",
+        "date_order": "DMY",
         "url": "https://dk9q89lxhn3e0.cloudfront.net/EU+designated+vessels+consolidated.xlsx",
         "file_type": "xlsx",
         "external_id_path": "IMO number",
@@ -163,14 +171,31 @@ WATCHLIST_CONFIGS = {
     },
     "EU-TRAVEL-BAN": {
         "source_name": "EU-TRAVEL-BAN",
+        "date_order": "DMY",
         "url": "https://www.sanctionsmap.eu/api/v1/travelbans/file/101",
         "file_type": "xml",
         "external_id_path": "logicalId",
         "root_tags": ["sanctionEntity"],
         "schedule": "daily",
+        "filename_aliases": ["TRAVEL"],
     },
-    "UN": {
+    "UN-SANCTIONS": {
+        "source_name": "UN-SANCTIONS",
+        "date_order": "DMY",
+        "url": "https://scsanctions.un.org/resources/xml/en/consolidated.xml",
         "file_type": "xml",
-        "root_tags": ["INDIVIDUAL", "ENTITY", "sanctionEntity"],
-    }
+        "root_tags": ["INDIVIDUAL", "ENTITY"],
+        "external_id_path": "DATAID",
+        "filename_aliases": ["UN"],
+    },
+    "EU-FINANCIAL-SANCTIONS": {
+        "source_name": "EU-FINANCIAL-SANCTIONS",
+        "date_order": "DMY",
+        "url": "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw",
+        "file_type": "xml",
+        "root_tags": ["sanctionEntity"],
+        "external_id_path": "logicalId",
+        "filename_aliases": ["EU"],
+    },
+
 }

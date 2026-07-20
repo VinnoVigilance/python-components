@@ -236,7 +236,7 @@ if __name__ == "__main__":
 
     mapper = MappingEngine(mapping_rules)
 
-    post_normalizer = PostNormalizationEngine(post_rules_df)
+    post_normalizer = PostNormalizationEngine(post_rules_df, config=config)
 
     pipeline = WatchlistPipeline(
         config=config,

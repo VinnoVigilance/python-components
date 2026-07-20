@@ -4,8 +4,10 @@ from copy import deepcopy
 from datetime import datetime
 import re
 
+from transforms.dateResolver import resolve_dates
 
-def empty_dependency_handler(entity, rule):
+
+def empty_dependency_handler(entity, rule, config=None):
     condition_path = rule["condition_path"]
     target_path = rule["target_path"]
     value = rule["value"]
@@ -38,7 +40,7 @@ def empty_dependency_handler(entity, rule):
     entity[tgt_list_name] = tgt_list
 
 
-def date_normalization_handler(entity, rule):
+def date_normalization_handler(entity, rule, config=None):
     source_path = rule["condition_path"]
 
     if source_path not in entity:
@@ -49,164 +51,12 @@ def date_normalization_handler(entity, rule):
     if not isinstance(values, list):
         return
 
-    date_patterns = [
-        r"\b\d{4}-\d{2}-\d{2}(?:\s\d{2}:\d{2}:\d{2})?\b",
-        r"\b\d{1,2}\s+[A-Za-z]+\s+\d{4}\b",
-        r"\b[A-Za-z]+\s+\d{1,2},\s*\d{4}\b",
-        r"\b\d{1,2}/\d{1,2}/\d{4}\b",
-        r"\b\d{1,2}/\d{4}\b",
-        r"\bApproximately\s+\d{4}\b",
-        r"\b\d{4}\s*\(\s*\d{4}\s*\)\b",
-        r"\b\d{4}\b",
-    ]
+    date_order = (config or {}).get("date_order", "DMY")
 
-    normalized = []
-    seen = set()
-
-    for item in values:
-        item_type = item.get("Type") or item.get("type") or ""
-        raw_text = (
-            item.get("Note")
-            or item.get("note")
-            or item.get("date_full")
-            or item.get("Year")
-            or item.get("year")
-            or ""
-        )
-
-        raw_text = re.sub(r"\s+", " ", str(raw_text).strip())
-
-        if not raw_text:
-            continue
-
-        parts = [
-            p.strip()
-            for p in re.split(r"\s*[,;]\s*", raw_text)
-            if p.strip()
-        ]
-
-        for part in parts:
-            if re.fullmatch(
-                r"between\s+\d{4}\s+and\s+\d{4}",
-                part,
-                flags=re.IGNORECASE,
-            ):
-                key = ("", "", "", part)
-
-                if key not in seen:
-                    seen.add(key)
-                    normalized.append({
-                        "Day": "",
-                        "Month": "",
-                        "Year": "",
-                        "Type": item_type,
-                        "IsApproximate": "",
-                        "Note": part,
-                    })
-
-                continue
-
-            matches = []
-            consumed_spans = []
-
-            for pattern in date_patterns:
-                for match in re.finditer(pattern, part, flags=re.IGNORECASE):
-                    start, end = match.span()
-
-                    if any(start < e and end > s for s, e in consumed_spans):
-                        continue
-
-                    consumed_spans.append((start, end))
-                    matches.append((start, match.group()))
-
-            matches.sort(key=lambda x: x[0])
-
-            for _, token in matches:
-                token = token.strip()
-                parsed_dates = []
-
-                try:
-                    dt = datetime.strptime(token[:10], "%Y-%m-%d")
-                    parsed_dates.append(
-                        (str(dt.year), f"{dt.month:02}", f"{dt.day:02}")
-                    )
-                except:
-                    pass
-
-                if not parsed_dates:
-                    for fmt in [
-                        "%d %B %Y",
-                        "%d %b %Y",
-                        "%B %d, %Y",
-                        "%b %d, %Y",
-                    ]:
-                        try:
-                            dt = datetime.strptime(token, fmt)
-                            parsed_dates.append(
-                                (str(dt.year), f"{dt.month:02}", f"{dt.day:02}")
-                            )
-                            break
-                        except:
-                            pass
-
-                if (
-                    not parsed_dates
-                    and re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", token)
-                ):
-                    day, month, year = token.split("/")
-                    parsed_dates.append(
-                        (year, month.zfill(2), day.zfill(2))
-                    )
-
-                if (
-                    not parsed_dates
-                    and re.fullmatch(r"\d{1,2}/\d{4}", token)
-                ):
-                    month, year = token.split("/")
-                    parsed_dates.append(
-                        (year, month.zfill(2), "")
-                    )
-
-                if (
-                    not parsed_dates
-                    and re.fullmatch(r"\d{4}\s*\(\s*\d{4}\s*\)", token)
-                ):
-                    for year in re.findall(r"\d{4}", token):
-                        parsed_dates.append((year, "", ""))
-
-                if not parsed_dates:
-                    year_match = re.search(r"\d{4}", token)
-
-                    if year_match:
-                        parsed_dates.append(
-                            (year_match.group(), "", "")
-                        )
-
-                for year, month, day in parsed_dates:
-                    key = (year, month, day, part)
-
-                    if key in seen:
-                        continue
-
-                    seen.add(key)
-
-                    normalized.append({
-                        "Day": day,
-                        "Month": month,
-                        "Year": year,
-                        "Type": item_type,
-                        "IsApproximate": (
-                            "true"
-                            if "approx" in part.lower()
-                            else "false"
-                        ),
-                        "Note": part,
-                    })
-
-    entity[source_path] = normalized
+    entity[source_path] = resolve_dates(values, date_order)
 
 
-def deduplicate_all_arrays_handler(entity, rule):
+def deduplicate_all_arrays_handler(entity, rule, config=None):
 
     def make_hashable(value):
         if isinstance(value, dict):
@@ -262,8 +112,12 @@ HANDLERS = {
 
 class PostNormalizationEngine:
 
-    def __init__(self, rules_df: pd.DataFrame):
+    def __init__(self, rules_df: pd.DataFrame, config=None):
         self.rules_df = rules_df.sort_values("priority")
+
+        # Carries per source settings such as date_order, so a handler
+        # can read a date the way the list that published it writes them
+        self.config = config or {}
 
     def post_normalize_record(self, record):
         entity = deepcopy(record)
@@ -273,7 +127,7 @@ class PostNormalizationEngine:
             handler = HANDLERS.get(rule_type)
 
             if handler:
-                handler(entity, rule)
+                handler(entity, rule, self.config)
 
         return entity
 
