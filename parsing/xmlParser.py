@@ -5,6 +5,42 @@ from pathlib import Path
 
 class XmlParser:
 
+    def resolve_root_tags(self, config=None, root_tags=None):
+        # Priority:
+        # 1. Explicit root_tags argument
+        # 2. root_tags from config
+        # 3. Default
+        if root_tags is not None:
+            return root_tags
+
+        if config is not None:
+            return config.get("root_tags", ["Designation"])
+
+        return ["Designation"]
+
+    def matches_root_tag(self, elem, root_tags):
+        tag = elem.tag
+
+        # Comments and processing instructions carry a callable tag
+        if not isinstance(tag, str):
+            return False
+
+        return tag.split("}")[-1] in root_tags
+
+    def release(self, elem):
+        # Free the subtree we just consumed along with any siblings
+        # already processed. Only called once a matched element has
+        # been converted, so this never drops data still to be read.
+        elem.clear()
+
+        parent = elem.getparent()
+
+        if parent is None:
+            return
+
+        while elem.getprevious() is not None:
+            del parent[0]
+
     def elem_to_dict(self, elem):
 
         node = {}
@@ -12,7 +48,14 @@ class XmlParser:
         for attr_key, attr_value in elem.attrib.items():
             node[attr_key] = attr_value
 
-        if len(elem) == 0:
+        # Comments and processing instructions carry a callable tag
+        # rather than a string, and are not part of the data
+        children = [
+            child for child in elem
+            if isinstance(child.tag, str)
+        ]
+
+        if not children:
 
             text = (elem.text or "").strip()
 
@@ -24,7 +67,7 @@ class XmlParser:
 
             return node
 
-        for child in elem:
+        for child in children:
 
             tag = child.tag.split("}")[-1]
 
@@ -49,15 +92,7 @@ class XmlParser:
         config=None,
         root_tags=None
     ):
-        # Priority:
-        # 1. Explicit root_tags argument
-        # 2. root_tags from config
-        # 3. Default
-        if root_tags is None:
-            if config is not None:
-                root_tags = config.get("root_tags", ["Designation"])
-            else:
-                root_tags = ["Designation"]
+        root_tags = self.resolve_root_tags(config, root_tags)
 
         if output_file is None:
 
@@ -81,7 +116,7 @@ class XmlParser:
 
             for _, elem in context:
 
-                if any(elem.tag.endswith(tag) for tag in root_tags):
+                if self.matches_root_tag(elem, root_tags):
                     data = self.elem_to_dict(elem)
 
                     f.write(
@@ -92,7 +127,7 @@ class XmlParser:
                     )
 
                     count += 1
-                    elem.clear()
+                    self.release(elem)
 
         print(f"Done: {count}")
 
@@ -104,15 +139,7 @@ class XmlParser:
         config=None,
         root_tags=None
     ):
-        # Priority:
-        # 1. Explicit root_tags argument
-        # 2. root_tags from config
-        # 3. Default
-        if root_tags is None:
-            if config is not None:
-                root_tags = config.get("root_tags", ["Designation"])
-            else:
-                root_tags = ["Designation"]
+        root_tags = self.resolve_root_tags(config, root_tags)
 
         context = etree.iterparse(
             file_path,
@@ -122,11 +149,11 @@ class XmlParser:
 
         for _, elem in context:
 
-            if any(elem.tag.endswith(tag) for tag in root_tags):
+            if self.matches_root_tag(elem, root_tags):
 
                 data = self.elem_to_dict(elem)
 
-                elem.clear()
+                self.release(elem)
 
                 yield data
 
