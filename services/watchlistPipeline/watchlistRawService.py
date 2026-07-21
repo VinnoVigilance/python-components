@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from time import perf_counter
 from typing import Any
+from copy import deepcopy
 
 from infrastructure.database.connection import connection_pool
 from parsing.parserFactory import create_parser
@@ -46,11 +47,29 @@ def process_watchlist_file(
             )
         )
 
+        preprocessing_rules = deepcopy(
+            config.get("preprocessing", [])
+        )
+
+        for rule in preprocessing_rules:
+            rule_config = rule.get("config", {})
+
+            for path_field in rule.get(
+                "relative_path_fields",
+                [],
+            ):
+                relative_path = rule_config.get(path_field)
+
+                if relative_path:
+                    rule_config[path_field] = str(
+                        file_path.parent / relative_path
+                    )
+
         preprocessing_engine = PreProcessingEngine()
 
         processed_records = preprocessing_engine.preprocess(
             records=parsed_records,
-            rules=config.get("preprocessing", []),
+            rules=preprocessing_rules,
         )
 
         if not processed_records:

@@ -16,6 +16,7 @@ from config.loggingConfig import configure_logging
 from ingestion.downloader import interface as downloader
 from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
 from services.watchlistPipeline import (
+    watchlistAttachmentService,
     watchlistCoreService,
     watchlistFileService,
     watchlistRawService,
@@ -199,7 +200,13 @@ def run_watchlist_pipeline(
                 watchlist_file_id=watchlist_file_id,
             )
         )
-
+    attachment_result = (
+    watchlistAttachmentService.process_attachments(
+        source_file_path=source_file_path,
+        watchlist_file_id=watchlist_file_id,
+        config=config,
+    )
+    )
     core_result = (
         watchlistCoreService.process_watchlist_file(
             watchlist_file_id=watchlist_file_id,
@@ -213,6 +220,19 @@ def run_watchlist_pipeline(
     result["file_version"] = file_version
     result["storage_path"] = storage_path
     result["watchlist_file_id"] = watchlist_file_id
+    result["attachment_processed_count"] = (attachment_result["processed_count"])
+    result["attachment_new_count"] = (
+        attachment_result["new_count"]
+    )
+    result["attachment_reused_count"] = (
+        attachment_result["reused_count"]
+    )
+    result["member_attachment_count"] = (
+        attachment_result["member_mapping_count"]
+    )
+    result["list_attachment_count"] = (
+        attachment_result["list_mapping_count"]
+    )
 
     if raw_result is None:
         result["parsed_record_count"] = 0
@@ -258,7 +278,7 @@ if __name__ == "__main__":
 
     try:
         pipeline_result = run_watchlist_pipeline(
-            watchlist_name="EU-DESIGNATED-VESSELS",
+            watchlist_name="ATC-DESIGNATED-TERRORIST-INDIVIDUALS",
         )
 
         pprint(pipeline_result)

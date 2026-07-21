@@ -4,10 +4,9 @@ WATCHLIST_CONFIGS = {
     "DFAT": {
         "source_name": "DFAT",
         "list_name": "DFAT",
-        "download_method": "Manual",
+        "download_method": "HTTPS",
         "url": (
-            "https://www.dfat.gov.au/sites/default/files/"
-            "Australian_Sanctions_Consolidated_List.xlsx"
+            "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx"
         ),
         "file_type": "xlsx",
         "external_id_path": "Reference",
@@ -23,10 +22,9 @@ WATCHLIST_CONFIGS = {
     "OFAC-SDN": {
         "source_name": "OFAC",
         "list_name": "OFAC-SDN",
-        "download_method": "Manual",
+        "download_method": "HTTPS",
         "url": (
-            "https://sanctionslistservice.ofac.treas.gov/"
-            "api/PublicationPreview/exports/SDN_ENHANCED.XML"
+            "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN_ENHANCED.XML"
         ),
         "file_type": "xml",
         "root_tags": ["entity"],
@@ -37,10 +35,9 @@ WATCHLIST_CONFIGS = {
     "OFAC-NON-SDN": {
         "source_name": "OFAC",
         "list_name": "OFAC-NON-SDN",
-        "download_method": "Manual",
+        "download_method": "HTTPS",
         "url": (
-            "https://sanctionslistservice.ofac.treas.gov/"
-            "api/PublicationPreview/exports/CONS_ENHANCED.XML"
+            "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/CONS_ENHANCED.XML"
         ),
         "file_type": "xml",
         "root_tags": ["entity"],
@@ -51,10 +48,9 @@ WATCHLIST_CONFIGS = {
     "UKSL": {
         "source_name": "OFSI",
         "list_name": "UKSL",
-        "download_method": "Manual",
+        "download_method": "HTTPS",
         "url": (
-            "https://sanctionslist.fcdo.gov.uk/"
-            "docs/UK-Sanctions-List.xml"
+            "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml"
         ),
         "file_type": "xml",
         "root_tags": ["Designation"],
@@ -68,10 +64,7 @@ WATCHLIST_CONFIGS = {
         "download_method": "Manual",
         "external_id_path": "unique_id",
         "local_path": (
-            "data/downloads/"
-            "a3923f9e-5afc-4102-9899-8fc5a8f07f41_"
-            "Registered Designated Non-Financial Businesses "
-            "and Professions (DNFBPs) as of 31 March 2026.pdf"
+            "data/downloads/a3923f9e-5afc-4102-9899-8fc5a8f07f41_Registered Designated Non-Financial Businesses and Professions (DNFBPs) as of 31 March 2026.pdf"
         ),
         "url": (
             "https://www.amlc.gov.ph/storage/v1/object/public/"
@@ -105,19 +98,46 @@ WATCHLIST_CONFIGS = {
         "file_type": "html",
         "external_id_path": "unique_id",
         "schedule": "daily",
+        "versioning_strategy": "continuous",
         "local_path": (
-            "data/downloads/"
+            "data/downloads/ATC/"
+            "ATC-DESIGNATED-TERRORIST-INDIVIDUALS/"
+            "year=2026/month=07/day=20/"
             "Designated Terrorist Individuals _ "
             "Anti-Terrorism Council.html"
         ),
         "profile_dir": "data/downloads/profiles",
-        "preprocessing": [
+        "attachments": [
             {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": (
+                    "profile_data.profile_file"
+                ),
+                "source_url_field": "detail_url",
+            },
+            {
+                "scope": "member",
+                "attachment_type": "PHOTO",
+                "local_path_field": (
+                    "profile_data.local_images"
+                ),
+                "source_url_field": (
+                    "profile_data.image_urls"
+                ),
+            },
+        ],
+        "preprocessing": [
+           {
                 "handler": "enrich_atc_profile_data",
                 "level": "record",
+                "relative_path_fields": [
+                    "profile_dir",
+                    "images_dir",
+                ],
                 "config": {
-                    "profile_dir": "data/downloads/profiles",
-                    "images_dir": "data/downloads/images",
+                    "profile_dir": "attachments/profiles",
+                    "images_dir": "attachments/images",
                 },
             },
             {

@@ -248,7 +248,11 @@ class PreProcessingEngine:
 
         if os.path.exists(images_dir):
             for file_name in os.listdir(images_dir):
-                if file_base_name in file_name.upper():
+                image_name = os.path.splitext(
+                    file_name
+                )[0].lower()
+
+                if image_name == slug.lower():
                     local_images.append(
                         os.path.join(
                             images_dir,
