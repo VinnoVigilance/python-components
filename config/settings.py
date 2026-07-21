@@ -1,0 +1,10 @@
+STORAGE_S3_ENDPOINT = "http://localhost:8333"
+STORAGE_ACCESS_KEY_INGESTION = "vv_ingestion_user"
+STORAGE_SECRET_KEY_INGESTION = "Vv#ingesti0n"
+STORAGE_BUCKET_INGESTION = "ingestion"
+STORAGE_REGION = "us-east-1"
+DB_HOST = "localhost"
+DB_PORT = 5432
+DB_NAME = "vinno_vigilance"
+DB_USER = "postgres"
+DB_PASSWORD = "2852680"

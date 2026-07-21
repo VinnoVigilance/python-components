@@ -1,8 +1,10 @@
-import re
 import hashlib
-from urllib.parse import urlparse, unquote
+import os
+import re
+from urllib.parse import unquote, urlparse
 
 from nameparser import HumanName
+from scrapy import Selector
 
 
 EMPTY_VALUES = {"", "N/A", "NA", "NONE", "NULL", "UNKNOWN", "-"}
@@ -10,7 +12,9 @@ EMPTY_VALUES = {"", "N/A", "NA", "NONE", "NULL", "UNKNOWN", "-"}
 
 class PreProcessingEngine:
 
-    def apply_dataset(self, records, rules):
+    def preprocess(self, records, rules):
+        records = list(records)
+
         if not rules:
             return records
 
@@ -19,6 +23,7 @@ class PreProcessingEngine:
                 continue
 
             handler_name = rule["handler"]
+            config = rule.get("config", {})
             handler = getattr(self, handler_name, None)
 
             if handler is None:
@@ -26,33 +31,74 @@ class PreProcessingEngine:
                     f"No preprocessing handler found: {handler_name}"
                 )
 
-            records = handler(records)
+            records = handler(records, config)
 
-        return records
+        processed_records = []
 
-    def apply_record(self, record, rules):
-        if not rules:
-            return record
+        for record in records:
+            for rule in rules:
+                if rule.get("level", "record") != "record":
+                    continue
 
-        for rule in rules:
-            if rule.get("level", "record") != "record":
+                handler_name = rule["handler"]
+                config = rule.get("config", {})
+                handler = getattr(self, handler_name, None)
+
+                if handler is None:
+                    raise ValueError(
+                        f"No preprocessing handler found: {handler_name}"
+                    )
+
+                record = handler(record, config)
+
+            processed_records.append(record)
+
+        return processed_records
+
+    def fix_eu_vessel_multiline_rows(self, records, config):
+        fixed_records = []
+
+        for record in records:
+            vessel_name = str(
+                record.get("Vessel name at designation time", "")
+            ).strip()
+
+            imo_number = str(
+                record.get("IMO number", "")
+            ).strip()
+
+            date_value = str(
+                record.get("Date of application", "")
+            ).strip()
+
+            link_value = str(
+                record.get(
+                    "Link to relevant EU Official Journal ",
+                    "",
+                )
+            ).strip()
+
+            if not vessel_name or not imo_number:
                 continue
 
-            handler_name = rule["handler"]
-            config = rule.get("config", {})
+            if date_value == "#REF!":
+                date_value = ""
 
-            handler = getattr(self, handler_name, None)
+            if link_value == "#REF!":
+                link_value = ""
 
-            if handler is None:
-                raise ValueError(
-                    f"No preprocessing handler found: {handler_name}"
-                )
+            record["Vessel name at designation time"] = vessel_name
+            record["IMO number"] = imo_number
+            record["Date of application"] = date_value
+            record[
+                "Link to relevant EU Official Journal "
+            ] = link_value
 
-            record = handler(record, config)
+            fixed_records.append(record)
 
-        return record
+        return fixed_records
 
-    def merge_dfat_split_records(self, records):
+    def merge_dfat_split_records(self, records, config):
         grouped = {}
 
         single_value_fields = {
@@ -66,40 +112,57 @@ class PreProcessingEngine:
         }
 
         for record in records:
-            reference = str(record.get("Reference", "")).strip()
+            reference = str(
+                record.get("Reference", "")
+            ).strip()
 
             match = re.match(r"^(\d+)", reference)
-            base_reference = match.group(1) if match else reference
+            base_reference = (
+                match.group(1) if match else reference
+            )
 
             if base_reference not in grouped:
                 grouped[base_reference] = {
                     "Reference": base_reference,
-                    "Names": []
+                    "Names": [],
                 }
 
             merged = grouped[base_reference]
 
-            name_value = str(record.get("Name of Individual or Entity", "")).strip()
-            name_type = str(record.get("Name Type", "")).strip()
-            alias_strength = str(record.get("Alias Strength", "")).strip()
+            name_value = str(
+                record.get(
+                    "Name of Individual or Entity",
+                    "",
+                )
+            ).strip()
+
+            name_type = str(
+                record.get("Name Type", "")
+            ).strip()
+
+            alias_strength = str(
+                record.get("Alias Strength", "")
+            ).strip()
 
             if name_value:
                 name_item = {
                     "Name of Individual or Entity": name_value,
                     "Name Type": name_type,
-                    "Alias Strength": alias_strength
+                    "Alias Strength": alias_strength,
                 }
 
                 if name_item not in merged["Names"]:
                     merged["Names"].append(name_item)
 
+            ignored_fields = {
+                "Reference",
+                "Name of Individual or Entity",
+                "Name Type",
+                "Alias Strength",
+            }
+
             for field, value in record.items():
-                if field in {
-                    "Reference",
-                    "Name of Individual or Entity",
-                    "Name Type",
-                    "Alias Strength"
-                }:
+                if field in ignored_fields:
                     continue
 
                 value = str(value).strip()
@@ -119,26 +182,136 @@ class PreProcessingEngine:
                     merged[field].append(value)
 
         return list(grouped.values())
-    
+
+    def enrich_atc_profile_data(self, record, config):
+        profile_dir = config.get(
+            "profile_dir",
+            "downloads/profiles",
+        )
+
+        images_dir = config.get(
+            "images_dir",
+            "downloads/images",
+        )
+
+        detail_url = str(
+            record.get("detail_url", "")
+        ).strip()
+
+        if not detail_url:
+            return record
+
+        slug = detail_url.rstrip("/").split("/")[-1]
+        file_base_name = slug.replace("-", " ").upper()
+
+        profile_file_name = (
+            f"{file_base_name} _ Anti-Terrorism Council.html"
+        )
+
+        profile_file = os.path.join(
+            profile_dir,
+            profile_file_name,
+        )
+
+        if not os.path.exists(profile_file):
+            return record
+
+        with open(
+            profile_file,
+            "r",
+            encoding="utf-8",
+        ) as file:
+            html = file.read()
+
+        selector = Selector(text=html)
+        profile_fields = {}
+
+        rows = selector.xpath("//article//table//tr")
+
+        for row in rows:
+            key = row.xpath("./td[1]//text()").getall()
+            value = row.xpath("./td[2]//text()").getall()
+
+            key = " ".join(key).strip()
+            value = " ".join(value).strip()
+
+            if not key:
+                continue
+
+            profile_fields[key] = value
+
+        image_urls = selector.xpath(
+            "//article//img/@src"
+        ).getall()
+
+        local_images = []
+
+        if os.path.exists(images_dir):
+            for file_name in os.listdir(images_dir):
+                image_name = os.path.splitext(
+                    file_name
+                )[0].lower()
+
+                if image_name == slug.lower():
+                    local_images.append(
+                        os.path.join(
+                            images_dir,
+                            file_name,
+                        )
+                    )
+
+        record["profile_data"] = {
+            "profile_file": profile_file,
+            "profile_slug": slug,
+            "profile_fields": profile_fields,
+            "image_urls": image_urls,
+            "local_images": local_images,
+        }
+
+        return record
+
     def detect_entity_type(self, record, config):
         input_field = config["input_field"]
         output_field = config.get(
             "output_field",
-            "detected_entity_type"
+            "detected_entity_type",
         )
 
         name = str(record.get(input_field, "")).strip()
         name_upper = name.upper()
 
         org_keywords = [
-            "INC", "CORP", "COMPANY", "CO.", "LLC", "LTD", "OPC",
-            "SERVICES", "FIRM", "OFFICE", "ASSOCIATES", "PARTNERS",
-            "CPA", "CPAS", "ACCOUNTING", "BOOKKEEPING", "AUDITING",
-            "CONSULTANCY", "BUSINESS", "GROUP", "TRADING", "STORE",
-            "SHOP", "REALTY", "BROKERAGE"
+            "INC",
+            "CORP",
+            "COMPANY",
+            "CO.",
+            "LLC",
+            "LTD",
+            "OPC",
+            "SERVICES",
+            "FIRM",
+            "OFFICE",
+            "ASSOCIATES",
+            "PARTNERS",
+            "CPA",
+            "CPAS",
+            "ACCOUNTING",
+            "BOOKKEEPING",
+            "AUDITING",
+            "CONSULTANCY",
+            "BUSINESS",
+            "GROUP",
+            "TRADING",
+            "STORE",
+            "SHOP",
+            "REALTY",
+            "BROKERAGE",
         ]
 
-        if any(keyword in name_upper for keyword in org_keywords):
+        if any(
+            keyword in name_upper
+            for keyword in org_keywords
+        ):
             record[output_field] = "Entity"
             return record
 
@@ -153,40 +326,58 @@ class PreProcessingEngine:
 
     def generate_atc_unique_id(self, record, config):
         name_field = config.get("name_field", "name")
+
         resolution_field = config.get(
             "resolution_field",
-            "atc_resolution_no"
+            "atc_resolution_no",
         )
-        output_field = config.get("output_field", "unique_id")
+
+        output_field = config.get(
+            "output_field",
+            "unique_id",
+        )
+
         prefix = config.get("prefix", "ATC")
 
         name = str(record.get(name_field, "")).strip()
-        resolution_text = str(record.get(resolution_field, "")).strip()
+        resolution_text = str(
+            record.get(resolution_field, "")
+        ).strip()
 
         match = re.search(
             r"Resolution\s+No\.?\s*([0-9]+)",
             resolution_text,
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
-        resolution_no = match.group(1) if match else "UNKNOWN"
+        resolution_no = (
+            match.group(1) if match else "UNKNOWN"
+        )
 
         name_hash = hashlib.md5(
             name.lower().encode("utf-8")
         ).hexdigest()[:10]
 
-        record[output_field] = f"{prefix}-{resolution_no}-{name_hash}"
+        record[output_field] = (
+            f"{prefix}-{resolution_no}-{name_hash}"
+        )
 
         return record
 
     def extract_name_from_url(self, record, config):
-        input_field = config.get("input_field", "detail_url")
-        output_field = config.get(
-            "output_field",
-            "extracted_name_from_url"
+        input_field = config.get(
+            "input_field",
+            "detail_url",
         )
 
-        detail_url = str(record.get(input_field, "")).strip()
+        output_field = config.get(
+            "output_field",
+            "extracted_name_from_url",
+        )
+
+        detail_url = str(
+            record.get(input_field, "")
+        ).strip()
 
         if not detail_url:
             record[output_field] = ""
@@ -199,19 +390,24 @@ class PreProcessingEngine:
 
         return record
 
-    def split_atc_date_and_place_of_birth(self, record, config):
+    def split_atc_date_and_place_of_birth(
+        self,
+        record,
+        config,
+    ):
         input_field = config.get(
             "input_field",
-            "profile_data.profile_fields.Date and Place of Birth"
+            "profile_data.profile_fields.Date and Place of Birth",
         )
 
         date_output_field = config.get(
             "date_output_field",
-            "atc_birth_date"
+            "atc_birth_date",
         )
+
         place_output_field = config.get(
             "place_output_field",
-            "atc_birth_place"
+            "atc_birth_place",
         )
 
         value = record
@@ -231,9 +427,10 @@ class PreProcessingEngine:
             return record
 
         parts = value.split(",", 1)
-
         first_part = parts[0].strip()
-        remaining_part = parts[1].strip() if len(parts) > 1 else ""
+        remaining_part = (
+            parts[1].strip() if len(parts) > 1 else ""
+        )
 
         if first_part.upper() in EMPTY_VALUES:
             record[date_output_field] = ""
@@ -249,7 +446,11 @@ class PreProcessingEngine:
 
         return record
 
-    def clean_atc_profile_name_fields(self, record, config):
+    def clean_atc_profile_name_fields(
+        self,
+        record,
+        config,
+    ):
         fields = config.get("fields", [])
 
         profile_fields = (
@@ -258,7 +459,9 @@ class PreProcessingEngine:
         )
 
         for field in fields:
-            value = str(profile_fields.get(field, "")).strip()
+            value = str(
+                profile_fields.get(field, "")
+            ).strip()
 
             if value.upper() in EMPTY_VALUES:
                 profile_fields[field] = ""

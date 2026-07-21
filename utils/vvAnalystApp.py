@@ -17,7 +17,7 @@ from parsing.tabularParser import TabularParser
 from schemaExtractor import extract_schema, schema_to_rows
 
 # Import watchlist configs
-from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+from pipelines.watchlistConfigsOld import WATCHLIST_CONFIGS
 
 DATA_DIR = ROOT_DIR / "data"
 SEC_DATA_DIR = DATA_DIR / "sec"
