@@ -14,7 +14,7 @@ classification results"). It writes a human-readable report to
 data/reports/risk_rule_report.txt and prints the same to the console.
 
 Usage:
-    ./vv-env/Scripts/python.exe -m transforms.riskReporter
+    ./vv-env/Scripts/python.exe -m risk.reporter
 """
 
 import collections
@@ -23,8 +23,8 @@ import json
 import os
 from pathlib import Path
 
-from transforms.riskConfigLoader import load_risk_config
-from transforms.riskRuleMatcher import RuleMatcher, load_jsonl_safe
+from risk.configLoader import load_risk_config
+from risk.ruleMatcher import RuleMatcher, load_jsonl_safe
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FINAL_DIR = ROOT_DIR / "data" / "final"

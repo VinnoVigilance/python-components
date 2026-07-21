@@ -28,7 +28,7 @@ import json
 import re
 from copy import deepcopy
 
-from transforms.riskConfigLoader import RiskConfig, load_risk_config, _norm
+from risk.configLoader import RiskConfig, load_risk_config, _norm
 
 
 # ---------------------------------------------------------------------------
