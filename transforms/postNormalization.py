@@ -51,7 +51,16 @@ def date_normalization_handler(entity, rule, config=None):
     if not isinstance(values, list):
         return
 
-    date_order = (config or {}).get("date_order", "DMY")
+    # If a DATE_NORMALIZATION rule is running then date_order genuinely
+    # decides how ambiguous dates read (03/04 as 3 Apr under DMY vs 4 Mar
+    # under MDY), so a missing order is an error, not a thing to guess.
+    if not config or "date_order" not in config:
+        raise ValueError(
+            "DATE_NORMALIZATION rule requires 'date_order' in config "
+            "(e.g. 'DMY' or 'MDY'); none was provided."
+        )
+
+    date_order = config["date_order"]
 
     entity[source_path] = resolve_dates(values, date_order)
 
@@ -112,12 +121,14 @@ HANDLERS = {
 
 class PostNormalizationEngine:
 
-    def __init__(self, rules_df: pd.DataFrame, config=None):
+    def __init__(self, rules_df: pd.DataFrame, config: dict):
         self.rules_df = rules_df.sort_values("priority")
 
         # Carries per source settings such as date_order, so a handler
-        # can read a date the way the list that published it writes them
-        self.config = config or {}
+        # can read a date the way the list that published it writes them.
+        # Required rather than optional: a silent default here is what let
+        # a caller drop the config and fall back to DMY without noticing.
+        self.config = config
 
     def post_normalize_record(self, record):
         entity = deepcopy(record)
@@ -154,11 +165,11 @@ def save_jsonl(data, path):
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
 
-def post_normalize_record(record, rules_df):
-    engine = PostNormalizationEngine(rules_df)
+def post_normalize_record(record, rules_df, config):
+    engine = PostNormalizationEngine(rules_df, config)
     return engine.post_normalize_record(record)
 
 
-def run_post_normalization(jsonl_data, rules_df):
-    engine = PostNormalizationEngine(rules_df)
+def run_post_normalization(jsonl_data, rules_df, config):
+    engine = PostNormalizationEngine(rules_df, config)
     return engine.run_post_normalization(jsonl_data)

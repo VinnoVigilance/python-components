@@ -309,7 +309,7 @@ def test_full_pipeline(source_name, input_file=None, skip_download=False):
     # Initialize engines
     pre_normalizer = PreNormalizationEngine(prenorm_df, source_config_df)
     mapper = MappingEngine(mapping_rules)
-    post_normalizer = PostNormalizationEngine(post_rules_df)
+    post_normalizer = PostNormalizationEngine(post_rules_df, config)
     
     # Create and run pipeline
     pipeline = WatchlistPipeline(

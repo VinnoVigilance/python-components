@@ -76,7 +76,7 @@ def test_post_normalization():
 
     jsonl_data = load_jsonl(input_path)
     rules_df = pd.read_excel(rules_path)
-    result = run_post_normalization(jsonl_data, rules_df)
+    result = run_post_normalization(jsonl_data, rules_df, {"date_order": "DMY"})
 
     save_jsonl(result, output_path)
 

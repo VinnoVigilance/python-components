@@ -56,6 +56,7 @@ def create_normalization_engines(
 
     post_normalizer = PostNormalizationEngine(
         rules_df=post_normalization_df,
+        config=config,
     )
 
     return (
