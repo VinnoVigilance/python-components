@@ -466,6 +466,42 @@ class PathExpandHandler(BaseHandler):
         return resolve_all_in_context(raw_json, rule.source_value, item, anchor)
 
 
+class ListExpandHandler(BaseHandler):
+    """Return primitive list values for expansion into separate group objects.
+
+    This handler is intentionally separate from ``path_expand`` so existing
+    object-array mappings keep their current behaviour. It accepts both a
+    scalar and a list; a scalar produces one object and a list produces one
+    object per value.
+    """
+
+    def handle(self, rule, raw_json, item=None, anchor=None):
+        if not rule.source_value:
+            return []
+
+        values = resolve_all_in_context(
+            raw_json,
+            rule.source_value,
+            item,
+            anchor,
+        )
+
+        results = []
+
+        for value in values:
+            candidates = value if isinstance(value, list) else [value]
+
+            for candidate in candidates:
+                candidate = drop_placeholder(candidate)
+
+                if is_empty_value(candidate):
+                    continue
+
+                results.append(candidate)
+
+        return results
+
+
 class ConcatPathHandler(BaseHandler):
     def handle(self, rule, raw_json, item=None, anchor=None):
         if not rule.source_value:
@@ -699,6 +735,7 @@ HANDLERS = {
     "explode": ExplodeHandler(),
     "parallel_path": ParallelPathHandler(),
     "path_expand": PathExpandHandler(),
+    "list_expand": ListExpandHandler(),
     "conditional_path": ConditionalPathHandler(),
     "conditional_exclude_path": ConditionalExcludePathHandler(),
     "concat_path": ConcatPathHandler(),
@@ -845,6 +882,7 @@ class GroupProcessor:
             return all_items
 
         path_expand_rule = self._find_rule(rules, "path_expand")
+        list_expand_rule = self._find_rule(rules, "list_expand")
         expand_rule = self._find_rule(rules, "expand")
         explode_rule = self._find_rule(rules, "explode")
 
@@ -853,6 +891,13 @@ class GroupProcessor:
                 rules,
                 raw_json,
                 path_expand_rule
+            )
+
+        if list_expand_rule:
+            return self._process_expand_group(
+                rules,
+                raw_json,
+                list_expand_rule
             )
 
         if expand_rule:
@@ -1025,7 +1070,7 @@ class GroupProcessor:
                 if not leaf:
                     continue
 
-                if st in ["expand", "explode"]:
+                if st in ["expand", "explode", "list_expand"]:
                     obj[leaf] = expand_value
 
                 elif st == "parallel_path":
@@ -1036,7 +1081,10 @@ class GroupProcessor:
                     )
 
                     if i < len(values) and values[i] is not None:
-                        obj[leaf] = values[i]
+                        obj[leaf] = normalize_scalar(
+                            values[i],
+                            obj[leaf],
+                        )
 
                 else:
                     handler = HANDLERS.get(st)
