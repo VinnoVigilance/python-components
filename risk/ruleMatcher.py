@@ -96,11 +96,12 @@ def _merge_contributions(contributions: list) -> list:
         key = (c["category"], c["subcategory"])
         conf = c["confidence"] if c["confidence"] is not None else 0.0
 
+        ind = c.get("indicator")  # rule contributions have none; LLM ones may
         if key not in merged:
             merged[key] = {
                 "Category": c["category"],
                 "SubCategory": c["subcategory"],
-                "Indicators": [],
+                "Indicators": [ind] if ind else [],
                 "Confidence": conf,
                 "Method": [c["method"]],
                 "Evidence": [c["evidence"]],
@@ -109,6 +110,8 @@ def _merge_contributions(contributions: list) -> list:
         else:
             e = merged[key]
             e["Confidence"] = max(e["Confidence"], conf)
+            if ind and ind not in e["Indicators"]:
+                e["Indicators"].append(ind)
             if c["method"] not in e["Method"]:
                 e["Method"].append(c["method"])
             if c["evidence"] not in e["Evidence"]:
