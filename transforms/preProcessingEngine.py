@@ -467,3 +467,33 @@ class PreProcessingEngine:
                 profile_fields[field] = ""
 
         return record
+    
+    def filter_missing_required_field(self, records, config):
+        required_field = config["field"]
+
+        valid_records = []
+        rejected_count = 0
+
+        for record_index, record in enumerate(records, start=1):
+            field_value = str(
+                record.get(required_field, "")
+            ).strip()
+
+            if not field_value:
+                rejected_count += 1
+
+                print(
+                    f"[WARNING] Record {record_index} skipped: "
+                    f"{required_field} is missing."
+                )
+
+                continue
+
+            valid_records.append(record)
+
+        print(
+            f"[VALIDATION] {rejected_count} invalid records skipped. "
+            f"{len(valid_records)} valid records remaining."
+        )
+
+        return valid_records

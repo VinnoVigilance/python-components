@@ -2,7 +2,7 @@ def find_source_id(cursor,source_name: str,) -> int | None:
     cursor.execute(
         """
         SELECT id
-        FROM common.lkup_source_list
+        FROM common.lkup_source
         WHERE name = %s
         """,
         (source_name,),

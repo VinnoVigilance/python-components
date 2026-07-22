@@ -278,7 +278,7 @@ if __name__ == "__main__":
 
     try:
         pipeline_result = run_watchlist_pipeline(
-            watchlist_name="ATC-DESIGNATED-TERRORIST-INDIVIDUALS",
+            watchlist_name="OFAC-NON-SDN",
         )
 
         pprint(pipeline_result)

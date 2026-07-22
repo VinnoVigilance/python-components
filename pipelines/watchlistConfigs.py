@@ -6,12 +6,11 @@ WATCHLIST_CONFIGS = {
         "date_order": "DMY",
         "list_name": "DFAT",
         "download_method": "HTTPS",
-        "url": (
-            "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx"
-        ),
+        "url": ("https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx"),
         "file_type": "xlsx",
         "external_id_path": "Reference",
         "schedule": "daily",
+        "versioning_strategy": "continuous",
         "preprocessing": [
             {
                 "handler": "merge_dfat_split_records",
@@ -32,6 +31,7 @@ WATCHLIST_CONFIGS = {
         "root_tags": ["entity"],
         "external_id_path": "id",
         "schedule": "daily",
+        "versioning_strategy": "continuous",
     },
 
     "OFAC-NON-SDN": {
@@ -39,6 +39,7 @@ WATCHLIST_CONFIGS = {
         "date_order": "DMY",
         "list_name": "OFAC-NON-SDN",
         "download_method": "HTTPS",
+        "versioning_strategy": "continuous",
         "url": (
             "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/CONS_ENHANCED.XML"
         ),
@@ -53,6 +54,7 @@ WATCHLIST_CONFIGS = {
         "date_order": "DMY",
         "list_name": "UKSL",
         "download_method": "HTTPS",
+        "versioning_strategy": "continuous",
         "url": (
             "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml"
         ),
@@ -69,7 +71,8 @@ WATCHLIST_CONFIGS = {
         "date_order": "MDY",
         "list_name": "DNFBP",
         "download_method": "Manual",
-        "external_id_path": "unique_id",
+        "external_id_path": "INSTITUTION CODE",
+        "versioning_strategy": "continuous",
         "local_path": (
             "data/downloads/a3923f9e-5afc-4102-9899-8fc5a8f07f41_Registered Designated Non-Financial Businesses and Professions (DNFBPs) as of 31 March 2026.pdf"
         ),
@@ -198,12 +201,15 @@ WATCHLIST_CONFIGS = {
         "date_order": "DMY",
         "list_name": "ATC-DESIGNATED-TERRORIST-GROUPS",
         "download_method": "Manual",
+        "versioning_strategy": "continuous",
         "url": "https://atc.gov.ph/groups/",
         "file_type": "html",
         "external_id_path": "unique_id",
         "schedule": "daily",
         "local_path": (
-            "data/downloads/"
+            "data/downloads/ATC/"
+            "ATC-DESIGNATED-TERRORIST-GROUPS/"
+            "year=2026/month=07/day=21/"
             "Designated Terrorist Groups _ "
             "Anti-Terrorism Council.html"
         ),
@@ -246,7 +252,8 @@ WATCHLIST_CONFIGS = {
         "source_name": "EU",
         "date_order": "DMY",
         "list_name": "EU-TRAVEL-BAN",
-        "download_method": "Manual",
+        "download_method": "HTTPS",
+        "versioning_strategy": "continuous",
         "url": (
             "https://www.sanctionsmap.eu/"
             "api/v1/travelbans/file/101"
@@ -256,24 +263,39 @@ WATCHLIST_CONFIGS = {
         "root_tags": ["sanctionEntity"],
         "schedule": "daily",
         "filename_aliases": ["TRAVEL"],
+        "preprocessing": [
+            {
+                "handler": "filter_missing_required_field",
+                "level": "dataset",
+                "config": {
+                    "field": "logicalId",
+                },
+            },
+        ],
     },
     "UN-SANCTIONS": {
-        "source_name": "UN-SANCTIONS",
+        "source_name": "UN",
+        "list_name": "UN-SANCTIONS",
         "date_order": "DMY",
         "url": "https://scsanctions.un.org/resources/xml/en/consolidated.xml",
         "file_type": "xml",
         "root_tags": ["INDIVIDUAL", "ENTITY"],
         "external_id_path": "DATAID",
         "filename_aliases": ["UN"],
+        "download_method": "HTTPS",
+        "versioning_strategy": "continuous",
+
     },
     "EU-FINANCIAL-SANCTIONS": {
-        "source_name": "EU-FINANCIAL-SANCTIONS",
+        "source_name": "EU",
+        "list_name": "EU-FINANCIAL-SANCTIONS",
         "date_order": "DMY",
         "url": "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw",
         "file_type": "xml",
         "root_tags": ["sanctionEntity"],
         "external_id_path": "logicalId",
         "filename_aliases": ["EU"],
+        "download_method": "HTTPS",
+        "versioning_strategy": "continuous",
     },
-
 }
