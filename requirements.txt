@@ -1,0 +1,30 @@
+# Python dependencies for the watchlist / python-components pipeline.
+# Versions pinned to what is installed and verified in the vv-env venv.
+# Install:  pip install -r requirements.txt
+# Standard-library modules (json, re, pathlib, unicodedata, ...) are not listed.
+
+# --- Core data / rules (Excel-driven mapping + normalization) ---
+pandas==3.0.3
+openpyxl==3.1.5
+
+# --- Search enrichment (ES-substitute derived fields) ---
+anyascii==0.3.3          # transliterate any script to ASCII/English
+DoubleMetaphone==1.2     # phonetic "sounds-like" key
+pycountry==26.2.16       # country name -> ISO2 code
+
+# --- Parsing (source files: XML / tabular / PDF / HTML) ---
+lxml==6.1.1
+pdfplumber==0.11.10
+Scrapy==2.17.0
+nameparser==1.4.0
+
+# --- Ingestion / infrastructure ---
+requests==2.34.2         # source file downloads
+psycopg2-binary==2.9.12  # PostgreSQL access
+boto3                    # SeaweedFS/S3 storage client (not pinned: install if using infrastructure/storage)
+
+# --- LLM (risk classification / extraction) ---
+ollama==0.6.2
+
+# --- Analyst UI (utils/vvAnalystApp.py) ---
+streamlit==1.59.2
