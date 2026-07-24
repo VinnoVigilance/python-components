@@ -5,6 +5,14 @@ from datetime import datetime
 import re
 
 from transforms.dateResolver import resolve_dates
+from transforms.searchEnrichment import (
+    normalize_text,
+    tokenize,
+    phonetic_key,
+    detect_language,
+    country_to_iso2,
+    normalize_number,
+)
 
 
 def empty_dependency_handler(entity, rule, config=None):
@@ -112,9 +120,72 @@ def deduplicate_all_arrays_handler(entity, rule, config=None):
     entity.update(cleaned)
 
 
+# The search-support transforms a SEARCH_ENRICH rule can apply. Keyed by the
+# rule's ``action`` column so one handler covers Normalized_*, Search_Tokens and
+# Phonetic_Key without a handler each.
+_SEARCH_TRANSFORMS = {
+    "NORMALIZE": normalize_text,
+    "TOKENIZE": tokenize,
+    "PHONETIC": phonetic_key,
+    "LANGUAGE": detect_language,
+    "COUNTRY_CODE": country_to_iso2,
+    "NORMALIZE_NUMBER": normalize_number,
+}
+
+
+def _split_array_path(path):
+    """Split "Names[].Name" into ("Names", "Name").
+
+    Both the source (``condition_path``) and target (``target_path``) of a
+    SEARCH_ENRICH rule name a leaf inside the same array, e.g. the name lives at
+    ``Names[].Name`` and its normalized form at ``Names[].Normalized_Name``.
+    """
+    left, _, right = str(path).partition("[]")
+    return left.strip(". "), right.strip(". ")
+
+
+def search_enrich_handler(entity, rule, config=None):
+    """Fill a computed search field on every element of an array.
+
+    Reads the source leaf named by ``condition_path`` (e.g. Names[].Name) and
+    writes ``target_path``'s leaf (e.g. Names[].Normalized_Name) with the
+    transform named in ``action``. When ``condition`` is "IF_EMPTY" an element
+    that already carries a value (e.g. a Language the source provided) is left
+    untouched; otherwise the computed value always wins, since these fields have
+    no meaning except as a fresh derivation of the source text.
+    """
+    source_list, source_leaf = _split_array_path(rule["condition_path"])
+    target_list, target_leaf = _split_array_path(rule["target_path"])
+
+    action = str(rule.get("action") or "").strip().upper()
+    transform = _SEARCH_TRANSFORMS.get(action)
+
+    if transform is None:
+        return
+
+    only_if_empty = (
+        str(rule.get("condition") or "").strip().upper() == "IF_EMPTY"
+    )
+
+    items = entity.get(source_list)
+
+    if not isinstance(items, list):
+        return
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        if only_if_empty and item.get(target_leaf) not in (None, "", [], {}):
+            continue
+
+        item[target_leaf] = transform(item.get(source_leaf))
+
+
 HANDLERS = {
     "EMPTY_DEPENDENCY": empty_dependency_handler,
     "DATE_NORMALIZATION": date_normalization_handler,
+    "SEARCH_ENRICH": search_enrich_handler,
     "DEDUPLICATE_ALL_ARRAYS": deduplicate_all_arrays_handler,
 }
 
