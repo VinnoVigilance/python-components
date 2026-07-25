@@ -22,6 +22,7 @@ nameparser==1.4.0
 requests==2.34.2         # source file downloads
 psycopg2-binary==2.9.12  # PostgreSQL access
 boto3                    # SeaweedFS/S3 storage client (not pinned: install if using infrastructure/storage)
+python-dotenv==1.0.1     # load config/secrets from a local .env file
 
 # --- LLM (risk classification / extraction) ---
 ollama==0.6.2
