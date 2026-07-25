@@ -14,11 +14,7 @@ testpaths = ["test"]
 #   -v                 verbose: list every test by name (the "detailed" output you wanted)
 #   --strict-markers   fail if a test uses a marker we did not declare below (catches typos)
 #   --import-mode      import tests without needing __init__.py files everywhere
-#
-# The --ignore line excludes the OLD interactive script that asks input()
-# questions and would hang the robot. It should be converted into real tests
-# (see test/README.md) and then removed from this list.
-addopts = "-v --strict-markers --import-mode=importlib --ignore=test/parsing/test_xml_parser.py"
+addopts = "-v --strict-markers --import-mode=importlib"
 
 # Markers let us group tests so we can run a subset, e.g. `pytest -m unit`.
 markers = [
