@@ -16,10 +16,12 @@ from transforms.fieldMapper import (
     JsonPath,
     MappingEngine,
     Rule,
+    coerce_to_field_type,
     default_value,
     detect_entity_type,
     drop_placeholder,
     normalize_bool,
+    scrub_na_placeholders,
     strip_anchor_prefix,
     unquote,
     values_equal,
@@ -83,6 +85,45 @@ class TestSmallHelpers:
         assert drop_placeholder("UNKNOWN") is None
         assert drop_placeholder("Baghdad") == "Baghdad"
         assert drop_placeholder(123) == 123
+
+    def test_drop_placeholder_keeps_namibia_country_code(self):
+        # "NA" is Namibia's ISO code, a real value -- it must NOT be dropped.
+        assert drop_placeholder("NA") == "NA"
+
+    def test_coerce_to_field_type_collapses_list_for_scalar(self):
+        # A scalar field must never hold a list (the UN DateUpdated fix).
+        assert coerce_to_field_type(["2016-10-13", "2020-11-02"], "string") == "2016-10-13"
+        assert coerce_to_field_type(["", "x"], "string") == "x"  # first non-empty
+        assert coerce_to_field_type("single", "string") == "single"
+
+    def test_coerce_to_field_type_leaves_arrays_untouched(self):
+        assert coerce_to_field_type(["a", "b"], "array") == ["a", "b"]
+
+    def test_scrub_na_keeps_it_in_name_and_country_fields(self):
+        record = {
+            "Names": [{"Name": "NA"}],           # name fragment -> keep
+            "Countries": [{"Country": "NA"}],    # Namibia -> keep
+            "Nationalities": [{"Country": "NA"}],
+        }
+        result = scrub_na_placeholders(record)
+        assert result["Names"][0]["Name"] == "NA"
+        assert result["Countries"][0]["Country"] == "NA"
+        assert result["Nationalities"][0]["Country"] == "NA"
+
+    def test_scrub_na_drops_it_elsewhere(self):
+        record = {
+            "Programs": [{"Program": "NA"}],     # "not available" -> drop
+            "Gender": "NA",
+        }
+        result = scrub_na_placeholders(record)
+        assert result["Programs"][0]["Program"] == ""
+        assert result["Gender"] == ""
+
+    def test_scrub_na_keeps_nested_search_tokens_under_names(self):
+        # Anything nested under a name-like key stays safe.
+        record = {"Names": [{"Search_Tokens": ["na", "wang"]}]}
+        result = scrub_na_placeholders(record)
+        assert result["Names"][0]["Search_Tokens"] == ["na", "wang"]
 
     def test_strip_anchor_prefix(self):
         assert strip_anchor_prefix("names[].full", "names[]") == "full"

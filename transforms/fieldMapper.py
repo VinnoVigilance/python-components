@@ -206,6 +206,27 @@ def normalize_scalar(value: Any, fallback=""):
     return value
 
 
+def coerce_to_field_type(value: Any, target_type: Optional[str]) -> Any:
+    """Make a value obey the Field Type the mapping declares.
+
+    A field declared as a scalar (e.g. Field Type "string") must never hold a
+    list. When a source path resolves to several values -- for example UN
+    publishes several <VALUE> under one LAST_DAY_UPDATED, so DateUpdated would
+    otherwise become ["2016-10-13", "2020-11-02"] -- keep the first non-empty
+    value so the declared type holds. Array fields are left untouched.
+    """
+    if str(target_type or "").strip().lower() in {"array", "list"}:
+        return value
+
+    if isinstance(value, list):
+        for item in value:
+            if not is_empty_value(item):
+                return item
+        return ""
+
+    return value
+
+
 def detect_entity_type(raw_json: dict) -> str:
     val = (
         raw_json.get("entity_type")
@@ -256,13 +277,49 @@ def default_value(target_type: str):
 # Note: pickLists.xlsx defines "Unknown" as a legitimate value for Gender
 # and Measures.Status. No source currently produces it there, but if one
 # ever does it will be dropped by this and needs an exception.
-PLACEHOLDER_VALUES = {"N/A", "NA", "NONE", "NULL", "UNKNOWN", "-", "--"}
+# "NA" is deliberately NOT here: it is the ISO 3166 country code for Namibia,
+# and treating it as a placeholder would silently drop a real country. Sources
+# that mean "not available" use "N/A".
+PLACEHOLDER_VALUES = {"N/A", "NONE", "NULL", "UNKNOWN", "-", "--"}
 
 
 def drop_placeholder(value: Any) -> Any:
     """Turn a source's word for "nothing" into an actual nothing."""
     if isinstance(value, str) and value.strip().upper() in PLACEHOLDER_VALUES:
         return None
+
+    return value
+
+
+# "NA" is ambiguous: under a name or country field it is a real value (a name
+# fragment, or Namibia's ISO 3166 code), but elsewhere it usually means "not
+# available". So it is scrubbed everywhere EXCEPT under these field names.
+NA_SAFE_FIELD_HINTS = ("name", "alias", "country", "nationalit", "citizenship")
+
+
+def _is_na_safe_key(key: Any) -> bool:
+    lowered = str(key).lower()
+    return any(hint in lowered for hint in NA_SAFE_FIELD_HINTS)
+
+
+def scrub_na_placeholders(value: Any, safe: bool = False) -> Any:
+    """Drop a bare "NA" value unless it sits under a name/country-type field.
+
+    ``safe`` becomes True once any ancestor key is name/country-like and stays
+    True for everything nested under it, so e.g. Names[].* keeps "NA" while
+    Programs[].* does not.
+    """
+    if isinstance(value, dict):
+        return {
+            key: scrub_na_placeholders(val, safe or _is_na_safe_key(key))
+            for key, val in value.items()
+        }
+
+    if isinstance(value, list):
+        return [scrub_na_placeholders(item, safe) for item in value]
+
+    if not safe and isinstance(value, str) and value.strip().upper() == "NA":
+        return ""
 
     return value
 
@@ -1149,7 +1206,7 @@ class MappingEngine:
                 JsonPath.set(
                     output,
                     rule.target_path,
-                    value
+                    coerce_to_field_type(value, rule.target_type),
                 )
 
         for _, group_rules in grouped.items():
@@ -1162,7 +1219,7 @@ class MappingEngine:
 
             JsonPath.set(output, root, items)
 
-        return output
+        return scrub_na_placeholders(output)
 
 
 # =========================================================
