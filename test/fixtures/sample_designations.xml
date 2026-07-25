@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tiny fixture for XmlParser tests. Two designations; the first repeats a
+     child tag (Alias) so the list-collapsing behaviour is exercised. -->
+<Designations>
+    <Designation id="1">
+        <Name>John Smith</Name>
+        <Country>US</Country>
+        <Alias>Johnny</Alias>
+        <Alias>J. Smith</Alias>
+    </Designation>
+    <Designation id="2">
+        <Name>Jane Doe</Name>
+        <Country>GB</Country>
+    </Designation>
+</Designations>
