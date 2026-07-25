@@ -1,0 +1,78 @@
+# GitHub Actions workflow -- the "robot" (Continuous Integration).
+#
+# GitHub runs this automatically on a fresh Linux machine every time someone
+# pushes to main/staging or opens a pull request into them. If any test fails,
+# the commit / PR gets a red X and the pusher gets an email.
+#
+# No GitLab or external service needed -- this runs on GitHub for free.
+
+name: tests
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  tests:
+    name: Tests (unit + mocked, no real DB)
+    runs-on: ubuntu-latest
+
+    # Dummy values so that modules which read config at import time (via
+    # config/settings.py) can be imported. No real secret is ever used or
+    # needed here: the tests that run below never open a real connection.
+    env:
+      DB_PASSWORD: ci_dummy_password
+      STORAGE_SECRET_KEY_INGESTION: ci_dummy_secret
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      # Run everything EXCEPT tests that need a real database, live internet,
+      # or a full end-to-end pipeline. Those tiers require infrastructure that
+      # is not wired into CI yet (see test/README.md).
+      - name: Run tests
+        run: pytest -m "not db and not network and not e2e" --cov --cov-report=term-missing
+
+  # ---------------------------------------------------------------------------
+  # FUTURE: a second job for real-database integration tests. It needs a
+  # PostgreSQL service container AND the project's schema loaded into it. Once
+  # a schema/migration file is committed, uncomment and finish this job.
+  #
+  # database-tests:
+  #   name: Database integration tests
+  #   runs-on: ubuntu-latest
+  #   services:
+  #     postgres:
+  #       image: postgres:16
+  #       env:
+  #         POSTGRES_PASSWORD: postgres
+  #         POSTGRES_DB: vinno_vigilance_test
+  #       ports: ["5432:5432"]
+  #       options: >-
+  #         --health-cmd pg_isready --health-interval 10s
+  #         --health-timeout 5s --health-retries 5
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #       with: { python-version: "3.12", cache: pip }
+  #     - run: pip install -r requirements.txt -r requirements-dev.txt
+  #     - run: psql ... < schema.sql        # load the schema
+  #     - env:
+  #         TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vinno_vigilance_test
+  #       run: pytest -m db
+  # ---------------------------------------------------------------------------

@@ -1,0 +1,44 @@
+# Project tooling configuration.
+#
+# This file currently only configures pytest (the test runner) and coverage.
+# Runtime dependencies still live in requirements.txt; test-only dependencies
+# live in requirements-dev.txt.
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+
+# Where pytest looks for tests.
+testpaths = ["test"]
+
+# Default options applied to every `pytest` run:
+#   -v                 verbose: list every test by name (the "detailed" output you wanted)
+#   --strict-markers   fail if a test uses a marker we did not declare below (catches typos)
+#   --import-mode      import tests without needing __init__.py files everywhere
+#
+# The --ignore line excludes the OLD interactive script that asks input()
+# questions and would hang the robot. It should be converted into real tests
+# (see test/README.md) and then removed from this list.
+addopts = "-v --strict-markers --import-mode=importlib --ignore=test/parsing/test_xml_parser.py"
+
+# Markers let us group tests so we can run a subset, e.g. `pytest -m unit`.
+markers = [
+    "unit: fast pure-logic test. No database, no network, no filesystem services.",
+    "integration: touches a real database, storage, or external service.",
+    "db: requires a running PostgreSQL database.",
+    "network: requires live internet access (source websites).",
+    "e2e: end-to-end run of the whole pipeline.",
+]
+
+[tool.coverage.run]
+# When you run `pytest --cov`, measure coverage of our own code only.
+branch = true
+omit = [
+    "vv-env/*",
+    "test/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+# Show which specific lines are untested.
+show_missing = true
+skip_covered = false

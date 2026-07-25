@@ -1,0 +1,9 @@
+# Development / testing dependencies.
+# These are NOT needed to run the pipeline, only to run the test suite.
+# Install:  pip install -r requirements-dev.txt
+#
+# Kept separate from requirements.txt so the CI robot and developers can
+# install the test tools without pulling the whole runtime stack.
+
+pytest==8.3.4          # test runner
+pytest-cov==5.0.0      # coverage report ("which lines were never tested")
