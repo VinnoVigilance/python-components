@@ -7,7 +7,9 @@ from nameparser import HumanName
 from scrapy import Selector
 
 
-EMPTY_VALUES = {"", "N/A", "NA", "NONE", "NULL", "UNKNOWN", "-"}
+# "NA" is intentionally excluded: it is Namibia's ISO country code, not a
+# "nothing here" marker. Sources that mean empty use "N/A".
+EMPTY_VALUES = {"", "N/A", "NONE", "NULL", "UNKNOWN", "-"}
 
 
 class PreProcessingEngine:
