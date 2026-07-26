@@ -99,6 +99,44 @@ class TestClassifyRecord:
 
         assert "RiskCategories" not in record  # worked on a deepcopy
 
+    def test_base_category_taken_from_dataset_category(self):
+        # DatasetCategory on the record drives the top-level Category; the
+        # ListScope subcategory is kept only while it still belongs under it.
+        record = {
+            "Sources": [{"ListName": "OFAC-SDN", "DatasetCategory": "Sanctions"}],
+        }
+        result = RuleMatcher(make_config()).classify_record(record)
+
+        base = result["RiskCategories"][0]
+        assert base["Category"] == "Sanctions"
+        assert base["SubCategory"] == "Sanctioned"
+        # provenance is recorded in the evidence trail
+        assert any("DatasetCategory=Sanctions" in ev for ev in base["Evidence"])
+
+    def test_dataset_category_override_drops_orphaned_subcategory(self):
+        # If DatasetCategory names a different (valid) parent than the ListScope
+        # subcategory, the now-orphaned subcategory is dropped rather than
+        # emitting an invalid (Category, SubCategory) pair.
+        record = {
+            "Sources": [{"ListName": "OFAC-SDN", "DatasetCategory": "Crime"}],
+        }
+        result = RuleMatcher(make_config()).classify_record(record)
+
+        base = next(c for c in result["RiskCategories"] if c["Category"] == "Crime"
+                    and c["Method"] == "listscope")
+        assert base["SubCategory"] is None
+
+    def test_unknown_dataset_category_falls_back_to_listscope(self):
+        # A DatasetCategory the risk taxonomy does not know is ignored; the
+        # ListScope DefaultCategory still supplies the base label.
+        record = {
+            "Sources": [{"ListName": "OFAC-SDN", "DatasetCategory": "Bogus"}],
+        }
+        result = RuleMatcher(make_config()).classify_record(record)
+
+        labels = {(c["Category"], c["SubCategory"]) for c in result["RiskCategories"]}
+        assert ("Sanctions", "Sanctioned") in labels
+
 
 class TestMergeContributions:
     def test_same_label_is_merged_keeping_max_confidence_and_union_of_sources(self):

@@ -4,10 +4,16 @@ Rule matcher for the Risk Category Engine (deterministic layers 1 + 2).
 Given a mapped record and a loaded RiskConfig, this produces the record's
 ``RiskCategories[]`` from:
 
-  Layer 1 - ListScope base label
-      Every included list contributes a base label from its ListName
-      (e.g. OFAC-SDN -> Sanctions/Sanctioned). This is the backbone: it is
-      present and clean for every included record.
+  Layer 1 - Base label (provenance)
+      Every included list contributes a base label. The top-level Category is
+      taken from the record's Sources[].DatasetCategory - the value the mapping
+      now stamps on every record - so the mapping is the single source of truth
+      for what a list "is". The SubCategory, Confidence and the in/out-of-scope
+      decision still come from ListScope. When a record carries no
+      DatasetCategory (older data, or a source that omits Sources[]) or one the
+      risk taxonomy does not know, the ListScope DefaultCategory is used as a
+      fallback, so the base label is never lost. This is the backbone: present
+      and clean for every included record.
 
   Layer 2 - Rules
       Field-match rules add further labels on top of the base
@@ -41,6 +47,23 @@ def _collect(record, array_key, item_key):
         if isinstance(item, dict):
             values.append(item.get(item_key))
     return values
+
+
+def _dataset_categories_by_list(record) -> dict:
+    """Map each source list name -> the DatasetCategory stamped on it in the
+    record's Sources[].
+
+    This is the provenance-driven top-level category the mapping now writes onto
+    every record; Layer 1 prefers it over the ListScope DefaultCategory.
+    """
+    out = {}
+    for item in record.get("Sources") or []:
+        if isinstance(item, dict):
+            ln = _norm(item.get("ListName"))
+            dc = _norm(item.get("DatasetCategory"))
+            if ln and dc:
+                out[ln] = dc
+    return out
 
 
 FIELD_RESOLVERS = {
@@ -166,20 +189,41 @@ class RuleMatcher:
             return entity
 
         contributions = []
+        dataset_cats = _dataset_categories_by_list(record)
 
-        # Layer 1: ListScope base label, one per included source.
+        # Layer 1: base label, one per included source. Top-level Category comes
+        # from the record's Sources[].DatasetCategory; SubCategory / Confidence /
+        # inclusion come from ListScope. Fall back to the ListScope
+        # DefaultCategory when the record carries no (known) DatasetCategory.
         for name in included:
             default = self.config.default_label(name)
-            if default:
-                cat, sub, conf = default
-                contributions.append({
-                    "category": cat,
-                    "subcategory": sub,
-                    "confidence": conf,
-                    "method": "listscope",
-                    "evidence": f"ListName={name}",
-                    "source": name,
-                })
+            if not default:
+                continue
+            base_cat, sub, conf = default
+
+            override = dataset_cats.get(name)
+            if override and override in self.config.categories:
+                cat = override
+                evidence = f"ListName={name} DatasetCategory={cat}"
+            else:
+                cat = base_cat
+                evidence = f"ListName={name}"
+
+            # Never emit an orphaned pair: if overriding the category leaves the
+            # ListScope subcategory under a different parent, drop the subcategory.
+            if sub is not None:
+                meta = self.config.subcategories.get(sub)
+                if not meta or meta.get("parent") != cat:
+                    sub = None
+
+            contributions.append({
+                "category": cat,
+                "subcategory": sub,
+                "confidence": conf,
+                "method": "listscope",
+                "evidence": evidence,
+                "source": name,
+            })
 
         # Layer 2: rules (priority order preserved from the loader).
         for rule in self.config.rules:
