@@ -23,7 +23,6 @@ markers = [
     "db: requires a running PostgreSQL database.",
     "network: requires live internet access (source websites).",
     "e2e: end-to-end run of the whole pipeline.",
-    "slow: slow test (e.g. parsing a large PDF); skipped unless --runslow is passed.",
 ]
 
 [tool.coverage.run]
