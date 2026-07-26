@@ -69,13 +69,13 @@ always obvious where a new test belongs.
 
 ## Markers (grouping / tiers)
 
-| marker         | meaning                                              | runs in CI? |
-|----------------|------------------------------------------------------|-------------|
-| `unit`         | pure logic or mocked I/O. Fast. Always safe.         | yes         |
-| `integration`  | touches a real database or service.                  | no (yet)    |
-| `db`           | needs a running PostgreSQL test database.            | no (yet)    |
-| `network`      | needs live internet (source websites).               | no          |
-| `e2e`          | full pipeline end-to-end.                            | no          |
+| marker         | meaning                                              | runs in CI?          |
+|----------------|------------------------------------------------------|----------------------|
+| `unit`         | pure logic or mocked I/O. Fast. Always safe.         | yes                  |
+| `integration`  | touches a real database or service.                  | yes (Postgres `db`)  |
+| `db`           | needs a running PostgreSQL test database.            | yes (service + schema)|
+| `network`      | needs live internet (source websites).               | no                   |
+| `e2e`          | full pipeline end-to-end.                            | no                   |
 
 Run one group: `pytest -m unit`. Skip groups: `pytest -m "not db and not network"`.
 
@@ -103,10 +103,27 @@ against a real PostgreSQL, protected by three layers (see
 To run them locally against a scratch database:
 
 ```bash
-# create a throwaway DB that has your schema, then:
+# 1. create a throwaway DB and load the committed schema into it
+createdb vinno_vigilance_test
+psql "postgresql://postgres:pw@localhost:5432/vinno_vigilance_test" \
+    -f db/schema/vigilance_core_standard_v2_phase1.sql
+# 2. point the tests at it and run only the db tier
 TEST_DATABASE_URL="postgresql://postgres:pw@localhost:5432/vinno_vigilance_test" \
     vv-env/Scripts/python.exe -m pytest -m db
 ```
+
+In CI this is fully automated: the `database-tests` job in
+`.github/workflows/tests.yml` starts a disposable Postgres, loads
+`db/schema/vigilance_core_standard_v2_phase1.sql`, and runs `pytest -m db`.
+
+### Do mapping changes need a schema change?
+
+No — for almost all edits. `data/rules/mapping.xlsx` changes often; the schema
+in `db/schema/` changes rarely. The full canonical record is stored as `jsonb`
+in `core.watchlist_member.full_payload`, so new/edited mapping rows just land
+there (and in the existing `member_*` tables) with no migration. You only touch
+the schema to introduce a brand-new structural table/column. See
+[db/README.md](../db/README.md) for the full explanation.
 
 ## How to add a test for a new step
 
@@ -125,6 +142,9 @@ Done:
 - DB code (mocked): `watchlistFileLogRepository`, `rawPayloadRepository`.
 - Parser factory; downloader model + delegation.
 - Safe real-DB harness with rollback + name guard.
+- Committed schema (`db/schema/`) and a real-Postgres CI job that loads it.
+- Real-DB tests for `coreMemberRepository`: insert / versioning / history /
+  delete detection / rollback isolation, plus a schema-drift smoke test.
 - CI robot running all of the above.
 
 Next:
@@ -134,6 +154,7 @@ Next:
   `test/parsing/test_xml_parser.py`, then delete it from the `--ignore` list in
   `pyproject.toml`).
 - Risk: `ruleMatcher`, `configLoader`.
-- Commit a schema/migration file so the real-DB job can be enabled in CI (the
-  second job in `.github/workflows/tests.yml` is scaffolded and commented).
+- Real-DB tests for the remaining repositories (`rawPayloadRepository`,
+  `watchlistFileLogRepository`, `attachmentRepository`) and the shred tables
+  (`member_name`, `member_alias`, ...) once the core service writes them.
 - End-to-end test of `run_watchlist_pipeline` with the downloader and DB mocked.

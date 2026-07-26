@@ -49,30 +49,58 @@ jobs:
         run: pytest -m "not db and not network and not e2e" --cov --cov-report=term-missing
 
   # ---------------------------------------------------------------------------
-  # FUTURE: a second job for real-database integration tests. It needs a
-  # PostgreSQL service container AND the project's schema loaded into it. Once
-  # a schema/migration file is committed, uncomment and finish this job.
-  #
-  # database-tests:
-  #   name: Database integration tests
-  #   runs-on: ubuntu-latest
-  #   services:
-  #     postgres:
-  #       image: postgres:16
-  #       env:
-  #         POSTGRES_PASSWORD: postgres
-  #         POSTGRES_DB: vinno_vigilance_test
-  #       ports: ["5432:5432"]
-  #       options: >-
-  #         --health-cmd pg_isready --health-interval 10s
-  #         --health-timeout 5s --health-retries 5
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with: { python-version: "3.12", cache: pip }
-  #     - run: pip install -r requirements.txt -r requirements-dev.txt
-  #     - run: psql ... < schema.sql        # load the schema
-  #     - env:
-  #         TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vinno_vigilance_test
-  #       run: pytest -m db
-  # ---------------------------------------------------------------------------
+  # Real-database integration tests. Spins up a disposable PostgreSQL, loads the
+  # committed schema into it, and runs the `db`-marked tests against it. Every
+  # such test rolls back its own transaction (see test/integration/conftest.py),
+  # so the database is only ever a scratch instance that is thrown away with the
+  # runner. This never touches any real environment.
+  database-tests:
+    name: Database integration tests (real Postgres)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vinno_vigilance_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+
+    # Dummy values so config-reading modules import cleanly. The tests connect
+    # via TEST_DATABASE_URL (below), not via these.
+    env:
+      DB_PASSWORD: ci_dummy_password
+      STORAGE_SECRET_KEY_INGESTION: ci_dummy_secret
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Load the schema into the test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d vinno_vigilance_test \
+            -v ON_ERROR_STOP=1 \
+            -f db/schema/vigilance_core_standard_v2_phase1.sql
+
+      - name: Run database integration tests
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vinno_vigilance_test
+        run: pytest -m db

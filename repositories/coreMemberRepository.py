@@ -314,7 +314,9 @@ def insert_deleted_member(
             current_member["entity_type_id"],
             current_member["version_no"] + 1,
             current_member["record_hash"],
-            current_member["full_payload"],
+            # full_payload arrives as a dict (jsonb read back by find_deleted_
+            # current_members); psycopg2 cannot adapt a bare dict, so wrap it.
+            Json(current_member["full_payload"]),
         ),
     )
 
