@@ -91,9 +91,12 @@ class TestSmallHelpers:
         assert drop_placeholder("NA") == "NA"
 
     def test_coerce_to_field_type_collapses_list_for_scalar(self):
-        # A scalar field must never hold a list (the UN DateUpdated fix).
-        assert coerce_to_field_type(["2016-10-13", "2020-11-02"], "string") == "2016-10-13"
-        assert coerce_to_field_type(["", "x"], "string") == "x"  # first non-empty
+        # A scalar field must never hold a list (the UN DateUpdated fix). We keep
+        # the LAST non-empty value: for a "last updated" field the values arrive
+        # in chronological order, so the last one is the most recent.
+        assert coerce_to_field_type(["2016-10-13", "2020-11-02"], "string") == "2020-11-02"
+        assert coerce_to_field_type(["x", ""], "string") == "x"  # last non-empty
+        assert coerce_to_field_type(["", "x"], "string") == "x"
         assert coerce_to_field_type("single", "string") == "single"
 
     def test_coerce_to_field_type_leaves_arrays_untouched(self):

@@ -212,14 +212,23 @@ def coerce_to_field_type(value: Any, target_type: Optional[str]) -> Any:
     A field declared as a scalar (e.g. Field Type "string") must never hold a
     list. When a source path resolves to several values -- for example UN
     publishes several <VALUE> under one LAST_DAY_UPDATED, so DateUpdated would
-    otherwise become ["2016-10-13", "2020-11-02"] -- keep the first non-empty
-    value so the declared type holds. Array fields are left untouched.
+    otherwise become ["2016-10-13", "2020-11-02"] -- collapse to a single value
+    so the declared type holds. Array fields are left untouched.
+
+    We keep the *last* non-empty value, not the first. The scalar fields that
+    actually receive a list are "latest/updated" fields (a modified-date
+    accumulates history and repeats; an added/created-date is written once and
+    does not), and those values arrive in chronological order, so the last one
+    is the most recent -- which is what "DateUpdated" should hold. This is the
+    single place that decides the collapse, so if a future field ever needs the
+    first value instead (or a date-aware max for unordered input), it changes
+    here and nowhere else.
     """
     if str(target_type or "").strip().lower() in {"array", "list"}:
         return value
 
     if isinstance(value, list):
-        for item in value:
+        for item in reversed(value):
             if not is_empty_value(item):
                 return item
         return ""
