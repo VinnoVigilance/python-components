@@ -1,15 +1,12 @@
 """
 Unit tests for parsing/pdfParser.py
 
-The DNFBP fixture is a real 210-page PDF, and extracting tables from all of it
-takes minutes -- too slow for every run. So:
+The DNFBP fixture is a small real PDF (a few pages), so we test at two levels:
 
-  * the parser's row/header LOGIC is tested with synthetic input (instant, and
-    it is where the real logic lives), and
-  * one end-to-end test parses the real committed PDF, marked `slow` so it is
-    skipped unless you pass `--runslow` (see conftest.py). CI skips it too.
-
-Run the slow one explicitly with:  pytest --runslow test/unit/parsing/test_pdfParser.py
+  * the parser's row/header LOGIC with synthetic input (instant, and it is where
+    the real logic lives), and
+  * one end-to-end test that parses the whole committed PDF, so the full extract
+    path runs on every push and in CI.
 """
 
 from functools import lru_cache
@@ -57,9 +54,8 @@ def _real_records():
     return tuple(PdfParser().parse(FIXTURE))
 
 
-@pytest.mark.slow
 class TestRealPdf:
-    """End-to-end over the real committed PDF. Slow; opt-in via --runslow."""
+    """End-to-end over the whole real committed PDF."""
 
     def test_extracts_rows(self):
         records = _real_records()

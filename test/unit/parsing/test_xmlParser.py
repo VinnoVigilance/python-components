@@ -16,6 +16,9 @@ pytestmark = pytest.mark.unit
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures"
 SAMPLE_XML = str(FIXTURES / "sample_designations.xml")
+# A trimmed slice of a real download (UKSL), so the parser is exercised against
+# real-world XML shape, not just the hand-written sample above.
+REAL_XML = str(FIXTURES / "parsing" / "uksl.xml")
 
 
 def test_parses_each_designation():
@@ -51,3 +54,15 @@ def test_non_matching_root_tag_yields_nothing():
     records = list(XmlParser().parse(SAMPLE_XML, root_tags=["DoesNotExist"]))
 
     assert records == []
+
+
+class TestRealXml:
+    """Parse a trimmed slice of a real UKSL download (root tag 'Designation')."""
+
+    def test_yields_designation_records(self):
+        records = list(XmlParser().parse(REAL_XML, root_tags=["Designation"]))
+
+        assert len(records) > 0
+        assert all(isinstance(r, dict) for r in records)
+        # UniqueID is the list's external id -- present on every real record.
+        assert all(r.get("UniqueID") for r in records)
