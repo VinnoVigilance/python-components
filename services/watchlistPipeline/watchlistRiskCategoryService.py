@@ -16,9 +16,19 @@ Two execution modes
 
 Versioning rules (guideline "Versioning Rules" table)
 -----------------------------------------------------
+    no risk category (empty result)      -> store nothing (see below)
     ADD/UPDATE + identical active hash  -> skip (no change)
     ADD/UPDATE + different/absent hash   -> expire current (if any) + insert new
     DELETE                               -> expire all active rows, no insert
+
+Empty classifications
+---------------------
+A member whose calculation yields no risk category is never written. This covers
+both a list the ListScope config marks as no-risk (e.g. DNFBP - the engine simply
+returns no labels for it) and an included-list record that could not be
+classified. Because an included list always contributes its provenance base label
+(Layer 1), an included member never yields an empty result, so skipping the empty
+case cannot leave a stale active row behind.
 
 Change detection is driven ENTIRELY by ``risk_details_hash`` (canonical SHA-256
 of ``risk_details``). ADD and UPDATE collapse to the same operation - compare the
@@ -70,11 +80,28 @@ def _apply_member(
 ) -> str:
     """ADD / UPDATE / Initial-Load logic for one member.
 
-    Returns "skipped" (hash unchanged) or "versioned" (expired old + inserted
-    new). Guarantees the one-active-row invariant by expiring any current row
-    before inserting.
+    Returns:
+        "empty"     - the member has no risk category, so nothing is stored;
+        "skipped"   - hash unchanged, already up to date;
+        "versioned" - expired the old active row (if any) and inserted a new one.
+
+    Guarantees the one-active-row invariant by expiring any current row before
+    inserting.
     """
     risk_details = engine.classify(full_payload)
+
+    # No risk category -> store nothing. Two ways a member lands here, both
+    # intentionally treated the same: (1) its list is marked no-risk in the
+    # ListScope config (e.g. DNFBP), so the engine returns no labels; (2) its
+    # list DOES carry a category but this particular record could not be
+    # classified. We never write an empty risk classification.
+    #
+    # For an included list the provenance base label (Layer 1) is always present,
+    # so an included member does not reach here - meaning we never leave a stale
+    # active row behind by skipping.
+    if not (risk_details.get("RiskCategories") or []):
+        return "empty"
+
     new_hash = calculate_record_hash(risk_details)
 
     current = risk_repo.find_current_risk(cursor, vv_member_id)
@@ -130,6 +157,7 @@ def run_initial_load(
     processed = 0
     versioned = 0
     skipped = 0
+    empty = 0
     since_commit = 0
     last_member_id = 0
 
@@ -164,6 +192,8 @@ def run_initial_load(
                     since_commit += 1
                     if outcome == "versioned":
                         versioned += 1
+                    elif outcome == "empty":
+                        empty += 1
                     else:
                         skipped += 1
 
@@ -188,13 +218,16 @@ def run_initial_load(
         "processed_count": processed,
         "versioned_count": versioned,
         "skipped_count": skipped,
+        "empty_count": empty,
         "deleted_count": 0,
     }
     logger.info(
-        "Risk Category Initial Load: processed=%s versioned=%s skipped=%s (%.1fs)",
+        "Risk Category Initial Load: processed=%s versioned=%s skipped=%s "
+        "empty=%s (%.1fs)",
         processed,
         versioned,
         skipped,
+        empty,
         perf_counter() - started_at,
     )
     return result
@@ -221,6 +254,7 @@ def run_incremental(
     processed = 0
     versioned = 0
     skipped = 0
+    empty = 0
     deleted = 0
     missing = 0
     since_commit = 0
@@ -288,6 +322,8 @@ def run_incremental(
                     since_commit += 1
                     if outcome == "versioned":
                         versioned += 1
+                    elif outcome == "empty":
+                        empty += 1
                     else:
                         skipped += 1
 
@@ -318,16 +354,18 @@ def run_incremental(
         "processed_count": processed,
         "versioned_count": versioned,
         "skipped_count": skipped,
+        "empty_count": empty,
         "deleted_count": deleted,
         "missing_count": missing,
     }
     logger.info(
-        "Risk Category ETL %s: processed=%s versioned=%s skipped=%s deleted=%s "
-        "missing=%s (%.1fs)",
+        "Risk Category ETL %s: processed=%s versioned=%s skipped=%s empty=%s "
+        "deleted=%s missing=%s (%.1fs)",
         effective_date,
         processed,
         versioned,
         skipped,
+        empty,
         deleted,
         missing,
         perf_counter() - started_at,

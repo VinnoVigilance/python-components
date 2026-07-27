@@ -29,7 +29,12 @@ pytestmark = pytest.mark.unit
 
 def _engine(risk_details=None):
     engine = MagicMock()
-    engine.classify.return_value = risk_details or {"RiskCategories": []}
+    # Default to a NON-empty classification so tests that expect a row to be
+    # written exercise the insert path. The empty result is a distinct, skipped
+    # case and is tested explicitly (pass {"RiskCategories": []}).
+    engine.classify.return_value = risk_details or {
+        "RiskCategories": [{"Category": "Sanctions", "SubCategory": "Sanctioned"}]
+    }
     return engine
 
 
@@ -66,6 +71,26 @@ def test_initial_load_inserts_new_member(monkeypatch):
     assert inserted["version_no"] == 2
     assert result["versioned_count"] == 1
     assert result["skipped_count"] == 0
+
+
+def test_initial_load_skips_empty_classification(monkeypatch):
+    # A member with no risk category (e.g. an excluded DNFBP list, or an
+    # unclassifiable record) is never written and short-circuits before any hash
+    # lookup or insert.
+    repo = MagicMock()
+    repo.find_current_members_batch.side_effect = [
+        [{"id": 10, "vv_member_id": "uuid-1", "version_no": 2, "full_payload": {}}],
+        [],
+    ]
+    _patch(monkeypatch, repo=repo)
+
+    result = svc.run_initial_load(engine=_engine({"RiskCategories": []}))
+
+    repo.insert_risk.assert_not_called()
+    repo.expire_current_risk.assert_not_called()
+    repo.find_current_risk.assert_not_called()
+    assert result["empty_count"] == 1
+    assert result["versioned_count"] == 0
 
 
 def test_initial_load_is_idempotent_on_matching_hash(monkeypatch):
@@ -111,6 +136,26 @@ def test_add_new_member_is_versioned(monkeypatch):
     repo.expire_current_risk.assert_not_called()
     assert result["effective_date"] == "2026-07-17"
     assert result["versioned_count"] == 1
+
+
+def test_add_empty_classification_is_not_inserted(monkeypatch):
+    # Incremental ADD whose calculation yields no risk category -> stored as
+    # nothing, counted as empty.
+    repo = MagicMock()
+    repo.find_delta_actions.return_value = [_delta("ADD")]
+    repo.find_member_by_id.return_value = {
+        "id": 10, "vv_member_id": "uuid-1", "version_no": 1, "full_payload": {},
+    }
+    _patch(monkeypatch, repo=repo)
+
+    result = svc.run_incremental(
+        effective_date="2026-07-17", engine=_engine({"RiskCategories": []})
+    )
+
+    repo.insert_risk.assert_not_called()
+    repo.find_current_risk.assert_not_called()
+    assert result["empty_count"] == 1
+    assert result["versioned_count"] == 0
 
 
 def test_update_same_hash_is_skipped(monkeypatch):
