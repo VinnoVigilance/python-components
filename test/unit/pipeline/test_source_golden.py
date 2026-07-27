@@ -51,9 +51,14 @@ SAMPLES = {
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
 # These are the human-blessed expected values; they must match the `constant`
-# handlers in mapping.xlsx exactly. DatasetCategory is the field added most
-# recently -- sanctions lists -> "Sanctions", ATC terrorism -> "Crime",
+# handlers in mapping.xlsx exactly -- sanctions lists -> "Sanctions",
 # DNFBP -> "Regulatory".
+#
+# DatasetCategory may be a SET when a list is inherently more than one thing:
+# ATC is both a terrorism designation and a targeted financial sanction, mapped
+# with the `*` handler, so each record produces two Sources[] entries carrying
+# "Crime" and "Sanctions" respectively. A set expects that spread across the
+# entries; a plain string expects that single value on every entry.
 GOLDEN = {
     "OFAC-SDN": {
         "SourceType": "Official", "DatasetCategory": "Sanctions",
@@ -88,11 +93,11 @@ GOLDEN = {
         "ListName": "UN-SANCTIONS", "SourceName": "UN",
     },
     "ATC-DESIGNATED-TERRORIST-INDIVIDUALS": {
-        "SourceType": "Official", "DatasetCategory": "Crime",
+        "SourceType": "Official", "DatasetCategory": {"Crime", "Sanctions"},
         "ListName": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS", "SourceName": "ATC",
     },
     "ATC-DESIGNATED-TERRORIST-GROUPS": {
-        "SourceType": "Official", "DatasetCategory": "Crime",
+        "SourceType": "Official", "DatasetCategory": {"Crime", "Sanctions"},
         "ListName": "ATC-DESIGNATED-TERRORIST-GROUPS", "SourceName": "ATC",
     },
     "DNFBP": {
@@ -130,13 +135,18 @@ def test_samples_and_golden_cover_the_same_lists():
 class TestSourceGolden:
 
     def test_sources_constants_match_expected(self, list_name):
-        expected = GOLDEN[list_name]
+        expected = dict(GOLDEN[list_name])
+        # DatasetCategory may be a set (a dual-natured list mapped with `*`
+        # produces one Sources[] entry per value); handle it per record rather
+        # than per entry.
+        dataset_expected = expected.pop("DatasetCategory")
         records = _canonical_records(list_name)
         assert records, f"{list_name}: no sample records loaded"
 
         saw_sources = False
         for rec in records:
-            for src in rec.get("Sources") or []:
+            sources = rec.get("Sources") or []
+            for src in sources:
                 saw_sources = True
                 for field, want in expected.items():
                     got = src.get(field)
@@ -144,6 +154,27 @@ class TestSourceGolden:
                         f"{list_name}: Sources[].{field} = {got!r}, expected "
                         f"{want!r} -- check the Sources[].{field} row under the "
                         f"'{list_name}' column in mapping.xlsx"
+                    )
+
+            if not sources:
+                continue
+
+            if isinstance(dataset_expected, (set, frozenset)):
+                got = {src.get("DatasetCategory") for src in sources}
+                assert got == set(dataset_expected), (
+                    f"{list_name}: DatasetCategory across Sources[] = {got!r}, "
+                    f"expected {set(dataset_expected)!r} -- check the `*` "
+                    f"DatasetCategory row under the '{list_name}' column in "
+                    f"mapping.xlsx"
+                )
+            else:
+                for src in sources:
+                    got = src.get("DatasetCategory")
+                    assert got == dataset_expected, (
+                        f"{list_name}: Sources[].DatasetCategory = {got!r}, "
+                        f"expected {dataset_expected!r} -- check the "
+                        f"Sources[].DatasetCategory row under the '{list_name}' "
+                        f"column in mapping.xlsx"
                     )
 
         assert saw_sources, (

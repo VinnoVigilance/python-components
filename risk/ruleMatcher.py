@@ -53,16 +53,26 @@ def _dataset_categories_by_list(record) -> dict:
     """Map each source list name -> the DatasetCategory stamped on it in the
     record's Sources[].
 
-    This is the provenance-driven top-level category the mapping now writes onto
-    every record; Layer 1 prefers it over the ListScope DefaultCategory.
+    This is the provenance-driven top-level category the mapping writes onto
+    every record; Layer 1 uses it to choose which categories a list contributes.
+
+    A list may be stamped with more than one category. A dual-natured list such
+    as ATC is mapped with the `*` handler, which emits one Sources[] entry per
+    category (Crime, Sanctions) sharing the same ListName; each entry carries a
+    single DatasetCategory. This collects them all, so a ListName maps to a
+    de-duplicated LIST of categories (order preserved).
     """
     out = {}
     for item in record.get("Sources") or []:
-        if isinstance(item, dict):
-            ln = _norm(item.get("ListName"))
-            dc = _norm(item.get("DatasetCategory"))
-            if ln and dc:
-                out[ln] = dc
+        if not isinstance(item, dict):
+            continue
+        ln = _norm(item.get("ListName"))
+        dc = _norm(item.get("DatasetCategory"))
+        if not ln or not dc:
+            continue
+        cats = out.setdefault(ln, [])
+        if dc not in cats:
+            cats.append(dc)
     return out
 
 
@@ -181,7 +191,12 @@ class RuleMatcher:
         if hinted and hinted not in list_names:
             list_names.append(hinted)
 
-        included = [n for n in list_names if self.config.is_included(n)]
+        # De-duplicate, preserving order: a dual-natured list (e.g. ATC) puts
+        # the same ListName on several Sources[] entries, so it would otherwise
+        # be classified once per entry.
+        included = list(dict.fromkeys(
+            n for n in list_names if self.config.is_included(n)
+        ))
 
         # No included source -> deliberately out of scope (e.g. DNFBP).
         if not included:
@@ -191,39 +206,64 @@ class RuleMatcher:
         contributions = []
         dataset_cats = _dataset_categories_by_list(record)
 
-        # Layer 1: base label, one per included source. Top-level Category comes
-        # from the record's Sources[].DatasetCategory; SubCategory / Confidence /
-        # inclusion come from ListScope. Fall back to the ListScope
-        # DefaultCategory when the record carries no (known) DatasetCategory.
+        # Layer 1: base label(s), one per category an included list carries. The
+        # record's Sources[].DatasetCategory chooses WHICH categories are stamped
+        # (a list may name one or several); the ListScope base labels supply the
+        # SubCategory / Confidence paired with each category. When the record
+        # carries no known DatasetCategory we fall back to the FULL ListScope
+        # label set, so a dual-natured list still yields both labels even on
+        # records that omit Sources[].
         for name in included:
-            default = self.config.default_label(name)
-            if not default:
+            base_labels = self.config.default_labels(name)
+            if not base_labels:
                 continue
-            base_cat, sub, conf = default
 
-            override = dataset_cats.get(name)
-            if override and override in self.config.categories:
-                cat = override
-                evidence = f"ListName={name} DatasetCategory={cat}"
+            # category -> (subcategory, confidence), authoritative from ListScope.
+            listscope_by_category = {}
+            for category, subcategory, confidence in base_labels:
+                listscope_by_category.setdefault(category, (subcategory, confidence))
+            primary_confidence = base_labels[0][2]
+
+            known_dataset_cats = [
+                category
+                for category in dataset_cats.get(name, [])
+                if category in self.config.categories
+            ]
+
+            if known_dataset_cats:
+                chosen = [
+                    (category, *listscope_by_category.get(
+                        category, (None, primary_confidence)), True)
+                    for category in known_dataset_cats
+                ]
             else:
-                cat = base_cat
-                evidence = f"ListName={name}"
+                chosen = [
+                    (category, subcategory, confidence, False)
+                    for category, subcategory, confidence in base_labels
+                ]
 
-            # Never emit an orphaned pair: if overriding the category leaves the
-            # ListScope subcategory under a different parent, drop the subcategory.
-            if sub is not None:
-                meta = self.config.subcategories.get(sub)
-                if not meta or meta.get("parent") != cat:
-                    sub = None
+            for category, subcategory, confidence, from_dataset in chosen:
+                # Never emit an orphaned pair: drop a subcategory that does not
+                # sit under this category.
+                if subcategory is not None:
+                    meta = self.config.subcategories.get(subcategory)
+                    if not meta or meta.get("parent") != category:
+                        subcategory = None
 
-            contributions.append({
-                "category": cat,
-                "subcategory": sub,
-                "confidence": conf,
-                "method": "listscope",
-                "evidence": evidence,
-                "source": name,
-            })
+                evidence = (
+                    f"ListName={name} DatasetCategory={category}"
+                    if from_dataset
+                    else f"ListName={name}"
+                )
+
+                contributions.append({
+                    "category": category,
+                    "subcategory": subcategory,
+                    "confidence": confidence,
+                    "method": "listscope",
+                    "evidence": evidence,
+                    "source": name,
+                })
 
         # Layer 2: rules (priority order preserved from the loader).
         for rule in self.config.rules:

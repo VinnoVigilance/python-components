@@ -138,6 +138,87 @@ class TestClassifyRecord:
         assert ("Sanctions", "Sanctioned") in labels
 
 
+def make_dual_config():
+    """A config whose ATC list is inherently two things: a terrorism
+    designation (Crime/Terrorism) and a targeted financial sanction
+    (Sanctions/Sanctioned), expressed as two ListScope base labels."""
+    return RiskConfig(
+        list_scope={
+            "ATC": ListScopeEntry(
+                list_name="ATC",
+                included=True,
+                nature="PH terrorism designation",
+                default_category="Crime",
+                default_subcategory="Terrorism",
+                confidence=1.0,
+                base_labels=[
+                    ("Crime", "Terrorism", 1.0),
+                    ("Sanctions", "Sanctioned", 1.0),
+                ],
+            ),
+        },
+        categories={"Sanctions": "d", "Crime": "d"},
+        subcategories={
+            "Terrorism": {"parent": "Crime", "description": None},
+            "Sanctioned": {"parent": "Sanctions", "description": None},
+        },
+        indicators={},
+        rules=[],
+    )
+
+
+class TestDualNaturedList:
+    def test_two_source_entries_emit_both_labels(self):
+        # The `*` mapping produces one Sources[] entry per DatasetCategory value,
+        # sharing one ListName. Each value selects its own ListScope base label.
+        record = {
+            "Sources": [
+                {"ListName": "ATC", "DatasetCategory": "Crime"},
+                {"ListName": "ATC", "DatasetCategory": "Sanctions"},
+            ],
+        }
+        result = RuleMatcher(make_dual_config()).classify_record(record)
+
+        pairs = {(c["Category"], c["SubCategory"]) for c in result["RiskCategories"]}
+        assert pairs == {("Crime", "Terrorism"), ("Sanctions", "Sanctioned")}
+        # provenance for each is recorded in the evidence trail
+        evidence = " ".join(
+            ev for c in result["RiskCategories"] for ev in c["Evidence"]
+        )
+        assert "DatasetCategory=Crime" in evidence
+        assert "DatasetCategory=Sanctions" in evidence
+
+    def test_duplicate_list_name_is_not_classified_twice(self):
+        # Two ATC entries share a ListName; the list must be processed once.
+        record = {
+            "Sources": [
+                {"ListName": "ATC", "DatasetCategory": "Crime"},
+                {"ListName": "ATC", "DatasetCategory": "Sanctions"},
+            ],
+        }
+        result = RuleMatcher(make_dual_config()).classify_record(record)
+        # exactly two labels, no duplicates from double-processing
+        assert len(result["RiskCategories"]) == 2
+
+    def test_no_dataset_category_falls_back_to_all_labels(self):
+        # A record that omits DatasetCategory (or Sources[]) still yields both
+        # base labels via the list-name hint -> the full ListScope label set.
+        record = {"Sources": [{"ListName": "ATC"}]}
+        result = RuleMatcher(make_dual_config()).classify_record(record, list_name="ATC")
+
+        pairs = {(c["Category"], c["SubCategory"]) for c in result["RiskCategories"]}
+        assert pairs == {("Crime", "Terrorism"), ("Sanctions", "Sanctioned")}
+        assert all(c["Method"] == "listscope" for c in result["RiskCategories"])
+
+    def test_dataset_category_subset_narrows_to_one_label(self):
+        # A single DatasetCategory selects only its matching base label.
+        record = {"Sources": [{"ListName": "ATC", "DatasetCategory": "Sanctions"}]}
+        result = RuleMatcher(make_dual_config()).classify_record(record)
+
+        pairs = {(c["Category"], c["SubCategory"]) for c in result["RiskCategories"]}
+        assert pairs == {("Sanctions", "Sanctioned")}
+
+
 class TestMergeContributions:
     def test_same_label_is_merged_keeping_max_confidence_and_union_of_sources(self):
         contributions = [

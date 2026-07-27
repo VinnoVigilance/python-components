@@ -8,6 +8,7 @@ helpers, the convenience accessors, and the cross-reference validation.
 
 import math
 
+import pandas as pd
 import pytest
 
 from risk.configLoader import (
@@ -16,6 +17,7 @@ from risk.configLoader import (
     Rule,
     _norm,
     _norm_float,
+    _parse_list_scope,
     _validate,
 )
 
@@ -99,6 +101,80 @@ class TestAccessors:
 
     def test_default_label_for_excluded_is_none(self):
         assert make_config().default_label("DNFBP") is None
+
+    def test_default_labels_single_category_returns_one(self):
+        # __post_init__ seeds base_labels from the primary, so a plainly-built
+        # single-label entry exposes exactly one label.
+        assert make_config().default_labels("OFAC-SDN") == [
+            ("Sanctions", "Sanctioned", 1.0),
+        ]
+
+    def test_default_labels_for_excluded_is_empty(self):
+        assert make_config().default_labels("DNFBP") == []
+
+    def test_default_labels_dual_natured_returns_all_primary_first(self):
+        entry = ListScopeEntry(
+            list_name="ATC",
+            included=True,
+            nature="PH terrorism designation",
+            default_category="Crime",
+            default_subcategory="Terrorism",
+            confidence=1.0,
+            base_labels=[
+                ("Crime", "Terrorism", 1.0),
+                ("Sanctions", "Sanctioned", 1.0),
+            ],
+        )
+        cfg = make_config()
+        cfg.list_scope["ATC"] = entry
+        # default_label still returns only the primary, for single-label callers.
+        assert cfg.default_label("ATC") == ("Crime", "Terrorism", 1.0)
+        assert cfg.default_labels("ATC") == [
+            ("Crime", "Terrorism", 1.0),
+            ("Sanctions", "Sanctioned", 1.0),
+        ]
+
+
+class TestParseListScope:
+    def _df(self, rows):
+        cols = [
+            "ListName", "Included", "Nature",
+            "DefaultCategory", "DefaultSubCategory", "Confidence", "Note",
+        ]
+        return pd.DataFrame(rows, columns=cols)
+
+    def test_single_row_seeds_one_base_label(self):
+        df = self._df([
+            ["OFAC-SDN", "Yes", "Sanctions", "Sanctions", "Sanctioned", 1.0, None],
+        ])
+        entry = _parse_list_scope(df)["OFAC-SDN"]
+        assert entry.default_category == "Sanctions"
+        assert entry.base_labels == [("Sanctions", "Sanctioned", 1.0)]
+
+    def test_two_rows_same_list_accumulate_base_labels(self):
+        # A dual-natured list is written as two ListScope rows -- every value in
+        # its own cell, no delimiters. They aggregate onto one entry, primary
+        # first, and the entry is included if any row says so.
+        df = self._df([
+            ["ATC", "Yes", "PH terror", "Crime", "Terrorism", 1.0, None],
+            ["ATC", "Yes", "PH terror", "Sanctions", "Sanctioned", 1.0, None],
+        ])
+        entry = _parse_list_scope(df)["ATC"]
+        assert entry.included is True
+        assert entry.default_category == "Crime"
+        assert entry.default_subcategory == "Terrorism"
+        assert entry.base_labels == [
+            ("Crime", "Terrorism", 1.0),
+            ("Sanctions", "Sanctioned", 1.0),
+        ]
+
+    def test_duplicate_label_rows_are_not_repeated(self):
+        df = self._df([
+            ["ATC", "Yes", "PH terror", "Crime", "Terrorism", 1.0, None],
+            ["ATC", "Yes", "PH terror", "Crime", "Terrorism", 1.0, None],
+        ])
+        entry = _parse_list_scope(df)["ATC"]
+        assert entry.base_labels == [("Crime", "Terrorism", 1.0)]
 
     def test_allowed_labels(self):
         assert make_config().allowed_labels() == {

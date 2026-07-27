@@ -67,6 +67,20 @@ class ListScopeEntry:
     default_category: Optional[str]
     default_subcategory: Optional[str]
     confidence: Optional[float]
+    # Every base label the list carries, as (category, subcategory, confidence)
+    # tuples, primary first. Most lists have exactly one. A few are inherently
+    # more than one thing -- e.g. ATC is both a terrorism designation (Crime)
+    # and a targeted financial sanction (Sanctions) -- and get one ListScope
+    # ROW per nature; those rows accumulate here (see _parse_list_scope).
+    # Auto-seeded from the primary so an entry built directly (e.g. in tests or
+    # a single-row list) still exposes its one label.
+    base_labels: list = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.base_labels and self.default_category:
+            self.base_labels = [
+                (self.default_category, self.default_subcategory, self.confidence)
+            ]
 
 
 @dataclass
@@ -112,6 +126,19 @@ class RiskConfig:
             return None
         return (entry.default_category, entry.default_subcategory, entry.confidence)
 
+    def default_labels(self, list_name: str) -> list:
+        """Return EVERY base label for a list as (category, subcategory,
+        confidence) tuples, or [] when the list is excluded / has no default.
+
+        Single-category lists return one tuple; inherently dual-natured lists
+        (e.g. ATC -> Crime/Terrorism + Sanctions/Sanctioned) return several.
+        Callers that only need the primary use :meth:`default_label`.
+        """
+        entry = self.list_scope.get(list_name)
+        if not entry or not entry.included:
+            return []
+        return list(entry.base_labels)
+
     def rules_for(self, list_name: str) -> list:
         return [r for r in self.rules if r.applies_to(list_name)]
 
@@ -156,20 +183,51 @@ class RiskConfig:
 # ---------------------------------------------------------------------------
 
 def _parse_list_scope(df: pd.DataFrame) -> dict:
+    """Build ListName -> ListScopeEntry.
+
+    A list normally occupies a single row. A list that is inherently more than
+    one risk category (e.g. ATC = a terrorism designation that is also a
+    targeted financial sanction) is written as SEVERAL rows sharing one
+    ListName, one per nature; the extra rows accumulate as additional base
+    labels on the same entry. This keeps every value in its own cell -- no
+    delimited multi-value cells -- and stays fully backward-compatible with the
+    one-row-per-list config.
+    """
     out = {}
     for _, row in df.iterrows():
         name = _norm(row.get("ListName"))
         if not name:
             continue
+
         included = (_norm(row.get("Included")) or "").lower() == "yes"
-        out[name] = ListScopeEntry(
-            list_name=name,
-            included=included,
-            nature=_norm(row.get("Nature")),
-            default_category=_norm(row.get("DefaultCategory")),
-            default_subcategory=_norm(row.get("DefaultSubCategory")),
-            confidence=_norm_float(row.get("Confidence")),
-        )
+        category = _norm(row.get("DefaultCategory"))
+        subcategory = _norm(row.get("DefaultSubCategory"))
+        confidence = _norm_float(row.get("Confidence"))
+
+        entry = out.get(name)
+        if entry is None:
+            # First row for this list -> __post_init__ seeds base_labels from
+            # the primary category (if any).
+            out[name] = ListScopeEntry(
+                list_name=name,
+                included=included,
+                nature=_norm(row.get("Nature")),
+                default_category=category,
+                default_subcategory=subcategory,
+                confidence=confidence,
+            )
+            continue
+
+        # Additional row for a list already seen -> another base label.
+        entry.included = entry.included or included
+        if category:
+            if entry.default_category is None:
+                entry.default_category = category
+                entry.default_subcategory = subcategory
+                entry.confidence = confidence
+            label = (category, subcategory, confidence)
+            if label not in entry.base_labels:
+                entry.base_labels.append(label)
     return out
 
 
@@ -269,16 +327,17 @@ def _validate(config: RiskConfig) -> list:
     for name, entry in config.list_scope.items():
         if not entry.included:
             continue
-        if entry.default_category and entry.default_category not in cats:
-            problems.append(
-                f"ListScope '{name}' DefaultCategory "
-                f"'{entry.default_category}' is not in Categories."
-            )
-        if entry.default_subcategory and entry.default_subcategory not in subs:
-            problems.append(
-                f"ListScope '{name}' DefaultSubCategory "
-                f"'{entry.default_subcategory}' is not in SubCategories."
-            )
+        for category, subcategory, _conf in entry.base_labels:
+            if category and category not in cats:
+                problems.append(
+                    f"ListScope '{name}' DefaultCategory "
+                    f"'{category}' is not in Categories."
+                )
+            if subcategory and subcategory not in subs:
+                problems.append(
+                    f"ListScope '{name}' DefaultSubCategory "
+                    f"'{subcategory}' is not in SubCategories."
+                )
 
     for rule in config.rules:
         if rule.add_category and rule.add_category not in cats:
