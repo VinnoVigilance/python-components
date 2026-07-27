@@ -62,11 +62,11 @@ BEGIN
     -- If any error occurs, PostgreSQL will automatically roll back the entire transaction block.
 
     -- STEP 13 & 18 (Step 7): Idempotency - Delete any existing records for the requested Effective Date.
-    DELETE FROM delivery.watchlist_daily_delta 
+    DELETE FROM delivery.watchlist_daily_delta_actions 
     WHERE effective_date = p_effective_date;
 
     -- STEP 7, 8, 9, 10, & 12: Extract and map the delta records using CTEs.
-    INSERT INTO delivery.watchlist_daily_delta (effective_date, action, vv_member_id, watchlist_member_id)
+    INSERT INTO delivery.watchlist_daily_delta_actions (effective_date, action, vv_member_id, watchlist_member_id)
     WITH daily_records AS (
         -- STEP 2 & 7: Retrieve all candidate records created ONLY during the requested business date.
         SELECT 
@@ -527,17 +527,17 @@ COMMENT ON COLUMN core.member_risk_category.is_current IS 'TRUE indicates the cu
 COMMENT ON COLUMN core.member_risk_category.created_at IS 'Timestamp when this version was created.';
 
 
-CREATE TABLE delivery.watchlist_daily_delta (
+CREATE TABLE delivery.watchlist_daily_delta_actions (
   id bigserial PRIMARY KEY,
   effective_date date NOT NULL,
   action text NOT NULL,
   vv_member_id uuid NOT NULL,
   watchlist_member_id bigint NOT NULL REFERENCES core.watchlist_member (id) DEFERRABLE INITIALLY IMMEDIATE
 );
-COMMENT ON COLUMN delivery.watchlist_daily_delta.id IS 'Unique identifier of the delta record.';
-COMMENT ON COLUMN delivery.watchlist_daily_delta.effective_date IS 'Effective date of the delta record.';
-COMMENT ON COLUMN delivery.watchlist_daily_delta.action IS 'Delta operation type (ADD, UPDATE, DELETE).';
-COMMENT ON COLUMN delivery.watchlist_daily_delta.watchlist_member_id IS 'Reference to the current active watchlist member.';
+COMMENT ON COLUMN delivery.watchlist_daily_delta_actions.id IS 'Unique identifier of the delta record.';
+COMMENT ON COLUMN delivery.watchlist_daily_delta_actions.effective_date IS 'Effective date of the delta record.';
+COMMENT ON COLUMN delivery.watchlist_daily_delta_actions.action IS 'Delta operation type (ADD, UPDATE, DELETE).';
+COMMENT ON COLUMN delivery.watchlist_daily_delta_actions.watchlist_member_id IS 'Reference to the current active watchlist member.';
 
 
 CREATE TABLE delivery.risk_category_daily_delta (

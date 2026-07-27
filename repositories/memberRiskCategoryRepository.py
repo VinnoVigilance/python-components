@@ -2,8 +2,8 @@
 Data access for the Member Risk Category ETL.
 
 Reads members from ``core.watchlist_member`` and the daily change actions from
-``delivery.watchlist_daily_delta``, and maintains the SCD Type 2 history in
-``core.member_risk_category`` (expire-then-insert, one active row per member).
+``delivery.watchlist_daily_delta_actions``, and maintains the SCD Type 2 history
+in ``core.member_risk_category`` (expire-then-insert, one active row per member).
 """
 
 from typing import Any
@@ -20,7 +20,7 @@ def find_max_effective_date(cursor) -> Any | None:
     cursor.execute(
         """
         SELECT MAX(effective_date)
-        FROM delivery.watchlist_daily_delta
+        FROM delivery.watchlist_daily_delta_actions
         """
     )
 
@@ -40,7 +40,7 @@ def find_delta_actions(
             action,
             vv_member_id,
             watchlist_member_id
-        FROM delivery.watchlist_daily_delta
+        FROM delivery.watchlist_daily_delta_actions
         WHERE effective_date = %s
         ORDER BY id
         """,
