@@ -27,7 +27,7 @@ EXPECTED_TABLES = [
     ("core", "member_name"),
     ("core", "member_alias"),
     ("core", "member_identifier"),
-    ("delivery", "watchlist_daily_delta_actions"),
+    ("delivery", "watchlist_daily_delta"),
 ]
 
 # Columns core.watchlist_member must expose -- these are exactly the columns the
