@@ -18,6 +18,7 @@ test_*.log
 vv-env/
 venv/
 .env/
+.venv/
 
 # ============================================
 # Python Cache & Build Files
