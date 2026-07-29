@@ -26,7 +26,7 @@ Usage
     python -m pipelines.riskCategoryPipeline --initial-load
 
     # Stack the LLM layer on top of the rule labels (needs Ollama on the host):
-    python -m pipelines.riskCategoryPipeline --use-llm --model qwen2.5:14b-instruct
+    python -m pipelines.riskCategoryPipeline --use-llm --model qwen2.5:14b
 """
 
 import argparse
@@ -56,16 +56,18 @@ def run_risk_category_etl(
     effective_date=None,
     use_llm: bool = False,
     model: str | None = None,
+    max_rows: int | None = None,
 ) -> dict:
     """Run the Risk Category ETL in the requested mode."""
     engine = RiskEngine(use_llm=use_llm, model=model)
 
     if initial_load:
-        return risk_service.run_initial_load(engine=engine)
+        return risk_service.run_initial_load(engine=engine, max_rows=max_rows)
 
     return risk_service.run_incremental(
         effective_date=effective_date,
         engine=engine,
+        max_rows=max_rows,
     )
 
 
@@ -93,6 +95,14 @@ def _parse_args(argv=None):
         help="stack the LLM layer on the rule labels (requires Ollama)",
     )
     ap.add_argument("--model", default=None, help="Ollama model name for --use-llm")
+    ap.add_argument(
+        "--max-rows",
+        type=int,
+        default=None,
+        metavar="N",
+        help="process at most N members then stop (default: no limit / whole table). "
+             "Handy for a quick, bounded LLM run.",
+    )
     return ap.parse_args(argv)
 
 
@@ -106,6 +116,7 @@ def main(argv=None) -> None:
             effective_date=args.effective_date,
             use_llm=args.use_llm,
             model=args.model,
+            max_rows=args.max_rows,
         )
         pprint(result)
     except Exception:

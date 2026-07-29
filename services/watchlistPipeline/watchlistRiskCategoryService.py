@@ -63,7 +63,7 @@ from utils.hashing import calculate_record_hash
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 1000       # members read per keyset page (Initial Load)
-COMMIT_EVERY = 500      # members processed per commit (never splits a member)
+COMMIT_EVERY = 10       # members processed per commit (never splits a member)
 
 
 # ---------------------------------------------------------------------------
@@ -145,11 +145,15 @@ def run_initial_load(
     engine: RiskEngine | None = None,
     batch_size: int = BATCH_SIZE,
     commit_every: int = COMMIT_EVERY,
+    max_rows: int | None = None,
 ) -> dict[str, int]:
     """Populate risk categories for every current watchlist member.
 
     Ignores the delta table (guideline: Initial Load). Safe to re-run - hash
     detection skips members already classified.
+
+    ``max_rows`` (optional): stop after processing this many members. Used for a
+    quick, bounded run (e.g. eyeballing LLM output) instead of the full table.
     """
     started_at = perf_counter()
     engine = engine or RiskEngine()
@@ -201,7 +205,13 @@ def run_initial_load(
                         connection.commit()
                         since_commit = 0
 
+                    if max_rows is not None and processed >= max_rows:
+                        break
+
                 last_member_id = members[-1]["id"]
+
+                if max_rows is not None and processed >= max_rows:
+                    break
 
             connection.commit()
         finally:
@@ -241,6 +251,7 @@ def run_incremental(
     effective_date=None,
     engine: RiskEngine | None = None,
     commit_every: int = COMMIT_EVERY,
+    max_rows: int | None = None,
 ) -> dict[str, int]:
     """Process one delta batch (ADD / UPDATE / DELETE).
 
@@ -334,6 +345,9 @@ def run_incremental(
                 if since_commit >= commit_every:
                     connection.commit()
                     since_commit = 0
+
+                if max_rows is not None and processed >= max_rows:
+                    break
 
             connection.commit()
         finally:
