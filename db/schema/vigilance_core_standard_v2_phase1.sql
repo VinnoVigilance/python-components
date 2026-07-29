@@ -507,24 +507,26 @@ CREATE TABLE core.member_risk_category (
   vv_member_id uuid NOT NULL,
   watchlist_member_id bigint NOT NULL REFERENCES core.watchlist_member (id) DEFERRABLE INITIALLY IMMEDIATE,
   version_no int NOT NULL,
-  category citext NOT NULL,
-  sub_category citext,
-  indicator citext,
+  risk_details jsonb NOT NULL DEFAULT '{}'::jsonb,
+  risk_details_hash char(64) NOT NULL,
   valid_from timestamptz NOT NULL DEFAULT (now()),
   valid_to timestamptz,
   is_current boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT (now())
 );
+CREATE INDEX ON core.member_risk_category (watchlist_member_id, is_current);
+CREATE INDEX ON core.member_risk_category (vv_member_id, is_current);
+CREATE INDEX ON core.member_risk_category (risk_details_hash);
 COMMENT ON COLUMN core.member_risk_category.id IS 'Unique identifier of the risk category version.';
+COMMENT ON COLUMN core.member_risk_category.vv_member_id IS 'Business identifier of the unified member.';
 COMMENT ON COLUMN core.member_risk_category.watchlist_member_id IS 'Reference to the current active watchlist member.';
 COMMENT ON COLUMN core.member_risk_category.version_no IS 'Version number inherited from the watchlist member.';
-COMMENT ON COLUMN core.member_risk_category.category IS 'Risk category (e.g., Sanction, PEP, Adverse Media, Fraud, Regulatory, Law Enforcement).';
-COMMENT ON COLUMN core.member_risk_category.sub_category IS 'Risk sub-category.';
-COMMENT ON COLUMN core.member_risk_category.indicator IS 'Risk indicator or classification assigned to the member.';
-COMMENT ON COLUMN core.member_risk_category.valid_from IS 'Date and time when this risk category became effective.';
-COMMENT ON COLUMN core.member_risk_category.valid_to IS 'Date and time when this risk category expired. NULL indicates the current version.';
-COMMENT ON COLUMN core.member_risk_category.is_current IS 'TRUE indicates the current active risk category. FALSE indicates a historical version.';
-COMMENT ON COLUMN core.member_risk_category.created_at IS 'Timestamp when this version was created.';
+COMMENT ON COLUMN core.member_risk_category.risk_details IS 'Risk classification details including category, subcategory, evidence, contributing sources, confidence, reviewer information, and any future extensible attributes.';
+COMMENT ON COLUMN core.member_risk_category.risk_details_hash IS 'SHA-256 hash of the canonical risk_details JSON used for change detection.';
+COMMENT ON COLUMN core.member_risk_category.valid_from IS 'Timestamp when this version became effective.';
+COMMENT ON COLUMN core.member_risk_category.valid_to IS 'Timestamp when this version expired. NULL indicates the current version.';
+COMMENT ON COLUMN core.member_risk_category.is_current IS 'TRUE for the active version; FALSE for historical versions.';
+COMMENT ON COLUMN core.member_risk_category.created_at IS 'Timestamp when this record was created.';
 
 
 CREATE TABLE delivery.watchlist_daily_delta_actions (
