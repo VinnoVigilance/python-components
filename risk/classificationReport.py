@@ -14,7 +14,7 @@ classification results"). It writes a human-readable report to
 data/reports/risk_rule_report.txt and prints the same to the console.
 
 Usage:
-    ./vv-env/Scripts/python.exe -m risk.reporter
+    ./vv-env/Scripts/python.exe -m risk.classificationReport
 """
 
 import collections
