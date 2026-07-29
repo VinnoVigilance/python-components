@@ -79,7 +79,7 @@ STRENGTH_TO_CONF = {"explicit": 0.9, "implied": 0.7, "weak": 0.45}
 # of records) and adds noise. We hide it from the schema + vocabulary entirely.
 LLM_EXCLUDE_SUBCATS = {"Sanctioned"}
 
-DEFAULT_MODEL = "qwen2.5:14b-instruct"
+DEFAULT_MODEL = "qwen2.5:14b"
 
 
 # ---------------------------------------------------------------------------
@@ -424,6 +424,32 @@ def _write_jsonl(path, records):
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
+def _print_classified(path, n):
+    """Pretty-print the RiskCategories of the first ``n`` classified records so a
+    human can eyeball what the rule + LLM layers produced (used by --show)."""
+    print("\n" + "=" * 90)
+    print(f"First {n} classified records from {path}:")
+    with open(path, encoding="utf-8") as f:
+        for i, line in enumerate(f, 1):
+            if i > n:
+                break
+            rec = json.loads(line)
+            name = rec.get("EntityName") or rec.get("Names") or rec.get("external_id")
+            print("\n" + "-" * 90)
+            print(f"[{i}] {name}")
+            for rc in rec.get("RiskCategories", []):
+                cat = rc.get("Category")
+                sub = rc.get("SubCategory")
+                inds = rc.get("Indicators") or []
+                method = rc.get("Method")
+                conf = rc.get("Confidence")
+                ev = (rc.get("Evidence") or [""])[0]
+                print(f"    - {cat} / {sub}"
+                      + (f" {inds}" if inds else "")
+                      + f"  [{method}, conf={conf}]"
+                      + (f"  evidence: {ev[:80]}" if ev else ""))
+
+
 def classify_source(source, model=DEFAULT_MODEL, in_dir=FINAL_DIR, out_dir=RISK_DIR,
                     cfg=None, checkpoint_every=200, verbose=True):
     """Classify ONE source end to end and write the enriched records.
@@ -531,11 +557,24 @@ def main():
                          "records WITHOUT calling the model (safe anywhere)")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--limit", type=int, default=3, help="[dry-run] records per source")
+    ap.add_argument("--in-dir", default=str(FINAL_DIR),
+                    help="folder holding <SOURCE>_final.jsonl (default: data/final/). "
+                         "Point this at your own path to test a custom file.")
+    ap.add_argument("--out-dir", default=str(RISK_DIR),
+                    help="folder to write <SOURCE>_classified.jsonl (default: data/risk/)")
+    ap.add_argument("--show", type=int, default=0, metavar="N",
+                    help="after classifying, print the RiskCategories of the first N "
+                         "records to the console so you can eyeball the labels")
     args = ap.parse_args()
 
     # Production: classify real data (needs Ollama on this machine).
     if args.source:
-        classify_source(args.source, model=args.model)
+        out_path = classify_source(
+            args.source, model=args.model,
+            in_dir=args.in_dir, out_dir=args.out_dir,
+        )
+        if args.show:
+            _print_classified(out_path, args.show)
         return
     if args.all:
         classify_all(model=args.model)
