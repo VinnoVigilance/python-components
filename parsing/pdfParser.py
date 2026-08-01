@@ -46,40 +46,22 @@ class PdfParser:
         with pdfplumber.open(pdf_path) as pdf:
             total_pages = len(pdf.pages)
 
-            print(f"PDF opened: {pdf_path.name}")
-            print(f"Total pages: {total_pages}")
-
-            for page_number, page in enumerate(pdf.pages, start=1):
-                print(f"Processing page {page_number}/{total_pages} ...")
-
+            for page in pdf.pages:
                 tables = page.extract_tables()
 
                 if not tables:
-                    print(f"  No table found on page {page_number}")
                     continue
 
-                print(f"  Found {len(tables)} table(s) on page {page_number}")
-
-                for table_index, table in enumerate(tables, start=1):
+                for table in tables:
                     if not table:
-                        print(f"  Table {table_index} is empty")
                         continue
-
-                    print(
-                        f"  Table {table_index}: "
-                        f"{len(table)} row(s)"
-                    )
 
                     if global_headers is None:
                         global_headers = self._build_headers(table[0])
                         rows = table[1:]
-
-                        print("  Header detected from first table:")
-                        print(f"  {global_headers}")
                     else:
                         if self._is_same_header(table[0], global_headers):
                             rows = table[1:]
-                            print("  Repeated header skipped")
                         else:
                             rows = table
 
@@ -89,7 +71,11 @@ class PdfParser:
                         if record:
                             records.append(record)
 
-        print(f"Parsing finished. Total records: {len(records)}")
+        # One summary line once the whole file is done, instead of per page.
+        print(
+            f"PDF {pdf_path.name}: {total_pages} pages processed, "
+            f"{len(records)} records parsed."
+        )
 
         return records
     

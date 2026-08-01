@@ -70,7 +70,12 @@ def date_normalization_handler(entity, rule, config=None):
 
     date_order = config["date_order"]
 
-    entity[source_path] = resolve_dates(values, date_order)
+    # The approximate/exact word list is loaded once from
+    # preNormalization.xlsx and carried on config, so the resolver reads
+    # uncertain-date words from the sheet rather than from hardcoded sets.
+    approx_vocab = config.get("approx_vocab") if config else None
+
+    entity[source_path] = resolve_dates(values, date_order, approx_vocab)
 
 
 def deduplicate_all_arrays_handler(entity, rule, config=None):

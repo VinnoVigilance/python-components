@@ -42,12 +42,9 @@ CALENDARS = {
 
 APPROX_WORDS = ("approx", "circa", "about", "around", "est.", "possibly")
 
-APPROX_TRUE = {
-    "true", "yes", "1", "circa", "approximately",
-    "approx", "between", "estimated",
-}
-
-APPROX_FALSE = {"false", "no", "0", "exact", "known"}
+# Words this run has already reported as missing from the sheet, so each
+# unknown approximate value is printed once rather than once per record.
+_UNKNOWN_APPROX_SEEN = set()
 
 # A range in free text. UN writes "From Year: 1973 To Year: 1974",
 # other sources write "between 1945 and 1950" or "1945-1950".
@@ -206,16 +203,75 @@ def read_calendar(note):
     return "", text
 
 
-def read_approximate(value, from_text=False):
-    text = str(value or "").strip().lower()
+def load_approx_vocab(prenorm_df):
+    """
+    Build the approximate/exact vocabulary from preNormalization.xlsx.
 
-    if text in APPROX_TRUE:
+    A single general row (source '*', normalization_type 'approximate')
+    carries the whole list as ``word=true|word=false|...``, so the words a
+    source uses for an uncertain date live in the sheet a data analyst can
+    edit, not in this code. Returns {word_lower: 'true'|'false'}, or {} when
+    no such row is present (callers then fall back to the constants above).
+    """
+    vocab = {}
+
+    if prenorm_df is None:
+        return vocab
+
+    try:
+        rows = prenorm_df[
+            prenorm_df["normalization_type"].astype(str).str.strip()
+            == "approximate"
+        ]
+    except Exception:
+        return vocab
+
+    for _, row in rows.iterrows():
+        rule = str(row.get("normalization_rule", "") or "")
+
+        for pair in rule.split("|"):
+            if "=" not in pair:
+                continue
+
+            word, result = pair.split("=", 1)
+            word = word.strip().lower()
+            result = result.strip().lower()
+
+            if word and result in {"true", "false"}:
+                vocab[word] = result
+
+    return vocab
+
+
+def read_approximate(value, from_text=False, vocab=None):
+    # A date the resolver itself judged approximate -- it came from a range,
+    # from several candidate years, or from words like "circa" -- is
+    # approximate whatever the source's own flag says. OFAC, for one, marks a
+    # "1955 to 1957" birth range with isApproximate=false (it tracks range-ness
+    # in a separate isDateRange field), so the range detection has to win.
+    if from_text:
         return "true"
 
-    if text in APPROX_FALSE:
+    text = str(value or "").strip().lower()
+
+    # No source flag and not derived-approximate: treat as exact.
+    if not text:
         return "false"
 
-    return "true" if from_text else "false"
+    # The approximate/exact word list lives only in preNormalization.xlsx now.
+    if vocab and text in vocab:
+        return vocab[text]
+
+    # A non-empty word the sheet does not list: print it once so it can be
+    # added to the 'approximate' row, and fall back to exact.
+    if text not in _UNKNOWN_APPROX_SEEN:
+        _UNKNOWN_APPROX_SEEN.add(text)
+        print(
+            "[dateResolver] approximate value not in preNormalization "
+            f"list: {text!r} (defaulted to false)"
+        )
+
+    return "false"
 
 
 # =========================================================
@@ -487,6 +543,15 @@ def parse_text_dates(text, date_order="DMY"):
     if not results:
         results = scan_date_tokens(text, date_order)
 
+    # Several candidate dates in one field -- a comma-separated list of years
+    # like "1945, 1946, 1947" or a couple of alternatives -- means the real
+    # date is uncertain, so none of them is exact. Mark every one approximate.
+    if len(results) > 1:
+        results = [
+            (year, month, day, True)
+            for year, month, day, _ in results
+        ]
+
     return results
 
 
@@ -494,7 +559,7 @@ def parse_text_dates(text, date_order="DMY"):
 # ROW RESOLUTION
 # =========================================================
 
-def build_row(year, month, day, date_type, approximate, note):
+def build_row(year, month, day, date_type, approximate, note, original_value=""):
     full_date = ""
 
     # Only a whole date earns the FullDate column
@@ -502,6 +567,9 @@ def build_row(year, month, day, date_type, approximate, note):
         full_date = f"{year}-{month}-{day}"
 
     return {
+        # The raw date exactly as the source published it, kept beside the
+        # parsed parts so a whole date and the string it came from both survive.
+        "OriginalValue": clean_text(original_value),
         "FullDate": full_date,
         "Day": day,
         "Month": month,
@@ -512,7 +580,7 @@ def build_row(year, month, day, date_type, approximate, note):
     }
 
 
-def resolve_row(row, date_order="DMY"):
+def resolve_row(row, date_order="DMY", approx_vocab=None):
     """Turn one mapped date row into a list of normalised rows."""
     if not isinstance(row, dict):
         return []
@@ -526,28 +594,29 @@ def resolve_row(row, date_order="DMY"):
     # them as Gregorian would store a year that never existed
     foreign_calendar = bool(calendar) and calendar != "GREGORIAN"
 
-    full_date_raw = clean_text(
-        first_value(row.get("FullDate") or row.get("date_full"))
+    # OriginalValue is the raw date the source published, and the single field
+    # a list needs to map. Until a list is migrated to it, fall back to the
+    # older FullDate field so the raw string is still captured and parsed.
+    original_value = clean_text(
+        first_value(
+            row.get("OriginalValue")
+            or row.get("FullDate")
+            or row.get("date_full")
+        )
     )
 
     # 1. a complete date the source already gave us
-    if full_date_raw:
-        parsed = parse_date_string(full_date_raw, date_order)
+    if original_value:
+        parsed = parse_date_string(original_value, date_order)
 
         if parsed and (parsed[0] or (parsed[1] and parsed[2])):
             year, month, day, approx = parsed
 
-            # Keep the original when it could not be read in full,
-            # so "dd/mm/1957" survives even though FullDate stays empty
-            kept_note = note
-
-            if not (year and month and day) and not kept_note:
-                kept_note = full_date_raw
-
             return [build_row(
                 year, month, day, date_type,
-                read_approximate(source_approx, approx) == "true",
-                kept_note,
+                read_approximate(source_approx, approx, approx_vocab) == "true",
+                note,
+                original_value,
             )]
 
     # 2. the parts the source gave us
@@ -559,32 +628,35 @@ def resolve_row(row, date_order="DMY"):
         if year or (month and day):
             return [build_row(
                 year, month, day, date_type,
-                read_approximate(source_approx) == "true",
+                read_approximate(source_approx, vocab=approx_vocab) == "true",
                 note,
+                original_value,
             )]
 
-    # 3. whatever the free text holds
-    parsed_notes = parse_text_dates(note, date_order)
+    # 3. whatever the free text holds (OriginalValue first, then Note)
+    parsed_notes = parse_text_dates(original_value or note, date_order)
 
     if parsed_notes:
         return [
             build_row(
                 year, month, day, date_type,
-                read_approximate(source_approx, approx) == "true",
+                read_approximate(source_approx, approx, approx_vocab) == "true",
                 note,
+                original_value,
             )
             for year, month, day, approx in parsed_notes
         ]
 
     # 4. a span too wide to be a birth date, kept as text so the record
     #    survives without inventing years the source never published
-    _, wide_span = expand_range(note)
+    _, wide_span = expand_range(original_value or note)
 
     if wide_span:
         return [build_row(
             "", "", "", date_type,
             True,
             note or wide_span,
+            original_value,
         )]
 
     # A date published only in another calendar produces nothing. Its
@@ -593,7 +665,7 @@ def resolve_row(row, date_order="DMY"):
     return []
 
 
-def resolve_dates(rows, date_order="DMY"):
+def resolve_dates(rows, date_order="DMY", approx_vocab=None):
     """Resolve every date row on a record and drop duplicates."""
     if not isinstance(rows, list):
         return []
@@ -602,7 +674,7 @@ def resolve_dates(rows, date_order="DMY"):
     seen = set()
 
     for row in rows:
-        for item in resolve_row(row, date_order):
+        for item in resolve_row(row, date_order, approx_vocab):
             key = (
                 item["FullDate"], item["Day"], item["Month"],
                 item["Year"], item["Type"], item["Note"],
