@@ -13,8 +13,9 @@ needing the pickLists.xlsx file at all.
 import pytest
 
 from transforms.searchEnrichment import (
+    canonicalize_script,
     country_to_iso2,
-    detect_language,
+    detect_script,
     normalize_number,
     normalize_text,
     phonetic_key,
@@ -81,15 +82,44 @@ class TestNormalizeNumber:
         assert normalize_number(None) == ""
 
 
-class TestDetectLanguage:
+class TestDetectScript:
     def test_latin(self):
-        assert detect_language("Frank") == "Latin"
+        assert detect_script("Frank") == "Latin"
 
     def test_arabic(self):
-        assert detect_language("محمد") == "Arabic"
+        assert detect_script("محمد") == "Arabic"
 
     def test_no_letters_is_empty(self):
-        assert detect_language("123 !!") == ""
+        assert detect_script("123 !!") == ""
+
+
+class TestCanonicalizeScript:
+    def test_standard_label_is_kept(self):
+        assert canonicalize_script("Latin") == "Latin"
+
+    def test_standard_label_casing_is_fixed(self):
+        assert canonicalize_script("latin") == "Latin"
+        assert canonicalize_script("ARABIC") == "Arabic"
+
+    def test_script_suffix_is_ignored(self):
+        assert canonicalize_script("Latin script") == "Latin"
+
+    def test_known_variant_is_mapped(self):
+        # ISO 15924 codes / alternate names for the same script.
+        assert canonicalize_script("Han") == "Chinese"
+        assert canonicalize_script("Cyrl") == "Cyrillic"
+
+    def test_non_latin_text_falls_back_to_detection(self):
+        # An original-script name landed in the field, not a label.
+        assert canonicalize_script("محمد") == "Arabic"
+
+    def test_unknown_latin_label_is_not_guessed(self):
+        # "Farsi" is a language written in Latin letters; must not become Latin.
+        assert canonicalize_script("Farsi") == ""
+
+    def test_empty_and_none(self):
+        assert canonicalize_script("") == ""
+        assert canonicalize_script(None) == ""
 
 
 class TestCountryToIso2:

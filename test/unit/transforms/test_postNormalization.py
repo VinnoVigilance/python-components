@@ -39,18 +39,43 @@ class TestSearchEnrichHandler:
 
         assert entity["Names"][0]["Normalized_Name"] == "frank muller"
 
-    def test_if_empty_leaves_existing_value_untouched(self):
-        entity = {"Names": [{"Name": "Frank", "Language": "English"}]}
+    def test_script_is_derived_from_name_when_empty(self):
+        entity = {"Names": [{"Name": "محمد"}]}
         rule = {
             "condition_path": "Names[].Name",
-            "target_path": "Names[].Language",
-            "action": "LANGUAGE",
+            "target_path": "Names[].Script",
+            "action": "SCRIPT",
             "condition": "IF_EMPTY",
         }
         search_enrich_handler(entity, rule)
 
-        # Language was already provided by the source -> not overwritten
-        assert entity["Names"][0]["Language"] == "English"
+        # No source script -> derived from the name's characters
+        assert entity["Names"][0]["Script"] == "Arabic"
+
+    def test_if_empty_leaves_existing_script_untouched(self):
+        entity = {"Names": [{"Name": "محمد", "Script": "Latin"}]}
+        rule = {
+            "condition_path": "Names[].Name",
+            "target_path": "Names[].Script",
+            "action": "SCRIPT",
+            "condition": "IF_EMPTY",
+        }
+        search_enrich_handler(entity, rule)
+
+        # Script already present -> the derive step does not override it
+        assert entity["Names"][0]["Script"] == "Latin"
+
+    def test_canonical_script_normalizes_source_value(self):
+        entity = {"Names": [{"Name": "Frank", "Script": "Han"}]}
+        rule = {
+            "condition_path": "Names[].Script",
+            "target_path": "Names[].Script",
+            "action": "CANONICAL_SCRIPT",
+        }
+        search_enrich_handler(entity, rule)
+
+        # A non-standard source label is mapped to the canonical one
+        assert entity["Names"][0]["Script"] == "Chinese"
 
 
 class TestDateNormalizationHandler:
