@@ -71,12 +71,7 @@ def date_normalization_handler(entity, rule, config=None):
 
     date_order = config["date_order"]
 
-    # The approximate/exact word list is loaded once from
-    # preNormalization.xlsx and carried on config, so the resolver reads
-    # uncertain-date words from the sheet rather than from hardcoded sets.
-    approx_vocab = config.get("approx_vocab") if config else None
-
-    entity[source_path] = resolve_dates(values, date_order, approx_vocab)
+    entity[source_path] = resolve_dates(values, date_order)
 
 
 def deduplicate_all_arrays_handler(entity, rule, config=None):
@@ -189,9 +184,48 @@ def search_enrich_handler(entity, rule, config=None):
         item[target_leaf] = transform(item.get(source_leaf))
 
 
+def enum_normalize_handler(entity, rule, config=None):
+    """Rewrite a canonical enum leaf using a ``word=value`` table.
+
+    For every element of the array named by ``condition_path`` (e.g.
+    Dates[].IsApproximate), map the leaf's raw word to the value listed in the
+    rule's ``value`` cell (``exact=false|approximately=true|...``) and write it
+    to ``target_path``. Matching is case-insensitive, so "EXACT" reads like
+    "exact"; a word the table does not list is left unchanged.
+    """
+    source_list, source_leaf = _split_array_path(rule["condition_path"])
+
+    target_path = str(rule.get("target_path") or "").strip()
+    target_leaf = (
+        _split_array_path(target_path)[1] if target_path else source_leaf
+    )
+
+    mapping = {}
+    for pair in str(rule.get("value") or "").split("|"):
+        if "=" not in pair:
+            continue
+        word, result = pair.split("=", 1)
+        mapping[word.strip().lower()] = result.strip()
+
+    items = entity.get(source_list)
+    if not isinstance(items, list):
+        return
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        raw = item.get(source_leaf)
+        key = "" if raw is None else str(raw).strip().lower()
+
+        if key in mapping:
+            item[target_leaf] = mapping[key]
+
+
 HANDLERS = {
     "EMPTY_DEPENDENCY": empty_dependency_handler,
     "DATE_NORMALIZATION": date_normalization_handler,
+    "ENUM_NORMALIZE": enum_normalize_handler,
     "SEARCH_ENRICH": search_enrich_handler,
     "DEDUPLICATE_ALL_ARRAYS": deduplicate_all_arrays_handler,
 }

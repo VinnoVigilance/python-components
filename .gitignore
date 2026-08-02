@@ -47,3 +47,10 @@ __pycache__/
 # IDE & Editor Files
 # ============================================
 .vscode/
+
+# ============================================
+# Personal / local working docs (not shared)
+# ============================================
+CLAUDE.md
+docs/field-mapper-guide.md
+docs/server-and-pgadmin-guide.md
