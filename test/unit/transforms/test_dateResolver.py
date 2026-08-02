@@ -19,6 +19,7 @@ from transforms.dateResolver import (
     disbelieved_year,
     expand_range,
     parse_date_string,
+    read_approximate,
     read_day,
     read_month,
     read_year,
@@ -147,6 +148,27 @@ class TestParseDateString:
     def test_empty_input(self):
         assert parse_date_string("") is None
         assert parse_date_string(None) is None
+
+
+# ---------------------------------------------------------------------------
+# read_approximate: read the flag the ENUM_NORMALIZE rule already settled
+# ---------------------------------------------------------------------------
+
+class TestReadApproximate:
+    def test_reads_settled_true(self):
+        # ENUM_NORMALIZE has already mapped the source word to "true"
+        assert read_approximate("true") == "true"
+
+    def test_reads_settled_false(self):
+        assert read_approximate("false") == "false"
+
+    def test_empty_flag_is_exact(self):
+        assert read_approximate("") == "false"
+
+    def test_range_forces_true_over_the_flag(self):
+        # A resolver-derived range wins even when the source flag says exact,
+        # so OFAC's "1955 to 1957" (isApproximate=false) still reads approximate
+        assert read_approximate("false", from_text=True) == "true"
 
 
 # ---------------------------------------------------------------------------

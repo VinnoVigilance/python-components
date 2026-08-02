@@ -17,6 +17,7 @@ from transforms.postNormalization import (
     date_normalization_handler,
     deduplicate_all_arrays_handler,
     empty_dependency_handler,
+    enum_normalize_handler,
     search_enrich_handler,
 )
 
@@ -89,6 +90,34 @@ class TestDateNormalizationHandler:
         entity = {"Dates": [{"Year": "1980"}]}
         with pytest.raises(ValueError, match="date_order"):
             date_normalization_handler(entity, {"condition_path": "Dates"}, {})
+
+
+class TestEnumNormalizeHandler:
+    # The rule that turns each source's raw approximate word into "true"/"false".
+    RULE = {
+        "condition_path": "Dates[].IsApproximate",
+        "target_path": "Dates[].IsApproximate",
+        "value": "true=true|approximately=true|circa=true|exact=false|false=false",
+    }
+
+    def test_maps_word_to_settled_value(self):
+        entity = {"Dates": [{"IsApproximate": "APPROXIMATELY"}]}
+        enum_normalize_handler(entity, self.RULE)
+
+        # UN's "APPROXIMATELY" -> canonical "true" (case-insensitive)
+        assert entity["Dates"][0]["IsApproximate"] == "true"
+
+    def test_exact_becomes_false(self):
+        entity = {"Dates": [{"IsApproximate": "EXACT"}]}
+        enum_normalize_handler(entity, self.RULE)
+
+        assert entity["Dates"][0]["IsApproximate"] == "false"
+
+    def test_unlisted_word_is_left_unchanged(self):
+        entity = {"Dates": [{"IsApproximate": "maybe"}]}
+        enum_normalize_handler(entity, self.RULE)
+
+        assert entity["Dates"][0]["IsApproximate"] == "maybe"
 
 
 class TestDeduplicateAllArraysHandler:

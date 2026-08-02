@@ -42,10 +42,6 @@ CALENDARS = {
 
 APPROX_WORDS = ("approx", "circa", "about", "around", "est.", "possibly")
 
-# Words this run has already reported as missing from the sheet, so each
-# unknown approximate value is printed once rather than once per record.
-_UNKNOWN_APPROX_SEEN = set()
-
 # A range in free text. UN writes "From Year: 1973 To Year: 1974",
 # other sources write "between 1945 and 1950" or "1945-1950".
 RANGE_PATTERNS = [
@@ -203,75 +199,17 @@ def read_calendar(note):
     return "", text
 
 
-def load_approx_vocab(prenorm_df):
-    """
-    Build the approximate/exact vocabulary from preNormalization.xlsx.
-
-    A single general row (source '*', normalization_type 'approximate')
-    carries the whole list as ``word=true|word=false|...``, so the words a
-    source uses for an uncertain date live in the sheet a data analyst can
-    edit, not in this code. Returns {word_lower: 'true'|'false'}, or {} when
-    no such row is present (callers then fall back to the constants above).
-    """
-    vocab = {}
-
-    if prenorm_df is None:
-        return vocab
-
-    try:
-        rows = prenorm_df[
-            prenorm_df["normalization_type"].astype(str).str.strip()
-            == "approximate"
-        ]
-    except Exception:
-        return vocab
-
-    for _, row in rows.iterrows():
-        rule = str(row.get("normalization_rule", "") or "")
-
-        for pair in rule.split("|"):
-            if "=" not in pair:
-                continue
-
-            word, result = pair.split("=", 1)
-            word = word.strip().lower()
-            result = result.strip().lower()
-
-            if word and result in {"true", "false"}:
-                vocab[word] = result
-
-    return vocab
-
-
-def read_approximate(value, from_text=False, vocab=None):
-    # A date the resolver itself judged approximate -- it came from a range,
-    # from several candidate years, or from words like "circa" -- is
-    # approximate whatever the source's own flag says. OFAC, for one, marks a
-    # "1955 to 1957" birth range with isApproximate=false (it tracks range-ness
-    # in a separate isDateRange field), so the range detection has to win.
+def read_approximate(value, from_text=False):
+    # A range or "circa"-style date is uncertain no matter what the source
+    # flag says (OFAC marks a "1955 to 1957" range isApproximate=false), so a
+    # resolver-derived approximate always wins.
     if from_text:
         return "true"
 
-    text = str(value or "").strip().lower()
-
-    # No source flag and not derived-approximate: treat as exact.
-    if not text:
-        return "false"
-
-    # The approximate/exact word list lives only in preNormalization.xlsx now.
-    if vocab and text in vocab:
-        return vocab[text]
-
-    # A non-empty word the sheet does not list: print it once so it can be
-    # added to the 'approximate' row, and fall back to exact.
-    if text not in _UNKNOWN_APPROX_SEEN:
-        _UNKNOWN_APPROX_SEEN.add(text)
-        print(
-            "[dateResolver] approximate value not in preNormalization "
-            f"list: {text!r} (defaulted to false)"
-        )
-
-    return "false"
+    # The source word (EXACT / APPROXIMATELY / true / circa ...) was already
+    # mapped to "true"/"false" by the ENUM_NORMALIZE post-normalization rule,
+    # so here we only read the settled flag.
+    return "true" if str(value or "").strip().lower() == "true" else "false"
 
 
 # =========================================================
@@ -580,7 +518,7 @@ def build_row(year, month, day, date_type, approximate, note, original_value="")
     }
 
 
-def resolve_row(row, date_order="DMY", approx_vocab=None):
+def resolve_row(row, date_order="DMY"):
     """Turn one mapped date row into a list of normalised rows."""
     if not isinstance(row, dict):
         return []
@@ -614,7 +552,7 @@ def resolve_row(row, date_order="DMY", approx_vocab=None):
 
             return [build_row(
                 year, month, day, date_type,
-                read_approximate(source_approx, approx, approx_vocab) == "true",
+                read_approximate(source_approx, approx) == "true",
                 note,
                 original_value,
             )]
@@ -628,7 +566,7 @@ def resolve_row(row, date_order="DMY", approx_vocab=None):
         if year or (month and day):
             return [build_row(
                 year, month, day, date_type,
-                read_approximate(source_approx, vocab=approx_vocab) == "true",
+                read_approximate(source_approx) == "true",
                 note,
                 original_value,
             )]
@@ -640,7 +578,7 @@ def resolve_row(row, date_order="DMY", approx_vocab=None):
         return [
             build_row(
                 year, month, day, date_type,
-                read_approximate(source_approx, approx, approx_vocab) == "true",
+                read_approximate(source_approx, approx) == "true",
                 note,
                 original_value,
             )
@@ -665,7 +603,7 @@ def resolve_row(row, date_order="DMY", approx_vocab=None):
     return []
 
 
-def resolve_dates(rows, date_order="DMY", approx_vocab=None):
+def resolve_dates(rows, date_order="DMY"):
     """Resolve every date row on a record and drop duplicates."""
     if not isinstance(rows, list):
         return []
@@ -674,7 +612,7 @@ def resolve_dates(rows, date_order="DMY", approx_vocab=None):
     seen = set()
 
     for row in rows:
-        for item in resolve_row(row, date_order, approx_vocab):
+        for item in resolve_row(row, date_order):
             key = (
                 item["FullDate"], item["Day"], item["Month"],
                 item["Year"], item["Type"], item["Note"],
