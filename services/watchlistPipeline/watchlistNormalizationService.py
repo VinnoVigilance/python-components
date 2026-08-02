@@ -7,7 +7,6 @@ from transforms.fieldMapper import (
     MappingEngine,
     load_rules,
 )
-from transforms.dateResolver import load_approx_vocab
 from transforms.postNormalization import (
     PostNormalizationEngine,
 )
@@ -55,17 +54,9 @@ def create_normalization_engines(
         rules=mapping_rules,
     )
 
-    # Load the approximate/exact vocabulary from the pre-norm sheet once and
-    # carry it on config, so the date resolver reads uncertain-date words
-    # (EXACT / APPROXIMATELY / BETWEEN / circa ...) from Excel, not from code.
-    post_config = {
-        **config,
-        "approx_vocab": load_approx_vocab(prenormalization_df),
-    }
-
     post_normalizer = PostNormalizationEngine(
         rules_df=post_normalization_df,
-        config=post_config,
+        config=config,
     )
 
     return (
