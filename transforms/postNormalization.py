@@ -9,7 +9,8 @@ from transforms.searchEnrichment import (
     normalize_text,
     tokenize,
     phonetic_key,
-    detect_language,
+    detect_script,
+    canonicalize_script,
     country_to_iso2,
     normalize_number,
 )
@@ -132,7 +133,8 @@ _SEARCH_TRANSFORMS = {
     "NORMALIZE": normalize_text,
     "TOKENIZE": tokenize,
     "PHONETIC": phonetic_key,
-    "LANGUAGE": detect_language,
+    "SCRIPT": detect_script,
+    "CANONICAL_SCRIPT": canonicalize_script,
     "COUNTRY_CODE": country_to_iso2,
     "NORMALIZE_NUMBER": normalize_number,
 }

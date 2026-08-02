@@ -50,6 +50,28 @@ _SCRIPT_LABELS = {
     "THAI": "Thai",
 }
 
+# The canonical labels above, keyed by their lowercased form, so a source value
+# that is *already* a standard label (any casing) is recognised and kept. This
+# is the first thing canonicalize_script checks.
+_CANONICAL_SCRIPTS = {label.lower(): label for label in _SCRIPT_LABELS.values()}
+
+# The non-standard spellings and ISO 15924 codes sources publish for the same
+# script. Only variants live here — the standard labels themselves are matched
+# via _CANONICAL_SCRIPTS above, so they are not repeated.
+_SCRIPT_ALIASES = {
+    "latn": "Latin", "roman": "Latin",
+    "cyrl": "Cyrillic", "cyr": "Cyrillic",
+    "arab": "Arabic", "aran": "Arabic", "perso-arabic": "Arabic",
+    "grek": "Greek",
+    "hebr": "Hebrew",
+    "han": "Chinese", "hani": "Chinese", "hans": "Chinese", "hant": "Chinese",
+    "hanzi": "Chinese", "cjk": "Chinese", "kanji": "Chinese",
+    "hang": "Korean", "hangul": "Korean", "kore": "Korean",
+    "kana": "Japanese", "hira": "Japanese", "hiragana": "Japanese",
+    "katakana": "Japanese", "jpan": "Japanese",
+    "deva": "Devanagari",
+}
+
 
 def to_english(text) -> str:
     """Romanise any script to ASCII. The single entry point every other
@@ -132,14 +154,13 @@ def phonetic_key(text) -> str:
     return " ".join(codes)
 
 
-def detect_language(text) -> str:
-    """Return a coarse script label for the dominant script of the *original*
-    text, or "" if it has no letters.
+def detect_script(text) -> str:
+    """Return a coarse script label (Latin/Arabic/Cyrillic/...) for the dominant
+    script of the *original* text, or "" if it has no letters.
 
     This is script detection, not language detection: from characters alone you
-    can tell Arabic from Cyrillic but not English from French. Callers should
-    only use it to fill an empty Language, never to override a value the source
-    provided.
+    can tell Arabic from Cyrillic but not English from French. Callers use it to
+    *derive* a name's script from its characters when the source gives none.
     """
     if text is None:
         return ""
@@ -165,6 +186,46 @@ def detect_language(text) -> str:
         return ""
 
     return max(counts, key=counts.get)
+
+
+def canonicalize_script(value) -> str:
+    """Normalise a *source-provided* script value to a standard label.
+
+    Verify-then-process:
+      1. already a standard label (or a known variant / ISO 15924 code)
+         -> return the canonical label, casing fixed.
+      2. not a label, but the value is itself written in a non-Latin script
+         (an original-script name landed in this field) -> detect from its
+         characters.
+      3. otherwise -> "" so the derive step can fill it from the name instead.
+
+    Case 3 deliberately rejects unknown Latin-only values: the English word for a
+    script ("Arabic", "Farsi") is written in Latin letters, so guessing "Latin"
+    from an unrecognised label would be wrong. Only genuinely non-Latin *text*
+    is detected here; unknown labels are left empty for the derive step.
+    """
+    if value is None:
+        return ""
+
+    cleaned = str(value).strip()
+
+    if not cleaned:
+        return ""
+
+    key = cleaned.lower().replace(" script", "").strip()
+
+    if key in _CANONICAL_SCRIPTS:
+        return _CANONICAL_SCRIPTS[key]
+
+    if key in _SCRIPT_ALIASES:
+        return _SCRIPT_ALIASES[key]
+
+    detected = detect_script(cleaned)
+
+    if detected and detected != "Latin":
+        return detected
+
+    return ""
 
 
 def normalize_number(number) -> str:
