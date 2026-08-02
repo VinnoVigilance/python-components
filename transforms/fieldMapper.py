@@ -579,38 +579,27 @@ class ConcatPathHandler(BaseHandler):
             if p.strip()
         ]
 
-        def is_literal(p):
-            return (p.startswith('"') and p.endswith('"')) or \
-                   (p.startswith("'") and p.endswith("'"))
-
         values = []
-        # A quoted label is a prefix for the value that follows it, so it is
-        # held back until a non-empty value arrives. If the next value is
-        # empty, the label is dropped instead of being stored on its own
-        # (e.g. "From Year: " is kept only when FROM_YEAR has a value).
-        pending_labels = []
 
         for part in parts:
-            if is_literal(part):
-                literal_value = part[1:-1]  # strip the quotes
+            # Check if it's a literal string (enclosed in quotes)
+            if (part.startswith('"') and part.endswith('"')) or \
+               (part.startswith("'") and part.endswith("'")):
+                # It's a constant/literal string
+                literal_value = part[1:-1]  # Remove the quotes
                 if literal_value:
-                    pending_labels.append(literal_value)
-                continue
-
-            # It's a path - resolve it from context
-            value = resolve_in_context(raw_json, part, item, anchor)
-            value = "" if value is None else str(value).strip()
-
-            if value:
-                # flush the labels waiting for this value, then the value
-                values.extend(pending_labels)
-                values.append(value)
-
-            # value present or not, its pending labels are now spent
-            pending_labels = []
-
-        # Trailing labels with no following path (suffix-style) are kept.
-        values.extend(pending_labels)
+                    values.append(literal_value)
+            else:
+                # It's a path - resolve it from context
+                value = resolve_in_context(raw_json, part, item, anchor)
+                
+                if value is None:
+                    continue
+                
+                value = str(value).strip()
+                
+                if value:
+                    values.append(value)
 
         return " ".join(values)
 
