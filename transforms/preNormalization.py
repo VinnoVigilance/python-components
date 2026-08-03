@@ -139,6 +139,131 @@ class DateFormatHandler(BaseHandler):
 
 
 # =========================================================
+# Regex Extract Handler
+# =========================================================
+
+class RegexExtractHandler(BaseHandler):
+
+    """
+    Pull a value out of free text using a regex written in the rule cell.
+
+    If the regex has a capture group, group(1) is returned; otherwise the
+    whole match. No match returns "". Generic -- any list can point this at
+    any field with any regex; nothing here is list-specific.
+
+    Example (SECO vessels):
+
+    field "Other information" = "IMO number: 9037123"
+    rule  = (?i)IMO\\s*Numbe?r?\\D*(\\d+)
+    ->
+    "9037123"
+    """
+
+    def normalize(self, value, rule):
+
+        if value is None:
+            return ""
+
+        match = re.search(str(rule), str(value))
+
+        if not match:
+            return ""
+
+        if match.groups():
+            return match.group(1)
+
+        return match.group(0)
+
+
+# =========================================================
+# Split Pattern Handler
+# =========================================================
+
+class SplitPatternHandler(BaseHandler):
+
+    """
+    Split one field into a list of objects, one per line, parsing each line with
+    a **named-group regex** taken from the rule cell. Every named group becomes a
+    key on the object, so a field that packs several structured values (a name
+    and its language, a code and its description, ...) is unpacked into proper
+    per-entry fields the mapper can then ``path_expand``.
+
+    Generic on purpose -- nothing here is list-specific. A new "text (tag)" style
+    field is handled by writing a new regex in the rule cell, never new code.
+
+    Conventions:
+
+      * The field is split on line breaks; each non-empty line is matched.
+      * A named group whose name starts with ``_`` is matched but **discarded**
+        (use it to swallow a redundant fragment without emitting it).
+      * A line that does not match is emitted as ``{first_key: line}`` so nothing
+        is silently lost.
+
+    Example -- SECO spelling variants, rule cell:
+
+        (?P<name>.+?)(?P<_translit>(?<=[^\\x00-\\x7F])\\s+[A-Za-z][A-Za-z0-9 .,'’-]*)?\\s*\\((?P<language>[^()]+)\\)\\s*$
+
+    turns
+
+        "عبد الله محمد رجب عبد الرحمن Mohamed Ragab Abdel Rahman (Arabic)"
+
+    into
+
+        {"name": "عبد الله محمد رجب عبد الرحمن", "language": "Arabic"}
+
+    The ``_translit`` group swallows the trailing Latin run (a partial copy of
+    the Primary Name), but only when it follows a non-ASCII character -- so a
+    genuinely Latin variant is kept whole.
+    """
+
+    def normalize(self, value, rule):
+
+        if not isinstance(value, str):
+            return value
+
+        try:
+            regex = re.compile(str(rule))
+        except re.error:
+            return value
+
+        # Emit named groups in the order declared, minus the discard (_) groups.
+        keys = sorted(regex.groupindex, key=regex.groupindex.get)
+
+        keys = [key for key in keys if not key.startswith("_")]
+
+        if not keys:
+            return value
+
+        results = []
+
+        for line in value.splitlines():
+
+            line = line.strip()
+
+            if not line:
+                continue
+
+            match = regex.search(line)
+
+            if match:
+
+                obj = {}
+
+                for key in keys:
+                    captured = match.group(key)
+                    obj[key] = captured.strip() if captured else ""
+
+                results.append(obj)
+
+            else:
+
+                # Unmatched line: keep it whole under the first field.
+                results.append({keys[0]: line})
+
+        return results
+
+
+# =========================================================
 # Handler Registry
 # =========================================================
 
@@ -147,6 +272,8 @@ HANDLERS = {
     "before_parenthesis": BeforeParenthesisHandler(),
     "remove_list_markers": RemoveListMarkersHandler(),
     "date_format": DateFormatHandler(),
+    "regex_extract": RegexExtractHandler(),
+    "split_pattern": SplitPatternHandler(),
 }
 
 
@@ -379,6 +506,19 @@ class PreNormalizationEngine:
                     key,
                     entity_type,
                 )
+
+        # ---------------------------------------------
+        # Stamp the canonical entity_type
+        # ---------------------------------------------
+        # The mapper reads the resolved type from the single field
+        # `entity_type`. Each list declares *where* its type lives via
+        # sourceConfig (`entity_field`); once resolved here, we copy it into
+        # `entity_type` so routing is general -- a new list needs only a
+        # sourceConfig row + an enum rule, never a code change.
+
+        if entity_type:
+
+            normalized_json["entity_type"] = entity_type
 
         # ---------------------------------------------
         # Load Rules

@@ -64,6 +64,13 @@ class JsonPath:
         if not path:
             return JsonPath._as_list(data)
 
+        # Some source columns are literal keys that themselves contain dots
+        # (e.g. SECO's "Good quality a.k.a."). The dotted-path traversal below
+        # would read those dots as nested navigation and find nothing, so match
+        # an exact whole-key first.
+        if isinstance(data, dict) and "[]" not in path and path in data:
+            return JsonPath._as_list(data[path])
+
         items = [data]
 
         for part in JsonPath.split(path):
@@ -138,6 +145,19 @@ def unquote(val: Optional[str]) -> str:
         return val[1:-1]
 
     return val
+
+
+def decode_escape_sequences(text: str) -> str:
+    """Turn the two-character escapes a spreadsheet stores (``\\n``, ``\\r``,
+    ``\\t``) into the real control characters, so a mapping cell can express a
+    separator like a line-break."""
+    return (
+        str(text)
+        .replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t")
+    )
 
 
 def normalize_bool(v: Any) -> str:
@@ -237,6 +257,15 @@ def coerce_to_field_type(value: Any, target_type: Optional[str]) -> Any:
 
 
 def detect_entity_type(raw_json: dict) -> str:
+    """Resolve a record's Individual / Entity / Vessel type.
+
+    `entity_type` is the canonical, general path: pre-normalization resolves
+    each list's type (from whatever field that list declares in sourceConfig)
+    and writes it here, so a new list never needs a change to this function.
+    The remaining reads are backward-compatible fallbacks for records that did
+    not pass through that step (older DFAT/OFAC direct `Type`/`generalInfo`
+    fields, and the vessel heuristic for EU designated vessels).
+    """
     val = (
         raw_json.get("entity_type")
         or JsonPath.get(raw_json, "generalInfo.entityType.text")
@@ -620,6 +649,12 @@ class ExplodeHandler(BaseHandler):
             source_expr = source_expr.strip()
             separator = separator.strip()
 
+        # A spreadsheet cell stores a line-break separator as the two
+        # characters "\n" (backslash + n). Turn that (and \r, \t) into the
+        # real control character so a mapping row can ask explode to split on
+        # line-breaks, e.g. source value "Good quality a.k.a.,\n".
+        separator = decode_escape_sequences(separator)
+
         raw_values = resolve_all_in_context(
             raw_json,
             source_expr,
@@ -636,7 +671,12 @@ class ExplodeHandler(BaseHandler):
             if raw_value is None:
                 continue
 
-            for x in str(raw_value).split(separator):
+            if separator in ("\n", "\r", "\r\n"):
+                tokens = str(raw_value).splitlines()
+            else:
+                tokens = str(raw_value).split(separator)
+
+            for x in tokens:
                 x = x.strip().strip(".")
 
                 if x and x.upper() != "N/A":
