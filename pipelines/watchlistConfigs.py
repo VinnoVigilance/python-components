@@ -298,4 +298,19 @@ WATCHLIST_CONFIGS = {
         "download_method": "HTTPS",
         "versioning_strategy": "continuous",
     },
+
+    "SECO-SANCTIONS": {
+        "source_name": "SECO",
+        "date_order": "DMY",
+        "list_name": "SECO-SANCTIONS",
+        "download_method": "HTTPS",
+        "url": (
+            "https://www.sesam.search.admin.ch/sesam-search-web/pages/"
+            "search.xhtml?action=generateExcelAction&lang=de"
+        ),
+        "file_type": "xlsx",
+        "external_id_path": "SSID",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+    },
 }
