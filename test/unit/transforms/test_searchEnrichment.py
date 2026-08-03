@@ -61,7 +61,7 @@ class TestTokenize:
 
 class TestPhoneticKey:
     def test_empty_is_empty(self):
-        assert phonetic_key("") == ""
+        assert phonetic_key("") == []
 
     def test_is_deterministic(self):
         assert phonetic_key("Johnson") == phonetic_key("Johnson")
@@ -69,6 +69,18 @@ class TestPhoneticKey:
     def test_sounds_alike_spellings_collide(self):
         # The whole point: differently-spelled but same-sounding names match.
         assert phonetic_key("Smith") == phonetic_key("Smyth")
+
+    def test_keeps_both_primary_and_secondary_renderings(self):
+        # Smith has a real second pronunciation (SM0 / XMT), so both survive.
+        assert phonetic_key("Smith") == ["SM0", "XMT"]
+
+    def test_two_renderings_for_a_multi_word_name(self):
+        # Whole-name primary rendering, then whole-name secondary rendering.
+        assert phonetic_key("Johnson Smith") == ["JNSN SM0", "ANSN XMT"]
+
+    def test_collapses_to_one_when_renderings_match(self):
+        # No word here has a distinct secondary, so there is only one rendering.
+        assert phonetic_key("Mohammed Ali") == ["MHMT AL"]
 
 
 class TestNormalizeNumber:

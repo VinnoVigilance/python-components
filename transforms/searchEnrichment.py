@@ -129,29 +129,39 @@ def tokenize(text) -> list:
     return tokens
 
 
-def phonetic_key(text) -> str:
-    """Build a Double Metaphone key so "sounds-like" spellings collide
+def phonetic_key(text) -> list:
+    """Build Double Metaphone keys so "sounds-like" spellings collide
     (Mohammed / Muhammad / Mohamad).
 
-    Computed per token and space-joined rather than over the whole string, so
-    multi-word names stay aligned token-for-token. Uses the primary code, with
-    the secondary code as a fallback when a token has no primary encoding.
+    Returns up to two whole-name renderings: the name spelled out in each
+    word's *primary* code, and the name spelled out in each word's *secondary*
+    code. Double Metaphone emits two codes per word for names with a second
+    plausible pronunciation (Smith -> SM0 / XMT), so keeping both catches those
+    variants. Each rendering is still computed per word and space-joined, so
+    multi-word names stay aligned token-for-token. When a word has no distinct
+    secondary the primary stands in, and when the two renderings come out
+    identical the result collapses to a single entry.
     """
-    tokens = tokenize(text)
+    primary_parts = []
+    secondary_parts = []
 
-    if not tokens:
-        return ""
-
-    codes = []
-
-    for token in tokens:
+    for token in tokenize(text):
         primary, secondary = doublemetaphone(token)
-        code = primary or secondary
+        primary_parts.append(primary or secondary)
+        secondary_parts.append(secondary or primary)
 
-        if code:
-            codes.append(code)
+    primary_key = " ".join(part for part in primary_parts if part)
+    secondary_key = " ".join(part for part in secondary_parts if part)
 
-    return " ".join(codes)
+    if not primary_key:
+        return []
+
+    keys = [primary_key]
+
+    if secondary_key and secondary_key != primary_key:
+        keys.append(secondary_key)
+
+    return keys
 
 
 def detect_script(text) -> str:
