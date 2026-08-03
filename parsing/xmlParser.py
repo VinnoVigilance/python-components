@@ -118,6 +118,7 @@ class XmlParser:
 
                 if self.matches_root_tag(elem, root_tags):
                     data = self.elem_to_dict(elem)
+                    data["_root_tag"] = elem.tag.split("}")[-1]
 
                     f.write(
                         json.dumps(
@@ -152,6 +153,7 @@ class XmlParser:
             if self.matches_root_tag(elem, root_tags):
 
                 data = self.elem_to_dict(elem)
+                data["_root_tag"] = elem.tag.split("}")[-1]
 
                 self.release(elem)
 

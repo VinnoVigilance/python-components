@@ -139,6 +139,43 @@ class DateFormatHandler(BaseHandler):
 
 
 # =========================================================
+# Regex Extract Handler
+# =========================================================
+
+class RegexExtractHandler(BaseHandler):
+
+    """
+    Pull a value out of free text using a regex written in the rule cell.
+
+    If the regex has a capture group, group(1) is returned; otherwise the
+    whole match. No match returns "". Generic -- any list can point this at
+    any field with any regex; nothing here is list-specific.
+
+    Example (SECO vessels):
+
+    field "Other information" = "IMO number: 9037123"
+    rule  = (?i)IMO\\s*Numbe?r?\\D*(\\d+)
+    ->
+    "9037123"
+    """
+
+    def normalize(self, value, rule):
+
+        if value is None:
+            return ""
+
+        match = re.search(str(rule), str(value))
+
+        if not match:
+            return ""
+
+        if match.groups():
+            return match.group(1)
+
+        return match.group(0)
+
+
+# =========================================================
 # Handler Registry
 # =========================================================
 
@@ -147,6 +184,7 @@ HANDLERS = {
     "before_parenthesis": BeforeParenthesisHandler(),
     "remove_list_markers": RemoveListMarkersHandler(),
     "date_format": DateFormatHandler(),
+    "regex_extract": RegexExtractHandler(),
 }
 
 
@@ -379,6 +417,19 @@ class PreNormalizationEngine:
                     key,
                     entity_type,
                 )
+
+        # ---------------------------------------------
+        # Stamp the canonical entity_type
+        # ---------------------------------------------
+        # The mapper reads the resolved type from the single field
+        # `entity_type`. Each list declares *where* its type lives via
+        # sourceConfig (`entity_field`); once resolved here, we copy it into
+        # `entity_type` so routing is general -- a new list needs only a
+        # sourceConfig row + an enum rule, never a code change.
+
+        if entity_type:
+
+            normalized_json["entity_type"] = entity_type
 
         # ---------------------------------------------
         # Load Rules
