@@ -57,12 +57,22 @@ def run_risk_category_etl(
     use_llm: bool = False,
     model: str | None = None,
     max_rows: int | None = None,
+    list_name: str | None = None,
 ) -> dict:
-    """Run the Risk Category ETL in the requested mode."""
+    """Run the Risk Category ETL in the requested mode.
+
+    ``list_name`` (optional, initial-load only): classify just ONE source list
+    (e.g. "OFAC-SDN"); ``None`` means every list. It is ignored by the
+    incremental mode, which is driven by the delta table.
+    """
     engine = RiskEngine(use_llm=use_llm, model=model)
 
     if initial_load:
-        return risk_service.run_initial_load(engine=engine, max_rows=max_rows)
+        return risk_service.run_initial_load(
+            engine=engine,
+            max_rows=max_rows,
+            list_name=list_name,
+        )
 
     return risk_service.run_incremental(
         effective_date=effective_date,
@@ -103,6 +113,14 @@ def _parse_args(argv=None):
         help="process at most N members then stop (default: no limit / whole table). "
              "Handy for a quick, bounded LLM run.",
     )
+    ap.add_argument(
+        "--list",
+        dest="list_name",
+        default=None,
+        metavar="LIST_NAME",
+        help="initial-load only: classify just ONE source list (e.g. OFAC-SDN); "
+             "default is every list.",
+    )
     return ap.parse_args(argv)
 
 
@@ -117,6 +135,7 @@ def main(argv=None) -> None:
             use_llm=args.use_llm,
             model=args.model,
             max_rows=args.max_rows,
+            list_name=args.list_name,
         )
         pprint(result)
     except Exception:
@@ -125,4 +144,26 @@ def main(argv=None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Two ways to run this file:
+    #   * pass command-line flags (see --help) -> CLI mode, honored below;
+    #   * run it with NO flags (e.g. your editor's Run button) -> the inline
+    #     "edit-and-run" block: set the options here, then run the file.
+    import sys
+
+    if len(sys.argv) > 1:
+        main()
+    else:
+        configure_logging()
+        try:
+            result = run_risk_category_etl(
+                initial_load=True,      # True = first-ever full population (ignores delta)
+                effective_date=None,    # incremental only: a date, or None for latest batch
+                use_llm=True,           # True = add the LLM layer (needs Ollama running)
+                model="qwen2.5:14b",    # Ollama model used when use_llm=True
+                list_name=None,         # None = ALL lists; or ONE list, e.g. "OFAC-SDN"
+                max_rows=None,          # None = whole table; a number bounds a quick test run
+            )
+            pprint(result)
+        except Exception:
+            logger.exception("Risk Category ETL execution failed.")
+            raise
