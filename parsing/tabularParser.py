@@ -14,7 +14,14 @@ class TabularParser:
 
     def parse(self, file_path, config):
 
-        file_type = str(config.get("file_type", "")).strip().lower()
+        # Prefer the declared file_type (the value parserFactory routed on);
+        # fall back to the on-disk suffix only when no type is declared (e.g. a
+        # direct TabularParser().parse(path, config={}) call). SECO's Excel is
+        # served from an ".xhtml" URL, so the suffix alone can lie -- when the
+        # config states the type, it wins.
+        file_type = str(config.get("file_type") or "").strip().lower()
+        if not file_type:
+            file_type = Path(file_path).suffix.lower().lstrip(".")
         sheet_name = config.get("sheet_name", 0)
 
         if file_type == "csv":
