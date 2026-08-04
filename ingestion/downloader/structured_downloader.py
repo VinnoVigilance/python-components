@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
+from urllib.parse import urlparse
 
 from .models import DownloadTask
 
@@ -15,11 +16,12 @@ def _generate_filename(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
 
+# TO
 def _get_original_filename(task: DownloadTask) -> str:
     if task.filename:
         return task.filename
-
-    name = task.url.split("/")[-1]
+    
+    name = urlparse(task.url).path.split("/")[-1]
 
     if name:
         return name

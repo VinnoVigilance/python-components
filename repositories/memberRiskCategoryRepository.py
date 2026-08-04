@@ -65,11 +65,18 @@ def find_current_members_batch(
     cursor,
     last_member_id: int = 0,
     batch_size: int = 1000,
+    list_name: str | None = None,
 ) -> list[dict[str, Any]]:
     """Keyset-paginated batch of current members, for the Initial Load.
 
     Ordered by ``id`` so the caller can page with ``last_member_id`` exactly the
     way ``rawPayloadRepository.find_raw_payload_batch`` does.
+
+    ``list_name`` (optional): restrict the batch to members of ONE source list,
+    matched on ``full_payload -> Sources[].ListName`` -- the same list identity
+    the engine classifies on -- with a JSONB containment (``@>``) filter. When
+    NULL, the guard passes and every current member is returned (all lists),
+    exactly as before.
     """
     cursor.execute(
         """
@@ -80,14 +87,24 @@ def find_current_members_batch(
             full_payload
         FROM core.watchlist_member
         WHERE is_current = TRUE
-          AND id > %s
+          AND id > %(last_member_id)s
+          AND (
+              %(list_name)s IS NULL
+              OR full_payload @> jsonb_build_object(
+                  'Sources',
+                  jsonb_build_array(
+                      jsonb_build_object('ListName', %(list_name)s)
+                  )
+              )
+          )
         ORDER BY id
-        LIMIT %s
+        LIMIT %(batch_size)s
         """,
-        (
-            last_member_id,
-            batch_size,
-        ),
+        {
+            "last_member_id": last_member_id,
+            "list_name": list_name,
+            "batch_size": batch_size,
+        },
     )
 
     return [

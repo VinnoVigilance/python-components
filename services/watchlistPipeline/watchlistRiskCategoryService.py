@@ -146,6 +146,7 @@ def run_initial_load(
     batch_size: int = BATCH_SIZE,
     commit_every: int = COMMIT_EVERY,
     max_rows: int | None = None,
+    list_name: str | None = None,
 ) -> dict[str, int]:
     """Populate risk categories for every current watchlist member.
 
@@ -154,6 +155,10 @@ def run_initial_load(
 
     ``max_rows`` (optional): stop after processing this many members. Used for a
     quick, bounded run (e.g. eyeballing LLM output) instead of the full table.
+
+    ``list_name`` (optional): classify only members of ONE source list (e.g.
+    "OFAC-SDN"); the filter is applied in the SQL read so other lists are never
+    fetched. When omitted, every current member (all lists) is processed.
     """
     started_at = perf_counter()
     engine = engine or RiskEngine()
@@ -177,6 +182,7 @@ def run_initial_load(
                     cursor=cursor,
                     last_member_id=last_member_id,
                     batch_size=batch_size,
+                    list_name=list_name,
                 )
 
                 if not members:
