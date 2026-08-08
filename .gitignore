@@ -54,3 +54,4 @@ __pycache__/
 CLAUDE.md
 docs/field-mapper-guide.md
 docs/server-and-pgadmin-guide.md
+/scripts/
