@@ -1,15 +1,18 @@
-# parsing/parserFactory.py
+"""Select a source-file parser by physical file type."""
 
-from parsing.xmlParser import XmlParser
-from parsing.pdfParser import PdfParser
 from parsing.htmlParser import HtmlParser
+from parsing.jsonlParser import JsonlParser
+from parsing.pdfParser import PdfParser
 from parsing.tabularParser import TabularParser
+from parsing.xmlParser import XmlParser
 
 
 PARSER_REGISTRY = {
     "xml": XmlParser,
     "pdf": PdfParser,
     "html": HtmlParser,
+    "htm": HtmlParser,
+    "jsonl": JsonlParser,
     "csv": TabularParser,
     "xlsx": TabularParser,
     "xls": TabularParser,
@@ -17,16 +20,9 @@ PARSER_REGISTRY = {
 
 
 def create_parser(file_type: str):
-    normalized_file_type = file_type.strip().lower()
-
-    parser_class = PARSER_REGISTRY.get(normalized_file_type)
-
+    normalized = file_type.strip().lower().lstrip(".")
+    parser_class = PARSER_REGISTRY.get(normalized)
     if parser_class is None:
-        supported_types = ", ".join(sorted(PARSER_REGISTRY))
-
-        raise ValueError(
-            f"Unsupported file type: {file_type}. "
-            f"Supported types: {supported_types}"
-        )
-
+        supported = ", ".join(sorted(PARSER_REGISTRY))
+        raise ValueError(f"Unsupported file type: {file_type}. Supported types: {supported}")
     return parser_class()
