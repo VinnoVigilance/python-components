@@ -6,6 +6,7 @@ from typing import Any
 from infrastructure.database.connection import connection_pool
 from infrastructure.storage import seaweedClient
 from ingestion.downloader.models import DownloadTask
+from ingestion.apiCollector.interface import collect, ApiCollectorTask
 from repositories import watchlistFileLogRepository
 from repositories import watchlistFileRepository
 from utils.hashing import calculate_file_hash
@@ -71,6 +72,9 @@ def acquire_source_file(
             If neither `local_path` nor `url` is provided.
     """
 
+    if config.get("download_method") == "API":
+        return _collect_api_source(config=config)
+
     local_path = config.get("local_path")
 
     if local_path:
@@ -115,6 +119,45 @@ def _get_manual_file(
     if not source_file_path.is_file():
         raise FileNotFoundError(
             f"Manual source path is not a file: "
+            f"{source_file_path}"
+        )
+
+    return source_file_path
+
+
+def _collect_api_source(
+    config: dict[str, Any],
+) -> Path:
+    """
+    Acquire an API-based source by paging its endpoint into a JSONL snapshot.
+    """
+
+    api_config = config.get("api_config", {})
+
+    task = ApiCollectorTask(
+        url=config["url"],
+        source_name=config["source_name"],
+        list_name=config.get(
+            "list_name",
+            config["source_name"],
+        ),
+        pagination=api_config.get("pagination", {}),
+        items_path=api_config.get("items_path", "items"),
+        params=api_config.get("params", {}),
+        headers=api_config.get("headers", {}),
+        timeout=api_config.get("timeout", 30),
+        retry=api_config.get("retry", 3),
+        throttle_delay=api_config.get("throttle_delay", 0.0),
+        write_mode=api_config.get("write_mode", "single_jsonl"),
+    )
+
+    collected_path = collect(task)
+
+    source_file_path = Path(collected_path).resolve()
+
+    if not source_file_path.exists():
+        raise FileNotFoundError(
+            f"Collected API snapshot was not found: "
             f"{source_file_path}"
         )
 
