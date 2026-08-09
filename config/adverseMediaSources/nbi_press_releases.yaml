@@ -1,0 +1,270 @@
+source:
+  id: nbi_press_releases
+  name: National Bureau of Investigation
+  section: press_releases
+  url: https://nbi.gov.ph/press_releases/
+
+
+acquisition:
+  method: crawler
+  mode: automatic
+  engine: scrapy
+
+  start_url: https://nbi.gov.ph/press_releases/feed/
+
+  discovery_type: rss
+
+  item_selector:
+    xpath: //channel/item
+
+  namespaces:
+    dc: http://purl.org/dc/elements/1.1/
+
+  pagination:
+    parameter: paged
+    start_page: 1
+
+  # Used only when mode is manual.
+  # No crawler engine runs in manual mode.
+  manual_path: data/manual/adverse_media/nbi
+
+
+mapping:
+
+  # ============================================================
+  # SOURCE
+  # ============================================================
+
+  source_record_id:
+    group: source
+    from: discovery
+    xpath: guid/text()
+
+  source_name:
+    group: source
+    from: source
+    field: name
+
+  source_section:
+    group: source
+    from: source
+    field: section
+
+
+  # ============================================================
+  # URL
+  # ============================================================
+
+  source_url:
+    group: url
+    from: source
+    field: url
+
+  discovery_url:
+    group: url
+    from: system
+
+  article_url:
+    group: url
+    from: discovery
+    xpath: link/text()
+
+
+  # ============================================================
+  # CLASSIFICATION
+  # ============================================================
+
+  record_type:
+    group: classification
+    value: press_release
+
+  document_type:
+    group: classification
+    value: press_release
+
+
+  # ============================================================
+  # CONTENT
+  # ============================================================
+
+  title:
+    group: content
+    from: article
+    css: h1.entry-title::text
+
+  subtitle:
+    group: content
+    from: article
+    css: .entry-subtitle::text
+
+  summary:
+    group: content
+    from: discovery
+    xpath: description/text()
+    clean_html: true
+
+  description:
+    group: content
+    from: article
+    css: meta[name="description"]::attr(content)
+
+  lead_text:
+    group: content
+    from: article
+    css: .entry-content .lead::text
+
+  article_text:
+    group: content
+    from: article
+    css: .entry-content ::text
+    multiple: true
+    join_with: " "
+
+  article_html:
+    group: content
+    from: article
+    css: .entry-content
+    output: html
+
+  sections:
+    group: content
+    value: []
+
+
+  # ============================================================
+  # DATE
+  # ============================================================
+
+  published_date:
+    group: date
+    from: article
+    css: time.entry-date::attr(datetime)
+
+  updated_date:
+    group: date
+    from: article
+    css: time.updated::attr(datetime)
+
+  effective_date:
+    group: date
+    value: null
+
+  expiry_date:
+    group: date
+    value: null
+
+
+  # ============================================================
+  # PUBLISHER
+  # ============================================================
+
+  publisher:
+    group: publisher
+    from: source
+    field: name
+
+  authors:
+    group: publisher
+    from: discovery
+    xpath: dc:creator/text()
+    multiple: true
+
+
+  # ============================================================
+  # TAXONOMY
+  # ============================================================
+
+  language:
+    group: taxonomy
+    from: article
+    css: html::attr(lang)
+
+  categories:
+    group: taxonomy
+    from: discovery
+    xpath: category/text()
+    multiple: true
+
+  tags:
+    group: taxonomy
+    from: article
+    css: .tags-links a::text
+    multiple: true
+
+  topics:
+    group: taxonomy
+    value: []
+
+  keywords:
+    group: taxonomy
+    from: article
+    css: meta[name="keywords"]::attr(content)
+    multiple: true
+
+
+  # ============================================================
+  # MEDIA
+  # ============================================================
+
+  featured_image_url:
+    group: media
+    from: article
+    css: meta[property="og:image"]::attr(content)
+    output: url
+
+  image_urls:
+    group: media
+    from: article
+    css: .entry-content img::attr(src)
+    output: url
+    multiple: true
+
+  video_urls:
+    group: media
+    from: article
+    css: .entry-content iframe::attr(src)
+    output: url
+    multiple: true
+
+
+  # ============================================================
+  # FILES
+  # ============================================================
+
+  attachments:
+    group: files
+    from: article
+    css: .entry-content a
+    output: attachment
+    multiple: true
+
+
+  # ============================================================
+  # REFERENCES
+  # ============================================================
+
+  reference_numbers:
+    group: references
+    value: []
+
+
+  # ============================================================
+  # LINKS
+  # ============================================================
+
+  related_links:
+    group: links
+    from: article
+    css: .entry-content a
+    output: link
+    multiple: true
+
+
+  # ============================================================
+  # FEED / API
+  # ============================================================
+
+  rss_guid:
+    group: feed_api
+    from: discovery
+    xpath: guid/text()

@@ -1,34 +1,23 @@
-"""Items transported through Scrapy pipelines."""
+"""Data contracts passed from crawler spiders to Scrapy pipelines."""
 
 import scrapy
 
 
-ARTICLE_GROUP_FIELDS = (
-    "source",
-    "urls",
-    "classification",
-    "content",
-    "dates",
-    "publisher",
-    "taxonomy",
-    "media",
-    "files",
-    "references",
-    "links",
-    "feed",
-)
+class AdverseMediaArticleItem(scrapy.Item):
+    """One downloaded adverse-media article before raw HTML storage."""
 
-
-class ArticleItem(scrapy.Item):
-    """Transport envelope for one nested adverse-media record."""
-
-    record = scrapy.Field()
-    record_key = scrapy.Field()
+    article_number = scrapy.Field()
+    article_url = scrapy.Field()
+    discovery_url = scrapy.Field()
+    discovery = scrapy.Field()
+    article = scrapy.Field()
+    source_record_id = scrapy.Field()
+    html = scrapy.Field()
     raw_file_path = scrapy.Field()
 
 
 class WatchlistRecordItem(scrapy.Item):
-    """Transport envelope for one source-shaped watchlist record."""
+    """One structured Watchlist record; kept separate from adverse media."""
 
     external_id = scrapy.Field()
     payload = scrapy.Field()

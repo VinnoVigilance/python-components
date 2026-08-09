@@ -1,0 +1,252 @@
+"""Build the final adverse-media JSONL snapshot from crawler-extracted records."""
+
+import json
+import re
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any
+
+from ingestion.crawler.configLoader import PROJECT_ROOT
+
+
+DEFAULT_JSONL_WORKERS = 8
+
+
+def write_final_jsonl(
+    source_config: dict[str, Any],
+    downloaded_files: list[dict[str, Any]],
+    max_workers: int = DEFAULT_JSONL_WORKERS,
+) -> dict[str, Any]:
+    """
+    Build the final JSONL snapshot for one adverse-media source.
+
+    Each line in the JSONL file represents one article.
+    Fields are grouped into nested objects according to the `group`
+    property defined in the source YAML mapping.
+    """
+
+    source = source_config["source"]
+
+    output_path = (
+        PROJECT_ROOT
+        / "data"
+        / "final"
+        / "adverse_media"
+        / f"{_safe_name(source['id'])}_final.jsonl"
+    )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    temporary_path = output_path.with_name(
+        f".{output_path.name}.tmp"
+    )
+
+    ordered_files = sorted(
+        downloaded_files,
+        key=lambda item: int(item.get("article_number", 0)),
+    )
+
+    def build_record(file_info):
+        return _build_record(
+            source_config=source_config,
+            file_info=file_info,
+            mapping=source_config["mapping"],
+        )
+
+    worker_count = min(
+        max(1, int(max_workers)),
+        max(1, len(ordered_files)),
+    )
+
+    try:
+        with temporary_path.open(
+            "w",
+            encoding="utf-8",
+        ) as output_file:
+
+            if ordered_files:
+                with ThreadPoolExecutor(
+                    max_workers=worker_count
+                ) as executor:
+
+                    for record in executor.map(
+                        build_record,
+                        ordered_files,
+                    ):
+                        output_file.write(
+                            json.dumps(
+                                record,
+                                ensure_ascii=False,
+                            )
+                            + "\n"
+                        )
+
+        temporary_path.replace(output_path)
+
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+
+    return {
+        "final_output_path": str(
+            output_path.relative_to(PROJECT_ROOT)
+        ),
+        "final_record_count": len(ordered_files),
+    }
+
+
+def _build_record(
+    source_config: dict[str, Any],
+    file_info: dict[str, Any],
+    mapping: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Convert the flat crawler result into the final grouped
+    adverse-media schema.
+
+    Example:
+
+    {
+        "source": {
+            "source_record_id": "...",
+            "source_name": "..."
+        },
+        "url": {
+            "article_url": "..."
+        },
+        "content": {
+            "title": "...",
+            "article_text": "..."
+        }
+    }
+    """
+
+    article_values = file_info.get("article", {})
+    discovery_values = file_info.get("discovery", {})
+    source_values = source_config["source"]
+
+    record: dict[str, Any] = {}
+
+    for field_name, rule in mapping.items():
+
+        value = _resolve_field_value(
+            field_name=field_name,
+            rule=rule,
+            source_values=source_values,
+            file_info=file_info,
+            discovery_values=discovery_values,
+            article_values=article_values,
+        )
+
+        # For fields configured as arrays, always return an empty
+        # array instead of null when no value is available.
+        if value is None and rule.get("multiple"):
+            value = []
+
+        group_name = rule.get("group")
+
+        if group_name:
+            group_key = _normalize_group_name(group_name)
+
+            if group_key not in record:
+                record[group_key] = {}
+
+            record[group_key][field_name] = value
+
+        else:
+            # Backward-compatible fallback:
+            # fields without a group remain at root level.
+            record[field_name] = value
+
+    return record
+
+
+def _resolve_field_value(
+    field_name: str,
+    rule: dict[str, Any],
+    source_values: dict[str, Any],
+    file_info: dict[str, Any],
+    discovery_values: dict[str, Any],
+    article_values: dict[str, Any],
+) -> Any:
+    """
+    Resolve the value of one mapped field according to its origin.
+
+    Supported origins:
+        - source
+        - system
+        - discovery
+        - article
+        - fixed value
+    """
+
+    origin = rule.get("from")
+
+    # Fixed/static value from YAML.
+    if "value" in rule:
+        return rule["value"]
+
+    # Value from source configuration.
+    if origin == "source":
+        source_field = rule.get(
+            "field",
+            field_name,
+        )
+        return source_values.get(source_field)
+
+    # Value generated by the crawler/system.
+    if origin == "system":
+        system_field = rule.get(
+            "field",
+            field_name,
+        )
+        return file_info.get(system_field)
+
+    # Value extracted during discovery
+    # (RSS, listing page, API, sitemap, etc.).
+    if origin == "discovery":
+        if field_name in file_info:
+            return file_info.get(field_name)
+
+        return discovery_values.get(field_name)
+
+    # Value extracted from the article detail page.
+    if origin == "article":
+        return article_values.get(field_name)
+
+    return None
+
+
+def _normalize_group_name(group_name: str) -> str:
+    """
+    Convert schema group names into valid JSON object keys.
+
+    Examples:
+        Source          -> source
+        URL             -> url
+        Feed/API        -> feed_api
+        Classification  -> classification
+    """
+
+    normalized = str(group_name).strip().lower()
+
+    normalized = re.sub(
+        r"[^a-z0-9]+",
+        "_",
+        normalized,
+    )
+
+    return normalized.strip("_")
+
+
+def _safe_name(value: Any) -> str:
+    """
+    Convert source identifiers into safe filesystem names.
+    """
+
+    safe_value = re.sub(
+        r"[^A-Za-z0-9_.-]+",
+        "_",
+        str(value),
+    ).strip("._")
+
+    return safe_value or "unknown"

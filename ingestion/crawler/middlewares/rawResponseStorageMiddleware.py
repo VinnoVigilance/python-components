@@ -1,4 +1,8 @@
-"""Persist raw article or watchlist-page responses."""
+"""Optional raw-response storage for crawler types that explicitly enable it.
+
+Adverse-media articles use ``AdverseMediaHtmlStoragePipeline`` instead, so this
+middleware is intentionally not enabled in the shared settings.
+"""
 
 import re
 from pathlib import Path
