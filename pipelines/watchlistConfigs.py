@@ -317,6 +317,7 @@ WATCHLIST_CONFIGS = {
     "FBI-WANTED": {
         "source_name": "FBI",
         "list_name": "FBI-WANTED",
+        "date_order": "MDY",
         "download_method": "API",
         "url": "https://api.fbi.gov/wanted/v1/list",
         "file_type": "jsonl",
