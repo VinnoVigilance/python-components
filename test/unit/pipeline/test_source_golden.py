@@ -47,6 +47,7 @@ SAMPLES = {
     "ATC-DESIGNATED-TERRORIST-INDIVIDUALS": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS_raw_sample.jsonl",
     "ATC-DESIGNATED-TERRORIST-GROUPS": "ATC-DESIGNATED-TERRORIST-GROUPS_raw_sample.jsonl",
     "DNFBP": "DNFBP_raw_sample.jsonl",
+    "FBI-WANTED": "FBI-WANTED_raw_sample.jsonl",
 }
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
@@ -103,6 +104,10 @@ GOLDEN = {
     "DNFBP": {
         "SourceType": "Official", "DatasetCategory": "Regulatory",
         "ListName": "DNFBP", "SourceName": "AMLC",
+    },
+    "FBI-WANTED": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "FBI-WANTED", "SourceName": "FBI",
     },
 }
 

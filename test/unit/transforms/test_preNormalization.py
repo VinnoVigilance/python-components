@@ -18,6 +18,7 @@ from transforms.preNormalization import (
     DateFormatHandler,
     EnumHandler,
     PreNormalizationEngine,
+    RegexExtractHandler,
     RemoveListMarkersHandler,
     get_nested_values,
     parse_path,
@@ -53,6 +54,21 @@ class TestHandlers:
         assert handler.normalize("not a date", "MM/DD/YYYY") == "not a date"
         # unknown rule -> returned unchanged
         assert handler.normalize("03/29/1965", "WEIRD") == "03/29/1965"
+
+    def test_regex_extract_strips_wrapping_quotes(self):
+        # Reuse the existing regex_extract handler as a quote-stripper: capture
+        # the inside with the quotes made OPTIONAL, so the pattern always
+        # matches (a "between quotes" pattern would return "" for unquoted
+        # aliases and wipe them).
+        handler = RegexExtractHandler()
+        rule = r'^"?(.*?)"?$'
+
+        # FBI wraps nickname aliases in double quotes -> stripped
+        assert handler.normalize('"La Firma"', rule) == "La Firma"
+        # already-unquoted alias -> unchanged (not wiped to "")
+        assert handler.normalize("Manuel Perez", rule) == "Manuel Perez"
+        # a quote *inside* the name is preserved
+        assert handler.normalize('Ali "Bob" Smith', rule) == 'Ali "Bob" Smith'
 
 
 class TestPathUtilities:
@@ -117,3 +133,48 @@ class TestPreNormalizationEngineEndToEnd:
         engine.pre_normalize_record("OFAC", raw)
 
         assert raw == {"type": "person", "name": "John (alias):"}  # deepcopied
+
+
+class TestAliasDequoteEndToEnd:
+    """The FBI-WANTED alias-dequote setup, driven end-to-end via regex_extract.
+
+    FBI has no sourceConfig row, so its entity_type stays None and the rule must
+    carry entity_type "*" to apply. ``aliases`` is a list of bare strings, so
+    the field path needs the ``[]`` to reach each element -- ``aliases`` (no
+    brackets) would hand the whole list to the handler at once.
+    """
+
+    RULE = r'^"?(.*?)"?$'
+
+    def _engine(self, field):
+        # Empty source config -> no entity_field for FBI-WANTED (type stays None).
+        source_config_df = pd.DataFrame(columns=["source", "entity_field"])
+        prenorm_df = pd.DataFrame([{
+            "source": "FBI-WANTED", "field": field, "entity_type": "*",
+            "normalization_type": "regex_extract", "normalization_rule": self.RULE,
+        }])
+        return PreNormalizationEngine(prenorm_df, source_config_df)
+
+    def test_strips_quotes_per_alias_element(self):
+        engine = self._engine("aliases[]")
+
+        result = engine.pre_normalize_record(
+            "FBI-WANTED",
+            {"aliases": ['"La Firma"', "Manuel Perez", '"El Chess"']},
+        )
+
+        # each element de-quoted independently; unquoted one left alone
+        assert result["aliases"] == ["La Firma", "Manuel Perez", "El Chess"]
+
+    def test_field_without_brackets_corrupts_the_list(self):
+        # Guards the "needs aliases[]" reasoning. Pointed at the bare list path,
+        # regex_extract receives the whole list and stringifies it (str(value)),
+        # corrupting it into a string. That is exactly why the rule must use
+        # aliases[] -- so each element is handled individually.
+        engine = self._engine("aliases")
+
+        result = engine.pre_normalize_record("FBI-WANTED", {"aliases": ['"La Firma"']})
+
+        # no longer the original list -> proves the bracketless path is wrong
+        assert result["aliases"] != ['"La Firma"']
+        assert isinstance(result["aliases"], str)

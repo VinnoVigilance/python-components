@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import html
 from copy import deepcopy
 from datetime import datetime
 import re
@@ -222,10 +223,56 @@ def enum_normalize_handler(entity, rule, config=None):
             item[target_leaf] = mapping[key]
 
 
+def _strip_html(value):
+    """Remove HTML tags and unescape entities from a single string.
+
+    Order matters: entities are unescaped **first** (``&amp;`` -> ``&``), then
+    tags are stripped. Some sources double-encode markup (a literal
+    ``&lt;p&gt;`` sitting inside real ``<p>`` tags); unescaping first turns that
+    back into a ``<p>`` tag so the strip catches it too -- stripping first would
+    leave the resurrected tag behind. Tags become a space (not "") so block
+    boundaries like ``</p><p>`` don't glue words together; runs of whitespace
+    then collapse to one. Anything that isn't a string passes through untouched.
+    """
+    if not isinstance(value, str):
+        return value
+
+    unescaped = html.unescape(value)
+    without_tags = re.sub(r"<[^>]+>", " ", unescaped)
+    collapsed = re.sub(r"\s+", " ", without_tags)
+    return collapsed.strip()
+
+
+def sanitize_html_handler(entity, rule, config=None):
+    """Strip HTML from a free-text leaf on every element of an array.
+
+    Reads the array leaf named by ``condition_path`` (e.g. Comments[].text) and
+    rewrites each element's value with the markup removed. Generic across all
+    lists -- any source that leaks HTML into a text field is cleaned here, with
+    no per-source branch. Targeted at named free-text paths only, so structured
+    fields (identifiers, dates, numbers) are never touched. Runs before
+    DEDUPLICATE so two texts that differ only in markup collapse to one.
+    """
+    source_list, source_leaf = _split_array_path(rule["condition_path"])
+
+    items = entity.get(source_list)
+    if not isinstance(items, list):
+        return
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        value = item.get(source_leaf)
+        if isinstance(value, str):
+            item[source_leaf] = _strip_html(value)
+
+
 HANDLERS = {
     "EMPTY_DEPENDENCY": empty_dependency_handler,
     "DATE_NORMALIZATION": date_normalization_handler,
     "ENUM_NORMALIZE": enum_normalize_handler,
+    "SANITIZE_HTML": sanitize_html_handler,
     "SEARCH_ENRICH": search_enrich_handler,
     "DEDUPLICATE_ALL_ARRAYS": deduplicate_all_arrays_handler,
 }

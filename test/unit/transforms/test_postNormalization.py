@@ -14,10 +14,12 @@ import pytest
 from transforms.postNormalization import (
     PostNormalizationEngine,
     _split_array_path,
+    _strip_html,
     date_normalization_handler,
     deduplicate_all_arrays_handler,
     empty_dependency_handler,
     enum_normalize_handler,
+    sanitize_html_handler,
     search_enrich_handler,
 )
 
@@ -140,6 +142,51 @@ class TestEmptyDependencyHandler:
 
         assert entity["Names"][0]["Type"] == "primary"
         assert "Type" not in entity["Names"][1]
+
+
+class TestSanitizeHtmlHandler:
+    def test_removes_tags_and_unescapes_entities(self):
+        assert (
+            _strip_html("<p>Wanted for <b>fraud</b> &amp; theft.</p>")
+            == "Wanted for fraud & theft."
+        )
+
+    def test_block_tags_become_space_not_glue(self):
+        # </p><p> between sentences must not weld the words together
+        assert _strip_html("the FBI</p><p>Reward up to") == "the FBI Reward up to"
+
+    def test_double_encoded_tag_is_removed(self):
+        # A literal &lt;p&gt; sitting inside real tags: unescape-first turns it
+        # back into a <p> so the strip catches it too (the bug this guards).
+        assert _strip_html("<p>&lt;p&gt;To provide info</p>") == "To provide info"
+
+    def test_non_string_passes_through(self):
+        assert _strip_html(None) is None
+
+    def test_handler_cleans_every_element(self):
+        entity = {
+            "Comments": [
+                {"type": "Summary", "text": "<p>armed &amp; dangerous</p>"},
+                {"type": "Remarks", "text": "no markup here"},
+            ]
+        }
+        sanitize_html_handler(entity, {"condition_path": "Comments[].text"})
+
+        assert entity["Comments"][0]["text"] == "armed & dangerous"
+        assert entity["Comments"][1]["text"] == "no markup here"
+
+    def test_missing_array_is_a_no_op(self):
+        entity = {"Names": [{"Name": "x"}]}
+        sanitize_html_handler(entity, {"condition_path": "Comments[].text"})
+
+        assert entity == {"Names": [{"Name": "x"}]}
+
+    def test_non_string_leaf_is_left_untouched(self):
+        # the isinstance(str) guard keeps structured values safe
+        entity = {"additionalInfo": [{"Value": 5000}]}
+        sanitize_html_handler(entity, {"condition_path": "additionalInfo[].Value"})
+
+        assert entity["additionalInfo"][0]["Value"] == 5000
 
 
 class TestEngineEndToEnd:

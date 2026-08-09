@@ -313,4 +313,28 @@ WATCHLIST_CONFIGS = {
         "schedule": "daily",
         "versioning_strategy": "continuous",
     },
+
+    "FBI-WANTED": {
+        "source_name": "FBI",
+        "list_name": "FBI-WANTED",
+        "date_order": "MDY",
+        "download_method": "API",
+        "url": "https://api.fbi.gov/wanted/v1/list",
+        "file_type": "jsonl",
+        "external_id_path": "uid",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "page",
+                "page_param": "page",
+                "size_param": "pageSize",
+                "page_size": 50,
+                "start_page": 1,
+            },
+            "items_path": "items",
+            "write_mode": "single_jsonl",
+            "throttle_delay": 0.3,
+        },
+    },
 }
