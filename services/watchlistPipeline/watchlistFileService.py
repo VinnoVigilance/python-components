@@ -10,6 +10,7 @@ from ingestion.apiCollector.interface import collect, ApiCollectorTask
 from repositories import watchlistFileLogRepository
 from repositories import watchlistFileRepository
 from utils.hashing import calculate_file_hash
+from ingestion.urlResolver.interface import resolve_url
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -178,9 +179,9 @@ def _download_source_file(
         "list_name",
         source_name,
     )
-
+    source_url = resolve_url(config)
     download_task = DownloadTask(
-    url=config["url"],
+    url=source_url,
     source_name=config["source_name"],
     list_name=config.get(
         "list_name",
