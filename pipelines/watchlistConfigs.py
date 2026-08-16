@@ -393,4 +393,25 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+    
+    "CFTC-RED-LIST": {
+        "source_name": "CFTC",
+        "date_order": "MDY",
+        "list_name": "CFTC-RED-LIST",
+        "download_method": "CRAWLER",
+        "url": "https://www.cftc.gov/LearnAndProtect/Resources/Check/redlist.htm",
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/cftc_red_list.yaml",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+    },
 }
