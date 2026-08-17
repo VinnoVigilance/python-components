@@ -7,6 +7,7 @@ from infrastructure.database.connection import connection_pool
 from infrastructure.storage import seaweedClient
 from ingestion.downloader.models import DownloadTask
 from ingestion.apiCollector.interface import collect, ApiCollectorTask
+from ingestion.bypassCollector import BypassCollector
 from repositories import watchlistFileLogRepository
 from repositories import watchlistFileRepository
 from utils.hashing import calculate_file_hash
@@ -74,6 +75,9 @@ def acquire_source_file(
 
     if config.get("download_method") == "API":
         return _collect_api_source(config=config)
+
+    if config.get("download_method") == "BYPASS":
+        return _collect_bypass_source(config=config)
 
     local_path = config.get("local_path")
 
@@ -158,6 +162,37 @@ def _collect_api_source(
     if not source_file_path.exists():
         raise FileNotFoundError(
             f"Collected API snapshot was not found: "
+            f"{source_file_path}"
+        )
+
+    return source_file_path
+
+
+def _collect_bypass_source(
+    config: dict[str, Any],
+) -> Path:
+    """
+    Acquire a bot-protected source by driving a stealth browser.
+
+    The BypassCollector navigates the page, clears any anti-bot challenge
+    (e.g. Cloudflare), runs the configured actions, and saves the rendered
+    HTML artifact. It reads its ``bypass_config`` block off the config dict.
+    """
+
+    collected_path = BypassCollector().collect(config)
+
+    if collected_path is None:
+        raise RuntimeError(
+            f"Bypass collection failed for "
+            f"{config.get('source_name')}/"
+            f"{config.get('list_name')}."
+        )
+
+    source_file_path = Path(collected_path).resolve()
+
+    if not source_file_path.exists():
+        raise FileNotFoundError(
+            f"Collected bypass artifact was not found: "
             f"{source_file_path}"
         )
 
