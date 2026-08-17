@@ -4,6 +4,13 @@ data/final/
 data/preprocessed/
 data/reports/
 data/test
+/db/
+
+# ============================================
+# Bypass Collector / SeleniumBase runtime files
+# (browser download scratch folder; not our output)
+# ============================================
+downloaded_files/
 
 # ============================================
 # Test Data & Files
@@ -54,4 +61,3 @@ __pycache__/
 CLAUDE.md
 docs/field-mapper-guide.md
 docs/server-and-pgadmin-guide.md
-/scripts/
