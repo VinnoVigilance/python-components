@@ -44,6 +44,13 @@ detail_fields:
     selector_type: xpath
     value: text
 
+attachments:
+  - type: DETAIL_PAGE
+
+  - type: IMAGE
+    selector: "img.img-responsive[src*='/sites/default/files/']"
+    attribute: "src"
+
 record_id:
   strategy: url_regex
   source: detail_url

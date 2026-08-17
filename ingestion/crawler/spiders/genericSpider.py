@@ -1,6 +1,6 @@
 import re
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit, urljoin
 
 import scrapy
 
@@ -52,6 +52,7 @@ class GenericSpider(scrapy.Spider):
             )
 
     def parse_detail(self, response, list_data, record_id, detail_url):
+        self.current_url = response.url
         detail_data = self._extract_fields(response, self.config.get("detail_fields", {}))
         detail_file_path = None
 
@@ -61,12 +62,16 @@ class GenericSpider(scrapy.Spider):
                 content=response.text,
             )
 
+        attachments = self._extract_attachments(
+            response=response,
+            detail_url=detail_url,
+        )
+
         record = {
             "source_record_id": record_id,
             "list": list_data,
             "detail": detail_data,
-            "detail_url": str(detail_url),
-            "detail_file_path": str(detail_file_path) if detail_file_path else None,
+            "attachments": attachments,
         }
 
         self.records.append(record)
@@ -121,18 +126,25 @@ class GenericSpider(scrapy.Spider):
         multiple = field_config.get("multiple", False)
         value_type = field_config.get("value", "text")
 
-        if not selector:
-            return [] if multiple else None
-
         if selector_type == "xpath":
             values = node.xpath(selector).getall()
 
         elif selector_type == "css":
-            values = (
-                node.css(f"{selector}::text").getall()
-                if value_type == "text"
-                else node.css(selector).getall()
-            )
+            if value_type == "text":
+                values = node.css(f"{selector}::text").getall()
+
+            elif value_type == "attribute":
+                attribute = field_config.get("attribute")
+
+                value = node.css(selector).attrib.get(attribute)
+
+                if value and attribute in ["src", "href"]:
+                    value = urljoin(self.current_url, value)
+
+                values = [value] if value else []
+
+            else:
+                values = node.css(selector).getall()
 
         else:
             raise ValueError(f"Unsupported selector_type: {selector_type}")
@@ -159,6 +171,44 @@ class GenericSpider(scrapy.Spider):
         match = re.search(pattern, detail_url)
 
         return match.group(1) if match else None
+
+    def _extract_attachments(self, response, detail_url):
+        attachments = []
+
+        attachments.append(
+            {
+                "type": "DETAIL_PAGE",
+                "url": detail_url,
+            }
+        )
+
+        for config in self.config.get("attachments", []):
+            if config["type"] == "DETAIL_PAGE":
+                continue
+
+            selector = config.get("selector")
+
+            if not selector:
+                continue
+
+            attribute = config.get(
+                "attribute",
+                "src",
+            )
+
+            url = response.css(
+                selector
+            ).attrib.get(attribute)
+
+            if url:
+                attachments.append(
+                    {
+                        "type": config["type"],
+                        "url": response.urljoin(url),
+                    }
+                )
+
+        return attachments
 
     @staticmethod
     def _clean_text(value):
