@@ -1,8 +1,8 @@
 import logging
+from copy import deepcopy
 from pathlib import Path
 from time import perf_counter
 from typing import Any
-from copy import deepcopy
 
 from infrastructure.database.connection import connection_pool
 from parsing.parserFactory import create_parser
@@ -18,12 +18,41 @@ from transforms.preProcessingEngine import PreProcessingEngine
 logger = logging.getLogger(__name__)
 
 
-def process_watchlist_file(
+def process_watchlist_source(
+    acquisition,
+    config: dict[str, Any],
+    watchlist_file_id: int,
+) -> dict[str, int]:
+    """Extract, preprocess and store a watchlist source in the Raw Layer."""
+
+    file_path = acquisition.source_file_path
+
+    if acquisition.records is not None:
+        parsed_records = acquisition.records
+    else:
+        parser = create_parser(file_type=config["file_type"])
+        parsed_records = list(
+            parser.parse(
+                file_path=file_path,
+                config=config,
+            )
+        )
+
+    return process_records(
+        records=parsed_records,
+        file_path=file_path,
+        config=config,
+        watchlist_file_id=watchlist_file_id,
+    )
+
+
+def process_records(
+    records: list[dict[str, Any]],
     file_path: Path,
     config: dict[str, Any],
     watchlist_file_id: int,
 ) -> dict[str, int]:
-    """Parse, preprocess and store a source file in the Raw Layer."""
+    """Preprocess and store already extracted records in the Raw Layer."""
 
     current_step = "PARSING"
     step_started_at = perf_counter()
@@ -32,32 +61,16 @@ def process_watchlist_file(
         file_id=watchlist_file_id,
         step="PARSING",
         status="STARTED",
-        message="File parsing started.",
+        message="Record processing started.",
     )
 
     try:
-        parser = create_parser(
-            file_type=config["file_type"],
-        )
-
-        parsed_records = list(
-            parser.parse(
-                file_path=file_path,
-                config=config,
-            )
-        )
-
-        preprocessing_rules = deepcopy(
-            config.get("preprocessing", [])
-        )
+        preprocessing_rules = deepcopy(config.get("preprocessing", []))
 
         for rule in preprocessing_rules:
             rule_config = rule.get("config", {})
 
-            for path_field in rule.get(
-                "relative_path_fields",
-                [],
-            ):
+            for path_field in rule.get("relative_path_fields", []):
                 relative_path = rule_config.get(path_field)
 
                 if relative_path:
@@ -65,19 +78,17 @@ def process_watchlist_file(
                         file_path.parent / relative_path
                     )
 
-        preprocessing_engine = PreProcessingEngine()
-
-        processed_records = preprocessing_engine.preprocess(
-            records=parsed_records,
+        processed_records = PreProcessingEngine().preprocess(
+            records=records,
             rules=preprocessing_rules,
         )
 
         if not processed_records:
             raise ValueError(
-                "Parser and preprocessing returned no records."
+                "Extraction and preprocessing returned no records."
             )
 
-        parsing_duration_ms = int(
+        processing_duration_ms = int(
             (perf_counter() - step_started_at) * 1000
         )
 
@@ -87,9 +98,9 @@ def process_watchlist_file(
             status="SUCCESS",
             message=(
                 f"{len(processed_records)} records "
-                "parsed and preprocessed successfully."
+                "extracted and preprocessed successfully."
             ),
-            duration_ms=parsing_duration_ms,
+            duration_ms=processing_duration_ms,
         )
 
         current_step = "RAW_INSERT"
@@ -102,10 +113,8 @@ def process_watchlist_file(
         )
 
         return {
-            "parsed_record_count": len(parsed_records),
-            "processed_record_count": len(
-                processed_records
-            ),
+            "parsed_record_count": len(records),
+            "processed_record_count": len(processed_records),
             "raw_record_count": raw_record_count,
         }
 
@@ -121,10 +130,10 @@ def process_watchlist_file(
                 error=error,
                 duration_ms=duration_ms,
             )
+
         except Exception:
             logger.exception(
-                "Failed to update file status and "
-                "insert database failure log."
+                "Failed to update file status and insert database failure log."
             )
 
         logger.exception(
@@ -144,18 +153,14 @@ def insert_raw_payloads(
 
     payloads = []
 
-    for record_index, record in enumerate(
-        records,
-        start=1,
-    ):
+    for record_index, record in enumerate(records, start=1):
         external_id = str(
             record.get(external_id_path, "")
         ).strip()
 
         if not external_id:
             raise ValueError(
-                "External ID was not found for "
-                f"record number {record_index}. "
+                f"External ID was not found for record number {record_index}. "
                 f"Expected field: {external_id_path}"
             )
 
@@ -194,10 +199,7 @@ def insert_raw_payloads(
                     file_id=watchlist_file_id,
                     step="RAW_INSERT",
                     status="SUCCESS",
-                    message=(
-                        f"{inserted_count} raw records "
-                        "inserted successfully."
-                    ),
+                    message=f"{inserted_count} raw records inserted successfully.",
                     duration_ms=duration_ms,
                 )
 

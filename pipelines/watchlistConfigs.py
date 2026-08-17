@@ -395,4 +395,81 @@ WATCHLIST_CONFIGS = {
             "throttle_delay": 0.3,
         },
     },
+
+    "DILG-LOCAL-OFFICIALS": {
+        "source_name": "DILG",
+        "date_order": "DMY",
+        "list_name": "DILG-LOCAL-OFFICIALS",
+
+        "download_method": "HTTPS",
+
+        "url": (
+            r"https://region5.dilg.gov.ph/wp-content/uploads/2026/05/Masterlist-of-Local-Officials-2025-2028.pdf"
+        ),
+
+        "url_resolver": {
+            "type": "link_text",
+            "source_page_url": (
+                "https://region5.dilg.gov.ph/lgus/"
+            ),
+            "value": "Masterlist of Local Officials",
+        },
+
+        "file_type": "pdf",
+
+        "external_id_path": "unique_id",
+
+        "schedule": "daily",
+
+        "versioning_strategy": "continuous",
+
+        "parser_config": {
+            "expected_headers": [
+                "REGION",
+                "PROVINCE",
+                "P/C/M",
+                "POSITION",
+                "NAME",
+            ],
+        },
+
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "REGION",
+                        "PROVINCE",
+                        "P/C/M",
+                        "POSITION",
+                        "NAME",
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "DILG",
+                },
+            },
+        ],
+    },
+    
+    "CFTC-RED-LIST": {
+        "source_name": "CFTC",
+        "date_order": "MDY",
+        "list_name": "CFTC-RED-LIST",
+        "download_method": "CRAWLER",
+        "url": "https://www.cftc.gov/LearnAndProtect/Resources/Check/redlist.htm",
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/cftc_red_list.yaml",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+    },
 }

@@ -499,3 +499,44 @@ class PreProcessingEngine:
         )
 
         return valid_records
+
+    def generate_composite_id(
+        self,
+        record,
+        config,
+    ):
+        fields = config["fields"]
+
+        output_field = config.get(
+            "output_field",
+            "unique_id",
+        )
+
+        prefix = config.get(
+            "prefix",
+            "",
+        )
+
+        values = []
+
+        for field in fields:
+            value = str(
+                record.get(field, "")
+            ).strip()
+
+            values.append(value.upper())
+
+        raw_id = "|".join(values)
+
+        digest = hashlib.sha256(
+            raw_id.encode("utf-8")
+        ).hexdigest()
+
+        if prefix:
+            record[output_field] = (
+                f"{prefix}-{digest}"
+            )
+        else:
+            record[output_field] = digest
+
+        return record
