@@ -104,19 +104,48 @@ WATCHLIST_CONFIGS = {
         "list_name": (
             "ATC-DESIGNATED-TERRORIST-INDIVIDUALS"
         ),
-        "download_method": "Manual",
+        "download_method": "BYPASS",
         "url": "https://atc.gov.ph/individuals/",
         "file_type": "html",
         "external_id_path": "unique_id",
         "schedule": "daily",
         "versioning_strategy": "continuous",
-        "local_path": (
-            "data/downloads/ATC/"
-            "ATC-DESIGNATED-TERRORIST-INDIVIDUALS/"
-            "year=2026/month=07/day=20/"
-            "Designated Terrorist Individuals _ "
-            "Anti-Terrorism Council.html"
-        ),
+        "bypass_config": {
+            # Declare the challenge; the collector picks the engine that
+            # clears it (cloudflare -> stealth browser). No runtime detection.
+            "challenge": "cloudflare",
+            # False = run a VISIBLE browser window (often needed so the
+            # anti-bot challenge clears); set True only on a headless server.
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": ["Designated Terrorist Individuals"],
+
+            "actions": [
+                {
+                    "action": "navigate",
+                    "url": "{url}"
+                },
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "table.tablepress",
+                    "timeout": 60
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": "{source}_{list}_{timestamp}.html"
+                }
+            ],
+            
+            "validation": {
+                "required_content": [
+                    "Designated Terrorist",
+                    "tablepress",
+                    "Anti-Terrorism Council"
+                ],
+                "min_size_bytes": 10000
+            }
+        },
         "profile_dir": "data/downloads/profiles",
         "attachments": [
             {
@@ -200,19 +229,48 @@ WATCHLIST_CONFIGS = {
         "source_name": "ATC",
         "date_order": "DMY",
         "list_name": "ATC-DESIGNATED-TERRORIST-GROUPS",
-        "download_method": "Manual",
+        "download_method": "BYPASS",
         "versioning_strategy": "continuous",
         "url": "https://atc.gov.ph/groups/",
         "file_type": "html",
         "external_id_path": "unique_id",
         "schedule": "daily",
-        "local_path": (
-            "data/downloads/ATC/"
-            "ATC-DESIGNATED-TERRORIST-GROUPS/"
-            "year=2026/month=07/day=21/"
-            "Designated Terrorist Groups _ "
-            "Anti-Terrorism Council.html"
-        ),
+        "bypass_config": {
+            # Declare the challenge; the collector picks the engine that
+            # clears it (cloudflare -> stealth browser). No runtime detection.
+            "challenge": "cloudflare",
+            # False = run a VISIBLE browser window (often needed so the
+            # anti-bot challenge clears); set True only on a headless server.
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": ["Designated Terrorist Groups"],
+
+            "actions": [
+                {
+                    "action": "navigate",
+                    "url": "{url}"
+                },
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "table.tablepress",
+                    "timeout": 60
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": "{source}_{list}_{timestamp}.html"
+                }
+            ],
+
+            "validation": {
+                "required_content": [
+                    "Designated Terrorist",
+                    "tablepress",
+                    "Anti-Terrorism Council"
+                ],
+                "min_size_bytes": 10000
+            }
+        },
         "preprocessing": [
             {
                 "handler": "generate_atc_unique_id",
