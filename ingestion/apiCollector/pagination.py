@@ -24,6 +24,13 @@ def build_query(
 
     query: Dict[str, Any] = dict(params or {})
 
+    # A source declared ``type: "none"`` is fetched in a single request. Adding
+    # a page parameter here would be harmful: an endpoint that ignores paging
+    # returns the full list on every page, so the caller would loop forever.
+    # Emit only the static params in that case.
+    if pagination.get("type") == "none":
+        return query
+
     page_param = pagination.get("page_param", "page")
     size_param = pagination.get("size_param")
     page_size = pagination.get("page_size")

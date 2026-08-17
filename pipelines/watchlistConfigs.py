@@ -452,6 +452,44 @@ WATCHLIST_CONFIGS = {
         ],
     },
     
+    "GPPB-BLACKLISTED-ENTITIES": {
+        "source_name": "GPPB",
+        "date_order": "YMD",
+        "list_name": "GPPB-BLACKLISTED-ENTITIES",
+        "download_method": "API",
+        "url": "https://onlineblacklistingportal.gppb.gov.ph/obp-backend/cbr/cbr_public/",
+        "file_type": "jsonl",
+        "external_id_path": "unique_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "none",
+            },
+            "items_path": "",
+            "params": {
+                "category": "BLACKLISTED_ENTITIES",
+            },
+            "write_mode": "single_jsonl",
+        },
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "blacklisted_entity",
+                        "procuring_entity",
+                        "project",
+                        "start_date",
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "GPPB",
+                },
+            },
+        ],
+    },
+
     "CFTC-RED-LIST": {
         "source_name": "CFTC",
         "date_order": "MDY",

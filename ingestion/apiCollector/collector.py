@@ -60,9 +60,12 @@ def _iter_pages(task: ApiCollectorTask) -> Iterator[List[Any]]:
     """
     Yield each page's list of records until the API returns an empty page.
 
-    No page limit: paging ends on the first empty page.
+    No page limit: paging ends on the first empty page. A source declared
+    ``type: "none"`` is not paged at all -- it yields a single request's
+    records and stops.
     """
 
+    pagination_type = task.pagination.get("type", "page")
     page = task.pagination.get("start_page", 1)
 
     while True:
@@ -80,6 +83,11 @@ def _iter_pages(task: ApiCollectorTask) -> Iterator[List[Any]]:
             return
 
         yield items
+
+        # A single-request source (``type: "none"``) has no next page: one
+        # fetch is the whole dataset, so stop instead of re-requesting it.
+        if pagination_type == "none":
+            return
 
         page += 1
 
