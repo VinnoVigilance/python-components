@@ -1,5 +1,6 @@
 """
-Smoke test for the committed schema (db/schema/vigilance_core_standard_v2_phase1.sql).
+Smoke test for the committed schema
+(test/integration/schema/vigilance_core_db_design_v2_phase1.sql).
 
 This does not test behaviour -- it proves the schema that CI loaded actually
 contains the schemas, tables, columns and functions the application code writes
