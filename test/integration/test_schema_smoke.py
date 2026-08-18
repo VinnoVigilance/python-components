@@ -1,5 +1,6 @@
 """
-Smoke test for the committed schema (db/schema/vigilance_core_standard_v2_phase1.sql).
+Smoke test for the committed schema
+(test/integration/schema/vigilance_core_db_design_v2_phase1.sql).
 
 This does not test behaviour -- it proves the schema that CI loaded actually
 contains the schemas, tables, columns and functions the application code writes
@@ -81,8 +82,9 @@ def test_watchlist_member_has_required_columns(db_cursor):
     assert not missing, f"core.watchlist_member is missing columns: {sorted(missing)}"
 
 
-def test_uuid_v7_default_function_is_callable(db_cursor):
-    """insert_new_member relies on the vv_member_id DEFAULT gen_random_uuid_v7()."""
-    db_cursor.execute("SELECT gen_random_uuid_v7()")
+def test_vv_member_id_sequence_is_usable(db_cursor):
+    """insert_new_member omits vv_member_id and relies on the column DEFAULT
+    nextval('core.vv_member_id_seq') to assign it, so the sequence must exist."""
+    db_cursor.execute("SELECT nextval('core.vv_member_id_seq')")
     value = db_cursor.fetchone()[0]
     assert value is not None

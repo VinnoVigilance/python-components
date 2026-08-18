@@ -490,6 +490,51 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "DMW-RECRUITMENT-AGENCIES": {
+        "source_name": "DMW",
+        "date_order": "YMD",
+        "list_name": "DMW-RECRUITMENT-AGENCIES",
+        "download_method": "API",
+        "url": "https://master-api.dmw.gov.ph/api/v1/public/licensed-agencies",
+        "file_type": "jsonl",
+        "external_id_path": "unique_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "page",
+                "page_param": "page",
+                "start_page": 1,
+            },
+            "items_path": "data",
+            "headers": {
+                "x-api-key": "RTA0X0lOWFcycm9KU29WTlZxNDUzSDY5enc5OWFxY2ktWkxVdkFwZjEyMjkwNTA2MTE",
+                "x-requested-with": "XMLHttpRequest",
+                "referer": "https://dmw.gov.ph/",
+                "origin": "https://dmw.gov.ph",
+                "accept": "application/json",
+                "user-agent": "Mozilla/5.0",
+            },
+            "throttle_delay": 0.3,
+            "write_mode": "single_jsonl",
+        },
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "name",
+                        "address",
+                        "license_status_date",
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "DMW",
+                },
+            },
+        ],
+    },
+
     "CFTC-RED-LIST": {
         "source_name": "CFTC",
         "date_order": "MDY",

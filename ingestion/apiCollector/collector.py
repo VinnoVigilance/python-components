@@ -113,6 +113,17 @@ def _get_page(task: ApiCollectorTask, query: dict) -> Any:
                 timeout=task.timeout,
             )
 
+            # An auth failure will not fix itself on retry, and a silent empty
+            # result would look like "no records". Fail loudly and immediately
+            # so a rotated/expired key/token is obvious.
+            if response.status_code in (401, 403):
+                raise RuntimeError(
+                    f"API authentication failed ({response.status_code}) for "
+                    f"{task.url}. The API key/token was rejected -- it may have "
+                    f"rotated; update the source's api_config headers "
+                    f"(e.g. 'x-api-key') in the watchlist config."
+                )
+
             response.raise_for_status()
 
             return response.json()

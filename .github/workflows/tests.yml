@@ -98,7 +98,7 @@ jobs:
         run: |
           psql -h localhost -U postgres -d vinno_vigilance_test \
             -v ON_ERROR_STOP=1 \
-            -f db/schema/vigilance_core_standard_v2_phase1.sql
+            -f test/integration/schema/vigilance_core_db_design_v2_phase1.sql
 
       - name: Run database integration tests
         env:

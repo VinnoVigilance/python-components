@@ -53,7 +53,7 @@ def test_insert_new_member_creates_version_one(db_cursor, make_member_data):
     result = repo.insert_new_member(cursor=db_cursor, member_data=make_member_data())
 
     assert result["version_no"] == 1
-    assert result["vv_member_id"] is not None  # DEFAULT gen_random_uuid_v7() fired
+    assert result["vv_member_id"] is not None  # DEFAULT nextval('core.vv_member_id_seq') fired
 
     stored = _read_member(db_cursor, result["id"])
     assert stored["version_no"] == 1

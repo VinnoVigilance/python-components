@@ -129,6 +129,33 @@ class TestIterPages:
 
         assert result == [[{"id": 1}], [{"id": 2}]]
 
+    def test_auth_failure_raises_immediately_without_retry(self):
+        # A 401/403 will not fix itself on retry and must not look like an
+        # empty result; _get_page raises a clear error on the first attempt.
+        task = _task({"type": "page"})
+        task.retry = 3
+
+        calls = {"count": 0}
+
+        class _Resp:
+            status_code = 401
+
+            def raise_for_status(self):  # pragma: no cover - must not be hit
+                raise AssertionError("raise_for_status should not be reached")
+
+            def json(self):  # pragma: no cover - must not be hit
+                return {}
+
+        def fake_get(*args, **kwargs):
+            calls["count"] += 1
+            return _Resp()
+
+        with patch.object(collector.requests, "get", side_effect=fake_get):
+            with pytest.raises(RuntimeError, match="authentication failed"):
+                collector._get_page(task, {"page": 1})
+
+        assert calls["count"] == 1
+
     def test_single_request_source_fetches_once(self):
         # The GPPB case: the endpoint ignores paging and always returns the
         # same non-empty list. With type: "none" the collector must fetch once
