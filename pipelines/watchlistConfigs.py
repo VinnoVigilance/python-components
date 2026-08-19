@@ -554,5 +554,15 @@ WATCHLIST_CONFIGS = {
                 "source_url_field": "detail_url",
             },
         ],
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            }
+        ],
     },
 }

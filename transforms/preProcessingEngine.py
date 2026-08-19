@@ -326,6 +326,26 @@ class PreProcessingEngine:
 
         return record
 
+    def set_constant_field(self, record, config):
+        output_field = config["output_field"]
+        value = config["value"]
+        overwrite = config.get("overwrite", False)
+
+        current_value = record.get(output_field)
+
+        is_empty = (
+            current_value is None
+            or (
+                isinstance(current_value, str)
+                and not current_value.strip()
+            )
+        )
+
+        if overwrite or is_empty:
+            record[output_field] = value
+
+        return record
+
     def generate_atc_unique_id(self, record, config):
         name_field = config.get("name_field", "name")
 
