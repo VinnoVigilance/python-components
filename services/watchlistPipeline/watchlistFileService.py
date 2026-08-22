@@ -156,6 +156,7 @@ def _collect_api_source(config: dict[str, Any]) -> Path:
         pagination=api_config.get("pagination", {}),
         items_path=api_config.get("items_path", "items"),
         params=api_config.get("params", {}),
+        param_variants=api_config.get("param_variants", []),
         headers=api_config.get("headers", {}),
         timeout=api_config.get("timeout", 30),
         retry=api_config.get("retry", 3),

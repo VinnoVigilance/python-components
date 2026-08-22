@@ -58,11 +58,34 @@ def collect_source(task: ApiCollectorTask) -> str:
 
 def _iter_pages(task: ApiCollectorTask) -> Iterator[List[Any]]:
     """
-    Yield each page's list of records until the API returns an empty page.
+    Yield every page of the source.
 
-    No page limit: paging ends on the first empty page. A source declared
-    ``type: "none"`` is not paged at all -- it yields a single request's
-    records and stops.
+    When ``param_variants`` is set, the source is fetched once per variant
+    (each merged over ``params``) and the pages are concatenated -- so several
+    partitions of one dataset land in a single snapshot. With no variants this
+    is a single fetch using ``params``, exactly as before.
+    """
+
+    variants = task.param_variants or [{}]
+
+    for index, variant in enumerate(variants):
+        params = {**task.params, **variant}
+
+        yield from _iter_variant_pages(task, params)
+
+        # Space consecutive variant fetches like pages when throttling is on.
+        if task.throttle_delay and index < len(variants) - 1:
+            time.sleep(task.throttle_delay)
+
+
+def _iter_variant_pages(
+    task: ApiCollectorTask,
+    params: dict,
+) -> Iterator[List[Any]]:
+    """
+    Yield each page's list of records for one param-set until the API returns
+    an empty page. A source declared ``type: "none"`` is not paged: it yields
+    a single request's records and stops.
     """
 
     pagination_type = task.pagination.get("type", "page")
@@ -71,7 +94,7 @@ def _iter_pages(task: ApiCollectorTask) -> Iterator[List[Any]]:
     while True:
         query = build_query(
             pagination=task.pagination,
-            params=task.params,
+            params=params,
             page=page,
         )
 

@@ -93,13 +93,15 @@ class TestShouldStop:
 
 # --- _iter_pages -----------------------------------------------------------
 
-def _task(pagination, items_path="items"):
+def _task(pagination, items_path="items", params=None, param_variants=None):
     return ApiCollectorTask(
         url="https://example.test/api",
         source_name="TEST",
         list_name="TEST",
         pagination=pagination,
         items_path=items_path,
+        params=params or {},
+        param_variants=param_variants or [],
     )
 
 
@@ -174,4 +176,56 @@ class TestIterPages:
             result = list(collector._iter_pages(task))
 
         assert result == [full_list]
+        assert calls["count"] == 1
+
+    def test_param_variants_fetch_each_and_concatenate(self):
+        # The GPPB case: one source split into three category partitions. With
+        # type: "none" each variant is a single fetch; all three are yielded in
+        # order and concatenated into one snapshot.
+        task = _task(
+            {"type": "none"},
+            items_path="",
+            param_variants=[
+                {"category": "BLACKLISTED_ENTITIES"},
+                {"category": "PERMANENT_BLACKLISTED_ENTITIES"},
+                {"category": "TEMPORARY_REMOVED_BLACKLISTED_ENTITIES"},
+            ],
+        )
+
+        seen = []
+
+        def fake_get_page(_task, query):
+            seen.append(query["category"])
+            return [{"cat": query["category"]}]
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            result = list(collector._iter_pages(task))
+
+        assert seen == [
+            "BLACKLISTED_ENTITIES",
+            "PERMANENT_BLACKLISTED_ENTITIES",
+            "TEMPORARY_REMOVED_BLACKLISTED_ENTITIES",
+        ]
+        assert result == [
+            [{"cat": "BLACKLISTED_ENTITIES"}],
+            [{"cat": "PERMANENT_BLACKLISTED_ENTITIES"}],
+            [{"cat": "TEMPORARY_REMOVED_BLACKLISTED_ENTITIES"}],
+        ]
+
+    def test_no_variants_preserves_single_fetch(self):
+        # BEFORE/AFTER guard: a source with no param_variants still does exactly
+        # one fetch using its base params -- unchanged from prior behaviour.
+        task = _task({"type": "none"}, items_path="", params={"category": "X"})
+
+        calls = {"count": 0}
+
+        def fake_get_page(_task, query):
+            calls["count"] += 1
+            assert query == {"category": "X"}
+            return [{"id": 1}]
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            result = list(collector._iter_pages(task))
+
+        assert result == [[{"id": 1}]]
         assert calls["count"] == 1
