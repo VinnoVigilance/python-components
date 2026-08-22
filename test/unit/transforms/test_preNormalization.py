@@ -17,6 +17,7 @@ from transforms.preNormalization import (
     BeforeParenthesisHandler,
     DateFormatHandler,
     EnumHandler,
+    FlattenDictHandler,
     PreNormalizationEngine,
     RegexExtractHandler,
     RemoveListMarkersHandler,
@@ -26,6 +27,35 @@ from transforms.preNormalization import (
 )
 
 pytestmark = pytest.mark.unit
+
+
+class TestFlattenDictHandler:
+    OFFENSES = {"14": "Failure to comply", "16": "Unsatisfactory progress"}
+
+    def test_default_joins_key_and_value_into_one_string(self):
+        handler = FlattenDictHandler()
+        assert handler.normalize(self.OFFENSES, "") == (
+            "14: Failure to comply; 16: Unsatisfactory progress"
+        )
+
+    def test_list_mode_returns_one_string_per_entry(self):
+        handler = FlattenDictHandler()
+        assert handler.normalize(self.OFFENSES, "mode=list") == [
+            "14: Failure to comply",
+            "16: Unsatisfactory progress",
+        ]
+
+    def test_custom_format_and_newline_separator(self):
+        handler = FlattenDictHandler()
+        assert handler.normalize(self.OFFENSES, "format={value}|sep=\\n") == (
+            "Failure to comply\nUnsatisfactory progress"
+        )
+
+    def test_non_dict_and_none_pass_through_unchanged(self):
+        handler = FlattenDictHandler()
+        assert handler.normalize("already a string", "") == "already a string"
+        assert handler.normalize(None, "") is None
+        assert handler.normalize({}, "") == ""
 
 
 class TestHandlers:

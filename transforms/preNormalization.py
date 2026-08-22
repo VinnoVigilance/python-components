@@ -264,6 +264,76 @@ class SplitPatternHandler(BaseHandler):
 
 
 # =========================================================
+# Flatten Dict Handler
+# =========================================================
+
+class FlattenDictHandler(BaseHandler):
+
+    """
+    Turn a ``{key: value}`` object into a flat string, or a list of strings,
+    so downstream mapping handlers (which cannot read a dict's key/value pairs)
+    can consume it. General: any source whose field is a code->description map
+    (e.g. GPPB ``offenses`` = ``{"14": "Failure...", "16": "Unsatisfactory..."}``)
+    reuses this by pointing a rule at that field.
+
+    Rule cell is an optional ``|``-separated config; every part is optional:
+
+        format={key}: {value}   template for each entry ({key}/{value} are
+                                replaced literally; default "{key}: {value}")
+        sep=;                   joiner between entries in string mode; supports
+                                \\n and \\t (default "; ")
+        mode=string             "string" -> one joined string (map with `path`);
+                                "list"   -> a list of strings (map with
+                                            `list_expand`, one object per entry)
+
+    Examples (rule -> output for {"14": "Failure...", "16": "Unsatisfactory..."}):
+
+        (empty)              -> "14: Failure...; 16: Unsatisfactory..."
+        mode=list            -> ["14: Failure...", "16: Unsatisfactory..."]
+        format={value}|sep=\\n -> "Failure...\\nUnsatisfactory..."
+
+    Anything that is not a dict is returned unchanged, so a rule aimed at a
+    field that is occasionally already a string/None is safe.
+    """
+
+    def normalize(self, value, rule):
+
+        if not isinstance(value, dict):
+            return value
+
+        template = "{key}: {value}"
+        separator = "; "
+        mode = "string"
+
+        for part in str(rule or "").split("|"):
+
+            if "=" not in part:
+                continue
+
+            name, raw = part.split("=", 1)
+            name = name.strip().lower()
+
+            if name == "format":
+                template = raw
+            elif name == "sep":
+                separator = raw.replace("\\n", "\n").replace("\\t", "\t")
+            elif name == "mode":
+                mode = raw.strip().lower()
+
+        items = [
+            template
+            .replace("{key}", "" if key is None else str(key))
+            .replace("{value}", "" if val is None else str(val))
+            for key, val in value.items()
+        ]
+
+        if mode == "list":
+            return items
+
+        return separator.join(items)
+
+
+# =========================================================
 # Handler Registry
 # =========================================================
 
@@ -274,6 +344,7 @@ HANDLERS = {
     "date_format": DateFormatHandler(),
     "regex_extract": RegexExtractHandler(),
     "split_pattern": SplitPatternHandler(),
+    "flatten_dict": FlattenDictHandler(),
 }
 
 
