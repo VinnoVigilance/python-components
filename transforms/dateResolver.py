@@ -217,7 +217,15 @@ def read_approximate(value, from_text=False):
 # =========================================================
 
 def strip_time(text):
-    return re.sub(r"\s+\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?\s*$", "", text)
+    # Strip a trailing time so a datetime reads as its date. Accepts both the
+    # space-separated form ("2025-11-11 00:00:00") and the ISO 8601 form DMW
+    # publishes ("2025-11-11T00:00:00.000Z"): the separator may be a space or a
+    # "T", and an optional "Z" or +hh:mm offset may follow.
+    return re.sub(
+        r"[ T]\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s*$",
+        "",
+        text,
+    )
 
 
 def strip_approx_words(text):
