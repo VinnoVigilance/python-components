@@ -467,9 +467,11 @@ WATCHLIST_CONFIGS = {
                 "type": "none",
             },
             "items_path": "",
-            "params": {
-                "category": "BLACKLISTED_ENTITIES",
-            },
+            "param_variants": [
+                {"category": "BLACKLISTED_ENTITIES"},
+                {"category": "PERMANENT_BLACKLISTED_ENTITIES"},
+                {"category": "TEMPORARY_REMOVED_BLACKLISTED_ENTITIES"},
+            ],
             "write_mode": "single_jsonl",
         },
         "preprocessing": [
@@ -485,6 +487,14 @@ WATCHLIST_CONFIGS = {
                     ],
                     "output_field": "unique_id",
                     "prefix": "GPPB",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
                 },
             },
         ],
@@ -530,6 +540,14 @@ WATCHLIST_CONFIGS = {
                     ],
                     "output_field": "unique_id",
                     "prefix": "DMW",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
                 },
             },
         ],
