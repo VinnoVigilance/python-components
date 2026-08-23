@@ -1,10 +1,11 @@
 import pandas as pd
 import json
+import html
 from copy import deepcopy
-from datetime import datetime
+from datetime import date, datetime
 import re
 
-from transforms.dateResolver import resolve_dates
+from transforms.dateResolver import parse_date_string, resolve_dates
 from transforms.searchEnrichment import (
     normalize_text,
     tokenize,
@@ -50,16 +51,6 @@ def empty_dependency_handler(entity, rule, config=None):
 
 
 def date_normalization_handler(entity, rule, config=None):
-    source_path = rule["condition_path"]
-
-    if source_path not in entity:
-        return
-
-    values = entity.get(source_path)
-
-    if not isinstance(values, list):
-        return
-
     # If a DATE_NORMALIZATION rule is running then date_order genuinely
     # decides how ambiguous dates read (03/04 as 3 Apr under DMY vs 4 Mar
     # under MDY), so a missing order is an error, not a thing to guess.
@@ -70,6 +61,54 @@ def date_normalization_handler(entity, rule, config=None):
         )
 
     date_order = config["date_order"]
+
+    # Scalar-leaf mode: when ``value`` names ``leaves=``, reformat those flat
+    # date-string leaves on each element of the ``condition_path`` array to one
+    # ISO shape using the same resolver, e.g. Measures[].EffectiveDate/EndDate.
+    # This reuses the date resolver rather than adding a second date handler.
+    leaves = [
+        leaf.strip()
+        for leaf in _parse_kv(rule.get("value")).get("leaves", "").split(",")
+        if leaf.strip()
+    ]
+
+    if leaves:
+        array_name = str(rule["condition_path"]).split("[]")[0].strip(". ")
+        items = entity.get(array_name)
+
+        if not isinstance(items, list):
+            return
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            for leaf in leaves:
+                if leaf not in item:
+                    continue
+
+                parsed = parse_date_string(item.get(leaf), date_order)
+                # Only a whole date earns an ISO value (the resolver's own rule);
+                # a non-date (empty, junk, PERMANENT) is blanked so a permanent
+                # measure reads as "no end", partial dates are left as written.
+                if parsed and parsed[0] and parsed[1] and parsed[2]:
+                    item[leaf] = f"{parsed[0]}-{parsed[1]}-{parsed[2]}"
+                elif not parsed:
+                    item[leaf] = ""
+
+        return
+
+    # Row-array mode (the original behaviour): resolve a whole Dates[]-style
+    # array of date rows into normalised rows.
+    source_path = rule["condition_path"]
+
+    if source_path not in entity:
+        return
+
+    values = entity.get(source_path)
+
+    if not isinstance(values, list):
+        return
 
     entity[source_path] = resolve_dates(values, date_order)
 
@@ -222,10 +261,200 @@ def enum_normalize_handler(entity, rule, config=None):
             item[target_leaf] = mapping[key]
 
 
+def _parse_kv(text):
+    """Parse a ``key=value|key=value`` config string into a dict.
+
+    Keys are lowercased; values are kept as written (trailing spaces and commas
+    matter to some options, so only the key side is normalized).
+    """
+    result = {}
+    for part in str(text or "").split("|"):
+        if "=" not in part:
+            continue
+        name, raw = part.split("=", 1)
+        result[name.strip().lower()] = raw
+    return result
+
+
+def _as_date(text, date_order):
+    """Turn a source date string into a ``date`` for comparison, or None.
+
+    Reuses the project's date reader so ``date_order`` (DMY/MDY/YMD) is honoured
+    and only the formats the pipeline already understands are accepted. A value
+    that carries no date -- empty, junk, or an open-ended marker like
+    ``"PERMANENT"`` -- returns None, which the caller reads as "no bound".
+    A day/month the source omits defaults to the 1st so a year- or month-only
+    date still compares.
+    """
+    parsed = parse_date_string(text, date_order)
+    if not parsed:
+        return None
+
+    year, month, day, _approx = parsed
+    try:
+        return date(int(year), int(month or 1), int(day or 1))
+    except (TypeError, ValueError):
+        return None
+
+
+def date_window_status_handler(entity, rule, config=None):
+    """Set a measure's Status from its own start/end date window -- every list.
+
+    Global (no list scoping). For each element of the ``condition_path`` array it
+    reads the start leaf (``condition_path``) and the ``EndDate`` leaf, and writes
+    the status leaf (``target_path``):
+
+      * a Status already set (by mapping or the source) is left alone;
+      * no usable start *and* no usable end          -> left blank;
+      * now before the start                         -> Inactive (not begun);
+      * now after a real end                         -> Inactive (expired);
+      * otherwise -- inside the window, or a start
+        with no end (a permanent measure)            -> Active.
+
+    A permanent measure has no end (``PERMANENT`` is not a date, so it reads as
+    "no end"), which is just "started, no end" -> Active; no special-casing here.
+
+    **Category override (config-driven, general).** A record the source has
+    suspended/removed is inside its window (dates alone would say Active) but must
+    read Inactive. When the record carries an ``additionalInfo[]`` entry whose
+    ``Type`` == ``hold_type`` and whose ``Value`` is one of ``hold_values``, every
+    element is forced to ``hold_status``. No list names appear here -- which
+    signal means what is entirely data, so any list opts in with its own values.
+
+    ``value`` config (``|`` separated, all optional):
+
+        active=Active | inactive=Inactive
+        | hold_type=Category | hold_values=TEMPORARY_REMOVED_BLACKLISTED_ENTITIES
+        | hold_status=Inactive
+    """
+    cfg = _parse_kv(rule.get("value"))
+
+    array_name, start_leaf = _split_array_path(rule["condition_path"])
+    _, status_leaf = _split_array_path(rule["target_path"])
+
+    end_leaf = "EndDate"
+    active_label = cfg.get("active", "Active").strip()
+    inactive_label = cfg.get("inactive", "Inactive").strip()
+
+    date_order = (config or {}).get("date_order", "DMY")
+    today = datetime.now().date()
+
+    items = entity.get(array_name)
+    if not isinstance(items, list):
+        return
+
+    hold_status = _hold_override(entity, cfg)
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        # 1. Respect a status mapping or the source already decided.
+        if str(item.get(status_leaf) or "").strip():
+            continue
+
+        # 2. A category hold (e.g. temporarily removed) overrides the dates.
+        if hold_status is not None:
+            item[status_leaf] = hold_status
+            continue
+
+        # 3. Otherwise derive it from the measure's own date window.
+        start = _as_date(item.get(start_leaf), date_order)
+        end = _as_date(item.get(end_leaf), date_order)
+
+        # Nothing to reason from -> leave it blank rather than guess.
+        if start is None and end is None:
+            continue
+
+        begun = start is None or today >= start
+        ended = end is not None and today > end
+
+        item[status_leaf] = (
+            active_label if (begun and not ended) else inactive_label
+        )
+
+
+def _hold_override(entity, cfg):
+    """Return the forced status when a record is on a category hold, else None.
+
+    Reads the canonical ``additionalInfo[]`` for an entry whose ``Type`` matches
+    ``hold_type`` and whose ``Value`` is in ``hold_values``; such a record is
+    treated as suspended/removed and every measure takes ``hold_status``. Driven
+    entirely by the rule's config, so it is general -- any list opts in.
+    """
+    hold_type = cfg.get("hold_type", "").strip()
+    hold_status = cfg.get("hold_status", "").strip()
+    hold_values = {
+        value.strip()
+        for value in cfg.get("hold_values", "").split(",")
+        if value.strip()
+    }
+
+    if not (hold_type and hold_status and hold_values):
+        return None
+
+    for info in entity.get("additionalInfo") or []:
+        if not isinstance(info, dict):
+            continue
+        if str(info.get("Type") or "").strip() == hold_type and (
+            str(info.get("Value") or "").strip() in hold_values
+        ):
+            return hold_status
+
+    return None
+
+
+def _strip_html(value):
+    """Remove HTML tags and unescape entities from a single string.
+
+    Order matters: entities are unescaped **first** (``&amp;`` -> ``&``), then
+    tags are stripped. Some sources double-encode markup (a literal
+    ``&lt;p&gt;`` sitting inside real ``<p>`` tags); unescaping first turns that
+    back into a ``<p>`` tag so the strip catches it too -- stripping first would
+    leave the resurrected tag behind. Tags become a space (not "") so block
+    boundaries like ``</p><p>`` don't glue words together; runs of whitespace
+    then collapse to one. Anything that isn't a string passes through untouched.
+    """
+    if not isinstance(value, str):
+        return value
+
+    unescaped = html.unescape(value)
+    without_tags = re.sub(r"<[^>]+>", " ", unescaped)
+    collapsed = re.sub(r"\s+", " ", without_tags)
+    return collapsed.strip()
+
+
+def sanitize_html_handler(entity, rule, config=None):
+    """Strip HTML from a free-text leaf on every element of an array.
+
+    Reads the array leaf named by ``condition_path`` (e.g. Comments[].text) and
+    rewrites each element's value with the markup removed. Generic across all
+    lists -- any source that leaks HTML into a text field is cleaned here, with
+    no per-source branch. Targeted at named free-text paths only, so structured
+    fields (identifiers, dates, numbers) are never touched. Runs before
+    DEDUPLICATE so two texts that differ only in markup collapse to one.
+    """
+    source_list, source_leaf = _split_array_path(rule["condition_path"])
+
+    items = entity.get(source_list)
+    if not isinstance(items, list):
+        return
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        value = item.get(source_leaf)
+        if isinstance(value, str):
+            item[source_leaf] = _strip_html(value)
+
+
 HANDLERS = {
     "EMPTY_DEPENDENCY": empty_dependency_handler,
     "DATE_NORMALIZATION": date_normalization_handler,
     "ENUM_NORMALIZE": enum_normalize_handler,
+    "DATE_WINDOW_STATUS": date_window_status_handler,
+    "SANITIZE_HTML": sanitize_html_handler,
     "SEARCH_ENRICH": search_enrich_handler,
     "DEDUPLICATE_ALL_ARRAYS": deduplicate_all_arrays_handler,
 }

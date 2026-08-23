@@ -1,0 +1,71 @@
+fetch_strategy: direct
+
+record_mode: list_detail
+
+discovery:
+  row_selector: "table.table.table-hover.table-striped tbody tr"
+  detail_link_selector: "td.views-field-field-company-registration-def a"
+  detail_link_attribute: "href"
+
+list_fields:
+  date_entered:
+    selector: "td.views-field-field-date-registration-def time"
+    selector_type: css
+    value: text
+
+  company:
+    selector: "td.views-field-field-company-registration-def a"
+    selector_type: css
+    value: text
+
+detail_fields:
+  web_address:
+    selector: "//b[normalize-space()='Web address:']/following-sibling::text()[normalize-space()][1]"
+    selector_type: xpath
+    value: text
+
+  origin:
+    selector: "//b[normalize-space()='Origin:']/following-sibling::text()[normalize-space()][1]"
+    selector_type: xpath
+    value: text
+
+  owned_and_operated_by:
+    selector: "//b[normalize-space()='Owned and Operated by:']/following-sibling::text()[normalize-space()][1]"
+    selector_type: xpath
+    value: text
+
+  type_of_offerings:
+    selector: "//b[normalize-space()='Type of Offerings:']/following-sibling::text()[normalize-space()][1]"
+    selector_type: xpath
+    value: text
+
+  red_list_date:
+    selector: "//b[normalize-space()='RED List date:']/following-sibling::text()[normalize-space()][1]"
+    selector_type: xpath
+    value: text
+
+attachments:
+  - type: DETAIL_PAGE
+
+  - type: IMAGE
+    selector: "img.img-responsive[src*='/sites/default/files/']"
+    attribute: "src"
+
+record_id:
+  strategy: url_regex
+  source: detail_url
+  pattern: "/node/(\\d+)"
+
+pagination:
+  type: query_params
+  params:
+    items_per_page: "All"
+
+storage:
+  save_listing_page: true
+  save_detail_pages: true
+
+  listing_role: primary
+  detail_role: attachment
+
+  detail_directory: attachments/members

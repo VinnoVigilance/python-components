@@ -133,6 +133,44 @@ class TestSplitAtcDateAndPlaceOfBirth:
         assert result["atc_birth_place"] == "Manila City"
 
 
+class TestSetConstantField:
+    """set_constant_field stamps a fixed value into a field.
+
+    Its job is to give a single-type list a routing type the source omits
+    (e.g. GPPB / DMW records carry no type field, so we stamp
+    ``entity_type = "Entity"`` before mapping). It fills only an empty field by
+    default, so a value the source or an earlier step already set is preserved.
+    """
+
+    def test_sets_value_when_field_missing(self, engine):
+        record = engine.set_constant_field(
+            {"name": "ACME CORP"},
+            {"output_field": "entity_type", "value": "Entity"},
+        )
+        assert record["entity_type"] == "Entity"
+
+    def test_sets_value_when_field_blank(self, engine):
+        record = engine.set_constant_field(
+            {"entity_type": "   "},
+            {"output_field": "entity_type", "value": "Entity"},
+        )
+        assert record["entity_type"] == "Entity"
+
+    def test_does_not_overwrite_existing_value(self, engine):
+        record = engine.set_constant_field(
+            {"entity_type": "Individual"},
+            {"output_field": "entity_type", "value": "Entity"},
+        )
+        assert record["entity_type"] == "Individual"
+
+    def test_overwrite_true_replaces_existing(self, engine):
+        record = engine.set_constant_field(
+            {"entity_type": "Individual"},
+            {"output_field": "entity_type", "value": "Entity", "overwrite": True},
+        )
+        assert record["entity_type"] == "Entity"
+
+
 class TestPreprocessOrchestrator:
     def test_runs_record_level_handler(self, engine):
         rules = [{

@@ -1,5 +1,6 @@
 import json
 import pandas as pd
+import re
 
 from dataclasses import dataclass
 from typing import Any, Optional, List
@@ -634,32 +635,98 @@ class ConcatPathHandler(BaseHandler):
 
 
 class ExplodeHandler(BaseHandler):
-    def handle(self, rule, raw_json, item=None, anchor=None):
+
+    def handle(
+        self,
+        rule,
+        raw_json,
+        item=None,
+        anchor=None,
+    ):
         if not rule.source_value:
             return []
 
         source_expr = str(rule.source_value).strip()
-        separator = "|"
 
-        if source_expr.endswith(",,"):
-            source_expr = source_expr[:-2].strip()
-            separator = ","
-        elif "," in source_expr:
-            source_expr, separator = source_expr.rsplit(",", 1)
+        # Default legacy separator
+        separators = ["|"]
+
+        # -------------------------------------------------
+        # New syntax: multiple separators
+        #
+        # Example:
+        # detail.origin::,|;
+        #
+        # Separators:
+        #   ,
+        #   ;
+        # -------------------------------------------------
+        if "::" in source_expr:
+
+            source_expr, separator_expression = (
+                source_expr.split("::", 1)
+            )
+
             source_expr = source_expr.strip()
-            separator = separator.strip()
 
-        # A spreadsheet cell stores a line-break separator as the two
-        # characters "\n" (backslash + n). Turn that (and \r, \t) into the
-        # real control character so a mapping row can ask explode to split on
-        # line-breaks, e.g. source value "Good quality a.k.a.,\n".
-        separator = decode_escape_sequences(separator)
+            separators = [
+                decode_escape_sequences(separator)
+                for separator
+                in separator_expression.split("|")
+                if separator != ""
+            ]
 
+            # Invalid/empty separator configuration:
+            # preserve the previous default behaviour.
+            if not separators:
+                separators = ["|"]
+
+        # -------------------------------------------------
+        # Legacy comma syntax
+        #
+        # Example:
+        # nameAlias[].title,,
+        #
+        # Means: split by comma.
+        # -------------------------------------------------
+        elif source_expr.endswith(",,"):
+
+            source_expr = source_expr[:-2].strip()
+            separators = [","]
+
+        # -------------------------------------------------
+        # Legacy single-separator syntax
+        #
+        # Examples:
+        # addresses,;
+        # aliases,/
+        # aliases,\n
+        # -------------------------------------------------
+        elif "," in source_expr:
+
+            source_expr, separator = (
+                source_expr.rsplit(",", 1)
+            )
+
+            source_expr = source_expr.strip()
+            separator = decode_escape_sequences(
+                separator.strip()
+            )
+
+            separators = (
+                [separator]
+                if separator
+                else ["|"]
+            )
+
+        # -------------------------------------------------
+        # Read values from JSON
+        # -------------------------------------------------
         raw_values = resolve_all_in_context(
             raw_json,
             source_expr,
             item,
-            anchor
+            anchor,
         )
 
         if not raw_values:
@@ -667,23 +734,65 @@ class ExplodeHandler(BaseHandler):
 
         results = []
 
+        # Remove duplicate separators while preserving order.
+        unique_separators = list(
+            dict.fromkeys(
+                separator
+                for separator in separators
+                if separator
+            )
+        )
+
         for raw_value in raw_values:
+
             if raw_value is None:
                 continue
 
-            if separator in ("\n", "\r", "\r\n"):
-                tokens = str(raw_value).splitlines()
+            raw_text = str(raw_value)
+
+            # Preserve previous splitlines behaviour.
+            if (
+                len(unique_separators) == 1
+                and unique_separators[0]
+                in ("\n", "\r", "\r\n")
+            ):
+                tokens = raw_text.splitlines()
+
+            elif unique_separators:
+
+                # Longest separator first, so overlapping
+                # separators such as \r\n and \n work correctly.
+                split_pattern = "|".join(
+                    re.escape(separator)
+                    for separator in sorted(
+                        unique_separators,
+                        key=len,
+                        reverse=True,
+                    )
+                )
+
+                tokens = re.split(
+                    split_pattern,
+                    raw_text,
+                )
+
             else:
-                tokens = str(raw_value).split(separator)
+                tokens = [raw_text]
 
-            for x in tokens:
-                x = x.strip().strip(".")
+            # -------------------------------------------------
+            # Clean extracted values
+            # -------------------------------------------------
+            for token in tokens:
 
-                if x and x.upper() != "N/A":
-                    results.append(x)
+                token = token.strip().strip(".")
+
+                if (
+                    token
+                    and token.upper() != "N/A"
+                ):
+                    results.append(token)
 
         return results
-
 class ConditionalPathHandler(BaseHandler):
 
     def handle(self, rule, raw_json, item=None, anchor=None):

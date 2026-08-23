@@ -106,7 +106,7 @@ To run them locally against a scratch database:
 # 1. create a throwaway DB and load the committed schema into it
 createdb vinno_vigilance_test
 psql "postgresql://postgres:pw@localhost:5432/vinno_vigilance_test" \
-    -f db/schema/vigilance_core_standard_v2_phase1.sql
+    -f test/integration/schema/vigilance_core_db_design_v2_phase1.sql
 # 2. point the tests at it and run only the db tier
 TEST_DATABASE_URL="postgresql://postgres:pw@localhost:5432/vinno_vigilance_test" \
     vv-env/Scripts/python.exe -m pytest -m db
@@ -114,12 +114,13 @@ TEST_DATABASE_URL="postgresql://postgres:pw@localhost:5432/vinno_vigilance_test"
 
 In CI this is fully automated: the `database-tests` job in
 `.github/workflows/tests.yml` starts a disposable Postgres, loads
-`db/schema/vigilance_core_standard_v2_phase1.sql`, and runs `pytest -m db`.
+`test/integration/schema/vigilance_core_db_design_v2_phase1.sql`, and runs
+`pytest -m db`.
 
 ### Do mapping changes need a schema change?
 
 No — for almost all edits. `data/rules/mapping.xlsx` changes often; the schema
-in `db/schema/` changes rarely. The full canonical record is stored as `jsonb`
+in `test/integration/schema/` changes rarely. The full canonical record is stored as `jsonb`
 in `core.watchlist_member.full_payload`, so new/edited mapping rows just land
 there (and in the existing `member_*` tables) with no migration. You only touch
 the schema to introduce a brand-new structural table/column. See
@@ -142,7 +143,7 @@ Done:
 - DB code (mocked): `watchlistFileLogRepository`, `rawPayloadRepository`.
 - Parser factory; downloader model + delegation.
 - Safe real-DB harness with rollback + name guard.
-- Committed schema (`db/schema/`) and a real-Postgres CI job that loads it.
+- Committed schema (`test/integration/schema/`) and a real-Postgres CI job that loads it.
 - Real-DB tests for `coreMemberRepository`: insert / versioning / history /
   delete detection / rollback isolation, plus a schema-drift smoke test.
 - CI robot running all of the above.

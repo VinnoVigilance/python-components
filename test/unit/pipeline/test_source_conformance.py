@@ -51,6 +51,8 @@ SAMPLES = {
     "ATC-DESIGNATED-TERRORIST-INDIVIDUALS": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS_raw_sample.jsonl",
     "ATC-DESIGNATED-TERRORIST-GROUPS": "ATC-DESIGNATED-TERRORIST-GROUPS_raw_sample.jsonl",
     "DNFBP": "DNFBP_raw_sample.jsonl",
+    "FBI-WANTED": "FBI-WANTED_raw_sample.jsonl",
+    "DMW-RECRUITMENT-AGENCIES": "DMW-RECRUITMENT-AGENCIES_raw_sample.jsonl",
 }
 
 VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel"}

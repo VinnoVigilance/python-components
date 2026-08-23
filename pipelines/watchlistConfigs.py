@@ -104,19 +104,48 @@ WATCHLIST_CONFIGS = {
         "list_name": (
             "ATC-DESIGNATED-TERRORIST-INDIVIDUALS"
         ),
-        "download_method": "Manual",
+        "download_method": "BYPASS",
         "url": "https://atc.gov.ph/individuals/",
         "file_type": "html",
         "external_id_path": "unique_id",
         "schedule": "daily",
         "versioning_strategy": "continuous",
-        "local_path": (
-            "data/downloads/ATC/"
-            "ATC-DESIGNATED-TERRORIST-INDIVIDUALS/"
-            "year=2026/month=07/day=20/"
-            "Designated Terrorist Individuals _ "
-            "Anti-Terrorism Council.html"
-        ),
+        "bypass_config": {
+            # Declare the challenge; the collector picks the engine that
+            # clears it (cloudflare -> stealth browser). No runtime detection.
+            "challenge": "cloudflare",
+            # False = run a VISIBLE browser window (often needed so the
+            # anti-bot challenge clears); set True only on a headless server.
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": ["Designated Terrorist Individuals"],
+
+            "actions": [
+                {
+                    "action": "navigate",
+                    "url": "{url}"
+                },
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "table.tablepress",
+                    "timeout": 60
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": "{source}_{list}_{timestamp}.html"
+                }
+            ],
+            
+            "validation": {
+                "required_content": [
+                    "Designated Terrorist",
+                    "tablepress",
+                    "Anti-Terrorism Council"
+                ],
+                "min_size_bytes": 10000
+            }
+        },
         "profile_dir": "data/downloads/profiles",
         "attachments": [
             {
@@ -200,19 +229,48 @@ WATCHLIST_CONFIGS = {
         "source_name": "ATC",
         "date_order": "DMY",
         "list_name": "ATC-DESIGNATED-TERRORIST-GROUPS",
-        "download_method": "Manual",
+        "download_method": "BYPASS",
         "versioning_strategy": "continuous",
         "url": "https://atc.gov.ph/groups/",
         "file_type": "html",
         "external_id_path": "unique_id",
         "schedule": "daily",
-        "local_path": (
-            "data/downloads/ATC/"
-            "ATC-DESIGNATED-TERRORIST-GROUPS/"
-            "year=2026/month=07/day=21/"
-            "Designated Terrorist Groups _ "
-            "Anti-Terrorism Council.html"
-        ),
+        "bypass_config": {
+            # Declare the challenge; the collector picks the engine that
+            # clears it (cloudflare -> stealth browser). No runtime detection.
+            "challenge": "cloudflare",
+            # False = run a VISIBLE browser window (often needed so the
+            # anti-bot challenge clears); set True only on a headless server.
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": ["Designated Terrorist Groups"],
+
+            "actions": [
+                {
+                    "action": "navigate",
+                    "url": "{url}"
+                },
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "table.tablepress",
+                    "timeout": 60
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": "{source}_{list}_{timestamp}.html"
+                }
+            ],
+
+            "validation": {
+                "required_content": [
+                    "Designated Terrorist",
+                    "tablepress",
+                    "Anti-Terrorism Council"
+                ],
+                "min_size_bytes": 10000
+            }
+        },
         "preprocessing": [
             {
                 "handler": "generate_atc_unique_id",
@@ -312,5 +370,216 @@ WATCHLIST_CONFIGS = {
         "external_id_path": "SSID",
         "schedule": "daily",
         "versioning_strategy": "continuous",
+    },
+
+    "FBI-WANTED": {
+        "source_name": "FBI",
+        "list_name": "FBI-WANTED",
+        "date_order": "MDY",
+        "download_method": "API",
+        "url": "https://api.fbi.gov/wanted/v1/list",
+        "file_type": "jsonl",
+        "external_id_path": "uid",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "page",
+                "page_param": "page",
+                "size_param": "pageSize",
+                "page_size": 50,
+                "start_page": 1,
+            },
+            "items_path": "items",
+            "write_mode": "single_jsonl",
+            "throttle_delay": 0.3,
+        },
+    },
+
+    "DILG-LOCAL-OFFICIALS": {
+        "source_name": "DILG",
+        "date_order": "DMY",
+        "list_name": "DILG-LOCAL-OFFICIALS",
+
+        "download_method": "HTTPS",
+
+        "url": (
+            r"https://region5.dilg.gov.ph/wp-content/uploads/2026/05/Masterlist-of-Local-Officials-2025-2028.pdf"
+        ),
+
+        "url_resolver": {
+            "type": "link_text",
+            "source_page_url": (
+                "https://region5.dilg.gov.ph/lgus/"
+            ),
+            "value": "Masterlist of Local Officials",
+        },
+
+        "file_type": "pdf",
+
+        "external_id_path": "unique_id",
+
+        "schedule": "daily",
+
+        "versioning_strategy": "continuous",
+
+        "parser_config": {
+            "expected_headers": [
+                "REGION",
+                "PROVINCE",
+                "P/C/M",
+                "POSITION",
+                "NAME",
+            ],
+        },
+
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "REGION",
+                        "PROVINCE",
+                        "P/C/M",
+                        "POSITION",
+                        "NAME",
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "DILG",
+                },
+            },
+        ],
+    },
+
+        "CFTC-RED-LIST": {
+        "source_name": "CFTC",
+        "date_order": "MDY",
+        "list_name": "CFTC-RED-LIST",
+        "download_method": "CRAWLER",
+        "url": "https://www.cftc.gov/LearnAndProtect/Resources/Check/redlist.htm",
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/cftc_red_list.yaml",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            }
+        ],
+    },
+    "GPPB-BLACKLISTED-ENTITIES": {
+        "source_name": "GPPB",
+        "date_order": "YMD",
+        "list_name": "GPPB-BLACKLISTED-ENTITIES",
+        "download_method": "API",
+        "url": "https://onlineblacklistingportal.gppb.gov.ph/obp-backend/cbr/cbr_public/",
+        "file_type": "jsonl",
+        "external_id_path": "unique_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "none",
+            },
+            "items_path": "",
+            "param_variants": [
+                {"category": "BLACKLISTED_ENTITIES"},
+                {"category": "PERMANENT_BLACKLISTED_ENTITIES"},
+                {"category": "TEMPORARY_REMOVED_BLACKLISTED_ENTITIES"},
+            ],
+            "write_mode": "single_jsonl",
+        },
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "blacklisted_entity",
+                        "procuring_entity",
+                        "project",
+                        "start_date",
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "GPPB",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+        ],
+    },
+
+    "DMW-RECRUITMENT-AGENCIES": {
+        "source_name": "DMW",
+        "date_order": "YMD",
+        "list_name": "DMW-RECRUITMENT-AGENCIES",
+        "download_method": "API",
+        "url": "https://master-api.dmw.gov.ph/api/v1/public/licensed-agencies",
+        "file_type": "jsonl",
+        "external_id_path": "unique_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "page",
+                "page_param": "page",
+                "start_page": 1,
+            },
+            "items_path": "data",
+            "headers": {
+                "x-api-key": "RTA0X0lOWFcycm9KU29WTlZxNDUzSDY5enc5OWFxY2ktWkxVdkFwZjEyMjkwNTA2MTE",
+                "x-requested-with": "XMLHttpRequest",
+                "referer": "https://dmw.gov.ph/",
+                "origin": "https://dmw.gov.ph",
+                "accept": "application/json",
+                "user-agent": "Mozilla/5.0",
+            },
+            "throttle_delay": 0.3,
+            "write_mode": "single_jsonl",
+        },
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "name",
+                        "address",
+                        "license_status_date",
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "DMW",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+        ],
     },
 }
