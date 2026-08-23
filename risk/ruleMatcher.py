@@ -81,6 +81,7 @@ FIELD_RESOLVERS = {
     "Program": lambda r: _collect(r, "Programs", "Program"),
     "ProgramType": lambda r: _collect(r, "Programs", "ProgramType"),
     "MeasureType": lambda r: _collect(r, "Measures", "MeasureType"),
+    "MeasureNote": lambda r: _collect(r, "Measures", "Note"),
     "Comment": lambda r: _collect(r, "Comments", "text"),
 }
 
