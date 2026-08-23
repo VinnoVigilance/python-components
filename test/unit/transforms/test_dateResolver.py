@@ -118,6 +118,26 @@ class TestParseDateString:
     def test_iso_full_date(self):
         assert parse_date_string("1965-03-29") == ("1965", "03", "29", False)
 
+    def test_iso_datetime_with_z_suffix(self):
+        # Sources like DMW publish dates as ISO 8601 datetimes ("T" separator,
+        # milliseconds, trailing "Z"). The time portion must be stripped so the
+        # date reads normally instead of being rejected as unparseable.
+        assert parse_date_string("2025-11-11T00:00:00.000Z", "YMD") == (
+            "2025", "11", "11", False,
+        )
+
+    def test_iso_datetime_with_numeric_offset(self):
+        # A +hh:mm / -hh:mm timezone offset is stripped just like a "Z".
+        assert parse_date_string("2031-10-03T14:30:00+08:00", "YMD") == (
+            "2031", "10", "03", False,
+        )
+
+    def test_space_separated_time_still_stripped(self):
+        # The older space-separated datetime shape keeps working unchanged.
+        assert parse_date_string("2025-11-11 00:00:00", "YMD") == (
+            "2025", "11", "11", False,
+        )
+
     def test_slashed_dmy(self):
         # 30/01/1972 read day-first (default DMY)
         assert parse_date_string("30/01/1972") == ("1972", "01", "30", False)
