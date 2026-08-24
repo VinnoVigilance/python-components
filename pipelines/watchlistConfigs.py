@@ -1,5 +1,3 @@
-# pipelines/watchlist_configs.py
-
 WATCHLIST_CONFIGS = {
     "DFAT": {
         "source_name": "DFAT",
@@ -111,11 +109,7 @@ WATCHLIST_CONFIGS = {
         "schedule": "daily",
         "versioning_strategy": "continuous",
         "bypass_config": {
-            # Declare the challenge; the collector picks the engine that
-            # clears it (cloudflare -> stealth browser). No runtime detection.
             "challenge": "cloudflare",
-            # False = run a VISIBLE browser window (often needed so the
-            # anti-bot challenge clears); set True only on a headless server.
             "headless": False,
             "timeout_seconds": 90,
             "success_criteria": ["Designated Terrorist Individuals"],
@@ -236,11 +230,7 @@ WATCHLIST_CONFIGS = {
         "external_id_path": "unique_id",
         "schedule": "daily",
         "bypass_config": {
-            # Declare the challenge; the collector picks the engine that
-            # clears it (cloudflare -> stealth browser). No runtime detection.
             "challenge": "cloudflare",
-            # False = run a VISIBLE browser window (often needed so the
-            # anti-bot challenge clears); set True only on a headless server.
             "headless": False,
             "timeout_seconds": 90,
             "success_criteria": ["Designated Terrorist Groups"],
@@ -578,6 +568,65 @@ WATCHLIST_CONFIGS = {
                 "config": {
                     "output_field": "entity_type",
                     "value": "Entity",
+                },
+            },
+        ],
+    },
+
+    "COMELEC-2025-SENATORS": {
+        "source_name": "COMELEC-2025-ELECTION-RESULTS",
+        "list_name": "COMELEC-2025-SENATORS",
+        "date_order": "YMD",
+        "download_method": "API",
+        "url": "https://2025electionresults.comelec.gov.ph/data/coc/0.json",
+        "file_type": "jsonl",
+        "external_id_path": "ballot_number",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "transport": "browser",
+            "bypass_config": {
+                "headless": False,
+                "warmup_url": "https://2025electionresults.comelec.gov.ph/coc-result",
+                "timeout_seconds": 90,
+            },
+            "pagination": {"type": "none"},
+            "items_path": "national",
+            "write_mode": "single_jsonl",
+        },
+        "preprocessing": [
+            {
+                "handler": "explode_nested_records",
+                "level": "dataset",
+                "config": {
+                    "match_field": "contestCode",
+                    "match_value": "00399000",
+                    "list_path": "candidates.candidates",
+                    "carry_fields": {
+                        "contestCode": "contestCode",
+                        "contestName": "contestName",
+                        "statistic.overVotes": "overVotes",
+                        "statistic.underVotes": "underVotes",
+                        "statistic.validVotes": "validVotes",
+                        "statistic.obtainedVotes": "obtainedVotes",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name",
+                    "pattern": (
+                        r"^(?P<ballot_number>\d+)\.\s*"
+                        r"(?P<name>[^(]+?)\s*"
+                        r"(?:\((?P<party>[^)]*)\))?\s*$"
+                    ),
+                    "outputs": {
+                        "ballot_number": "ballot_number",
+                        "name": "name",
+                        "party": "party",
+                    },
                 },
             },
         ],
