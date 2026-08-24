@@ -61,9 +61,15 @@ class PreProcessingEngine:
         fixed_records = []
 
         for record in records:
-            vessel_name = str(
-                record.get("Vessel name at designation time", "")
-            ).strip()
+            vessel_name_key = next(
+                (
+                    key
+                    for key in record
+                    if str(key).startswith("Vessel name at designation time")
+                ),
+                "Vessel name at designation time",
+            )
+            vessel_name = str(record.get(vessel_name_key, "")).strip()
 
             imo_number = str(
                 record.get("IMO number", "")
