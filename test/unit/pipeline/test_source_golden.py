@@ -112,7 +112,7 @@ GOLDEN = {
     },
     "DMW-RECRUITMENT-AGENCIES": {
         "SourceType": "Official", "DatasetCategory": "Regulatory",
-        "ListName": "DMW_RECRUITMENT_AGENCIES", "SourceName": "DMW",
+        "ListName": "DMW-RECRUITMENT-AGENCIES", "SourceName": "DMW",
     },
 }
 
