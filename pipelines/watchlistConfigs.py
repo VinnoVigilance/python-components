@@ -582,4 +582,107 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
+    "PH-HOUSE-MEMBERS": {
+        "source_name": "CONGRESS-PH",
+        "date_order": "MDY",
+        "list_name": "PH-HOUSE-MEMBERS",
+
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+
+        "url": (
+            "https://www.congress.gov.ph/"
+            "house-members"
+        ),
+
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+
+        "source_config": (
+            "config/watchlistSources/"
+            "ph_house_members.yaml"
+        ),
+
+        "minimum_record_count": 250,
+
+        "bypass_config": {
+            "challenge": "cloudflare",
+            "headless": False,
+            "timeout_seconds": 120,
+
+            "success_criteria": [
+                "House Members",
+            ],
+
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "a[href*='/house-members/view/']"
+                    ),
+                    "timeout": 90,
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": (
+                        "{source}_{list}_"
+                        "{timestamp}.html"
+                    ),
+                },
+            ],
+
+            "validation": {
+                "required_content": [
+                    "Full Name",
+                    "Representing",
+                    "/house-members/view/",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": (
+                        "jurisdiction_country"
+                    ),
+                    "value": "Philippines",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": (
+                        "jurisdiction_code"
+                    ),
+                    "value": "PH",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "congress",
+                    "value": "20th Congress",
+                },
+            },
+        ],
+    },
 }

@@ -249,7 +249,7 @@ if __name__ == "__main__":
 
     try:
         pipeline_result = run_watchlist_pipeline(
-            watchlist_name="DFAT"
+            watchlist_name="PH-HOUSE-MEMBERS"
         )
 
         pprint(pipeline_result)

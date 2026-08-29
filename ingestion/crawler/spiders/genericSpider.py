@@ -114,11 +114,79 @@ class GenericSpider(scrapy.Spider):
 
         return response.urljoin(href) if href else None
 
-    def _extract_fields(self, node, fields_config: dict[str, Any]):
-        return {
-            field_name: self._extract_value(node, field_config)
-            for field_name, field_config in fields_config.items()
-        }
+    def _extract_fields(
+        self,
+        node,
+        fields_config: dict[str, Any],
+    ):
+        extracted_fields = {}
+
+        for field_name, field_config in fields_config.items():
+            nested_fields = field_config.get("fields")
+
+            if isinstance(nested_fields, dict) and nested_fields:
+                extracted_fields[field_name] = (
+                    self._extract_object_list(
+                        node=node,
+                        field_name=field_name,
+                        field_config=field_config,
+                    )
+                )
+            else:
+                extracted_fields[field_name] = self._extract_value(
+                    node=node,
+                    field_config=field_config,
+                )
+
+        return extracted_fields
+
+    def _extract_object_list(
+        self,
+        node,
+        field_name: str,
+        field_config: dict[str, Any],
+    ):
+        item_selector = field_config.get("selector")
+        selector_type = str(
+            field_config.get("selector_type", "css")
+        ).strip().lower()
+
+        item_fields = field_config.get("fields")
+
+        if not item_selector:
+            raise ValueError(
+                f"selector is required for nested field: {field_name}"
+            )
+
+        if selector_type == "xpath":
+            item_nodes = node.xpath(item_selector)
+
+        elif selector_type == "css":
+            item_nodes = node.css(item_selector)
+
+        else:
+            raise ValueError(
+                f"Unsupported selector_type for nested field "
+                f"'{field_name}': {selector_type}"
+            )
+
+        extracted_items = []
+
+        for item_node in item_nodes:
+            item = self._extract_fields(
+                node=item_node,
+                fields_config=item_fields,
+            )
+
+            has_meaningful_value = any(
+                value not in (None, "", [], {})
+                for value in item.values()
+            )
+
+            if has_meaningful_value:
+                extracted_items.append(item)
+
+        return extracted_items
 
     def _extract_value(self, node, field_config):
         selector = field_config.get("selector")
