@@ -321,3 +321,61 @@ def insert_deleted_member(
     )
 
     return cursor.fetchone()[0]
+
+def find_current_members_batch(
+    cursor,
+    last_member_id: int = 0,
+    batch_size: int = 1000,
+) -> list[dict[str, Any]]:
+    """
+    Return a keyset-paginated batch of current watchlist members.
+
+    Used by downstream consumers such as Elasticsearch indexing.
+    """
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            vv_member_id,
+            source_id,
+            list_type_id,
+            external_id,
+            entity_type_id,
+            version_no,
+            is_current,
+            record_hash,
+            valid_from,
+            valid_to,
+            change_type,
+            full_payload
+        FROM core.watchlist_member
+        WHERE is_current = TRUE
+          AND id > %s
+        ORDER BY id
+        LIMIT %s
+        """,
+        (
+            last_member_id,
+            batch_size,
+        ),
+    )
+
+    return [
+        {
+            "id": row[0],
+            "vv_member_id": row[1],
+            "source_id": row[2],
+            "list_type_id": row[3],
+            "external_id": row[4],
+            "entity_type_id": row[5],
+            "version_no": row[6],
+            "is_current": row[7],
+            "record_hash": row[8],
+            "valid_from": row[9],
+            "valid_to": row[10],
+            "change_type": row[11],
+            "full_payload": row[12],
+        }
+        for row in cursor.fetchall()
+    ]

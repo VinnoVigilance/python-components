@@ -1,0 +1,780 @@
+index:
+  alias: watchlist
+  version: v1
+
+
+settings:
+  number_of_shards: 1
+  number_of_replicas: 0
+
+
+mapping:
+  dynamic: strict
+
+  properties:
+
+    # ============================================================
+    # CORE / INDEX METADATA
+    # ============================================================
+
+    record_id:
+      type: keyword
+
+    source_id:
+      type: keyword
+
+    list_type_id:
+      type: keyword
+
+    external_id:
+      type: keyword
+
+    entity_type_id:
+      type: keyword
+
+    version_no:
+      type: integer
+
+    is_current:
+      type: boolean
+
+    record_hash:
+      type: keyword
+
+    change_type:
+      type: keyword
+
+    valid_from:
+      type: date
+      ignore_malformed: true
+
+    valid_to:
+      type: date
+      ignore_malformed: true
+
+
+    # ============================================================
+    # CANONICAL WATCHLIST PAYLOAD
+    # ============================================================
+
+    payload:
+      type: object
+      dynamic: strict
+
+      properties:
+
+        # ========================================================
+        # BASE ENTITY FIELDS
+        # ========================================================
+
+        EntityId:
+          type: keyword
+
+        EntityType:
+          type: keyword
+
+        Gender:
+          type: keyword
+
+        DateAdded:
+          type: date
+          ignore_malformed: true
+
+        DateUpdated:
+          type: date
+          ignore_malformed: true
+
+
+        # ========================================================
+        # SOURCES
+        # ========================================================
+
+        Sources:
+          type: nested
+
+          properties:
+
+            SourceType:
+              type: keyword
+
+            DatasetCategory:
+              type: keyword
+
+            ListName:
+              type: keyword
+
+            SourceName:
+              type: keyword
+
+            SourceURL:
+              type: keyword
+              ignore_above: 2048
+
+            SourceRecordId:
+              type: keyword
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # NAMES
+        # ========================================================
+
+        Names:
+          type: nested
+
+          properties:
+
+            NameType:
+              type: keyword
+
+            Name:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            FirstName:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 256
+
+            "Middle Name":
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 256
+
+            "Last Name":
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 256
+
+            Normalized_Name:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Phonetic_Key:
+              type: keyword
+              ignore_above: 512
+
+            Search_Tokens:
+              type: text
+
+            Language:
+              type: keyword
+
+            Script:
+              type: keyword
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # ALIASES
+        # ========================================================
+
+        Aliases:
+          type: nested
+
+          properties:
+
+            AliasType:
+              type: keyword
+
+            Alias:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Normalized_Alias:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Phonetic_Key:
+              type: keyword
+              ignore_above: 512
+
+            Search_Tokens:
+              type: text
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # DATES
+        # ========================================================
+
+        Dates:
+          type: nested
+
+          properties:
+
+            OriginalValue:
+              type: keyword
+              ignore_above: 1024
+
+            FullDate:
+              type: date
+              ignore_malformed: true
+
+            Day:
+              type: keyword
+
+            Month:
+              type: keyword
+
+            Year:
+              type: keyword
+
+            Type:
+              type: keyword
+
+            IsApproximate:
+              type: keyword
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # PLACE OF BIRTH
+        #
+        # Present in current canonical payloads such as DFAT.
+        # ========================================================
+
+        POBs:
+          type: nested
+
+          properties:
+
+            POB:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 1024
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # GENERIC PLACES
+        #
+        # Kept because it exists in the maximum schema.
+        # ========================================================
+
+        Places:
+          type: nested
+
+          properties:
+
+            PlaceType:
+              type: keyword
+
+            Place:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 1024
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # COUNTRIES
+        # ========================================================
+
+        Countries:
+          type: nested
+
+          properties:
+
+            CountryType:
+              type: keyword
+
+            CountryCode:
+              type: keyword
+
+            CountryName:
+              type: keyword
+              ignore_above: 256
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # IDENTIFIERS
+        # ========================================================
+
+        Identifiers:
+          type: nested
+
+          properties:
+
+            Type:
+              type: keyword
+
+            Number:
+              type: keyword
+              ignore_above: 512
+
+            Normalized_Number:
+              type: keyword
+              ignore_above: 512
+
+            ExpiryDate:
+              type: date
+              ignore_malformed: true
+
+            IssuedDate:
+              type: date
+              ignore_malformed: true
+
+            IssuingCountry:
+              type: keyword
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # CONTACTS
+        # ========================================================
+
+        Contacts:
+          type: nested
+
+          properties:
+
+            Type:
+              type: keyword
+
+            Value:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # PROGRAMS
+        # ========================================================
+
+        Programs:
+          type: nested
+
+          properties:
+
+            ProgramType:
+              type: keyword
+
+            Program:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Authority:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # TITLES
+        # ========================================================
+
+        Titles:
+          type: nested
+
+          properties:
+
+            Title:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # ADDRESSES
+        # ========================================================
+
+        Addresses:
+          type: nested
+
+          properties:
+
+            FullAddress:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 1024
+
+            AddressLine1:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            AddressLine2:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            AddressLine3:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            City:
+              type: keyword
+              ignore_above: 256
+
+            Province:
+              type: keyword
+              ignore_above: 256
+
+            Country:
+              type: keyword
+              ignore_above: 256
+
+            PostalCode:
+              type: keyword
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # RELATIONSHIPS
+        # ========================================================
+
+        Relationships:
+          type: nested
+
+          properties:
+
+            RelationType:
+              type: keyword
+
+            RelatedEntityID:
+              type: keyword
+
+            RelatedEntityName:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            StartDate:
+              type: date
+              ignore_malformed: true
+
+            EndDate:
+              type: date
+              ignore_malformed: true
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # COMMENTS
+        # ========================================================
+
+        Comments:
+          type: nested
+
+          properties:
+
+            type:
+              type: keyword
+
+            text:
+              type: text
+
+
+        # ========================================================
+        # MEASURES
+        # ========================================================
+
+        Measures:
+          type: nested
+
+          properties:
+
+            MeasureType:
+              type: keyword
+              ignore_above: 512
+
+            EffectiveDate:
+              type: date
+              ignore_malformed: true
+
+            EndDate:
+              type: date
+              ignore_malformed: true
+
+            Status:
+              type: keyword
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # ADDITIONAL INFO
+        # ========================================================
+
+        additionalInfo:
+          type: nested
+
+          properties:
+
+            Type:
+              type: keyword
+
+            Value:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 1024
+
+
+        # ========================================================
+        # ATTACHMENTS
+        # ========================================================
+
+        Attachments:
+          type: nested
+
+          properties:
+
+            Type:
+              type: keyword
+
+            URL:
+              type: keyword
+              ignore_above: 2048
+
+
+        # ========================================================
+        # INDIVIDUAL-SPECIFIC
+        # OCCUPATIONS
+        # ========================================================
+
+        Occupations:
+          type: nested
+
+          properties:
+
+            OccupationCtegory:
+              type: keyword
+              ignore_above: 512
+
+            OccupationTitle:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Organization:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Department:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            PositionLevel:
+              type: keyword
+
+            SinceDay:
+              type: keyword
+
+            SinceMonth:
+              type: keyword
+
+            SinceYear:
+              type: keyword
+
+            ToDay:
+              type: keyword
+
+            ToMonth:
+              type: keyword
+
+            ToYear:
+              type: keyword
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # ENTITY-SPECIFIC
+        # BUSINESS ACTIVITIES
+        # ========================================================
+
+        BusinessActivities:
+          type: nested
+
+          properties:
+
+            Category:
+              type: keyword
+              ignore_above: 512
+
+            Description:
+              type: text
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # VESSEL-SPECIFIC
+        # ========================================================
+
+        VesselDetails:
+          type: nested
+
+          properties:
+
+            Flag:
+              type: keyword
+              ignore_above: 256
+
+            VesselType:
+              type: keyword
+              ignore_above: 256
+
+            YearBuilt:
+              type: keyword
+
+            PortOfRegistry:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            Tonnage:
+              type: keyword
+
+            Length:
+              type: keyword
+
+            Owner:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 512
+
+            CallSign:
+              type: keyword
+              ignore_above: 256
+
+            Status:
+              type: keyword
+
+            Note:
+              type: text
+
+
+        # ========================================================
+        # VESSEL ADDITIONAL DETAILS
+        # ========================================================
+
+        VesselAdditionalDetails:
+          type: nested
+
+          properties:
+
+            type:
+              type: keyword
+
+            value:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 1024

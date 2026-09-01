@@ -24,9 +24,12 @@ sb-stealth-wrapper==0.4.0  # stealth browser engine for bypassCollector (Cloudfl
 psycopg2-binary==2.9.12  # PostgreSQL access
 boto3                    # SeaweedFS/S3 storage client (not pinned: install if using infrastructure/storage)
 python-dotenv==1.0.1     # load config/secrets from a local .env file
+PyYAML==6.0.2
+elasticsearch==9.5.0
 
 # --- LLM (risk classification / extraction) ---
 ollama==0.6.2
 
 # --- Analyst UI (utils/vvAnalystApp.py) ---
 streamlit==1.59.2
+
