@@ -75,3 +75,139 @@ def should_stop(items: List[Any]) -> bool:
     """
 
     return not items
+
+
+def no_more_pages(
+    fetched: int,
+    page_count: int,
+    cap: Any,
+    page_size: Any,
+) -> bool:
+    """
+    Decide whether to stop *after* yielding a page, for a capped list API.
+
+    Complements ``should_stop`` (which stops on an empty page *before* yielding).
+    Two conditions end the loop:
+      * ``fetched >= cap`` -- a capped query returns at most ``cap`` records, so
+        once that many are in hand there is nothing more to retrieve. This is the
+        guard against endpoints (e.g. Interpol) that answer an out-of-range page
+        number with a non-empty page -- repeating the last one -- instead of an
+        empty page, which would otherwise loop forever.
+      * ``page_count < page_size`` -- a short page is the last page.
+    ``cap`` / ``page_size`` may be falsy (not configured), in which case that
+    condition is simply skipped.
+    """
+
+    if cap and fetched >= cap:
+        return True
+
+    if page_size and page_count < page_size:
+        return True
+
+    return False
+
+
+def read_path(obj: Any, path: str) -> Any:
+    """
+    Read a single value out of a nested dict by dot-path.
+
+    ``read_path({"a": {"b": 1}}, "a.b")`` -> ``1``. Returns ``None`` when any
+    step is missing or not a dict. Used to pull an item's id for detail
+    hydration and its dedup key.
+    """
+
+    if not path:
+        return None
+
+    current: Any = obj
+
+    for key in path.split("."):
+        if isinstance(current, dict):
+            current = current.get(key)
+        else:
+            return None
+
+    return current
+
+
+def build_detail_url(url_template: str, id_value: Any) -> str:
+    """
+    Fill a detail URL template's ``{id}`` placeholder with the item's id.
+    """
+
+    return url_template.format(id=id_value)
+
+
+def merge_records(
+    stub: Dict[str, Any],
+    detail: Dict[str, Any],
+    target_field: str = None,
+) -> Dict[str, Any]:
+    """
+    Fold a detail response into its list stub, producing one record.
+
+    ``target_field`` set -> nest the whole detail object under that key
+    (``{**stub, target_field: detail}``), keeping the two shapes separate.
+    ``target_field`` None -> flat merge with detail winning on shared keys.
+    """
+
+    merged = dict(stub)
+
+    if target_field:
+        merged[target_field] = detail or {}
+    else:
+        merged.update(detail or {})
+
+    return merged
+
+
+def assemble_record(
+    stub: Dict[str, Any],
+    detail: Dict[str, Any],
+    shape: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Build a structured raw record from a stub + its detail, matching the
+    crawler's shape: a top-level id, the list stub, the detail, and a list of
+    attachment links.
+
+    ``shape`` keys:
+        id_path           dot-path in the stub to the record's id
+        id_field          top-level key to store it under (default
+                          "source_record_id")
+        list_field        key to nest the stub under (default "list")
+        detail_field      key to nest the detail under (default "detail")
+        attachments_field key for the attachments list (default "attachments")
+        attachments       rules [{type, url_path, from?}] -- url_path is read
+                          from the stub, or the detail when from="detail";
+                          only links that resolve are kept
+
+    The attachment URLs are stored for a later download service; nothing is
+    fetched here.
+    """
+
+    id_field = shape.get("id_field", "source_record_id")
+    list_field = shape.get("list_field", "list")
+    detail_field = shape.get("detail_field", "detail")
+    attachments_field = shape.get("attachments_field", "attachments")
+
+    record: Dict[str, Any] = {
+        id_field: read_path(stub, shape["id_path"]),
+        list_field: stub,
+    }
+
+    if detail is not None:
+        record[detail_field] = detail
+
+    attachments = []
+
+    for rule in shape.get("attachments", []):
+        source = detail if rule.get("from") == "detail" else stub
+        url = read_path(source, rule["url_path"])
+
+        if url:
+            attachments.append({"type": rule["type"], "url": url})
+
+    record[attachments_field] = attachments
+
+    return record
