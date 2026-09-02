@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import re
 from urllib.parse import unquote, urlparse
@@ -277,6 +278,86 @@ class PreProcessingEngine:
         }
 
         return record
+
+    def enrich_from_attachment(self, record, config):
+        """
+        Join a per-record attachment file into the record, shaped list/detail.
+
+        The GENERAL form of the crawler's list_detail join, for any source that
+        writes the "CFTC-style" layout: one primary listing of thin stubs plus
+        one detail file per record under a directory (e.g.
+        ``attachments/members/{key}.json``). It loads that detail file -- keyed
+        off a field already on the stub -- and returns the SAME structured shape
+        the crawler (``genericSpider``) and collector (``assemble_record``)
+        produce:
+
+            {source_record_id: <key>, "list": <stub>, "detail": <detail>}
+
+        i.e. the general/listing data under ``list`` and the profile under
+        ``detail`` -- so mapping addresses ``list.*`` and ``detail.*`` exactly
+        as it would for a crawled CFTC record. Any "one primary file +
+        key-matched attachments" source (Interpol red notices, ...) is wired
+        with a rule row, no new code.
+
+        config:
+            attachments_dir   directory holding the per-record files. Give it
+                              relative (e.g. "attachments/members") and list it
+                              in the rule's ``relative_path_fields`` so the
+                              service resolves it against the source file's own
+                              folder.
+            key_field         stub field holding the match key AND the record id
+                              (e.g. "entity_id").
+            filename_template how the key maps to a file name; default
+                              "{key}.json" (other sources may use "{key}.html").
+            id_field          top-level key for the id (default
+                              "source_record_id").
+            list_field        key to nest the stub under (default "list").
+            detail_field      key to nest the detail under (default "detail").
+
+        A record whose key is empty, or whose detail file is missing, is
+        returned unchanged (a stub with no detail file yet) -- so a partial
+        attachment set still preprocesses, and re-running after fetching more
+        profiles picks them up.
+        """
+
+        attachments_dir = config.get("attachments_dir")
+        key_field = config.get("key_field")
+
+        if not attachments_dir or not key_field:
+            return record
+
+        key = str(record.get(key_field, "")).strip()
+
+        if not key:
+            return record
+
+        # Match the file name the collector wrote: path-unsafe chars -> '-'
+        # (Interpol ids carry '/', e.g. "2004/41980" -> "2004-41980.json").
+        safe_key = key
+
+        for char in '/\\:*?"<>|':
+            safe_key = safe_key.replace(char, "-")
+
+        filename = config.get(
+            "filename_template", "{key}.json"
+        ).format(key=safe_key)
+
+        file_path = os.path.join(attachments_dir, filename)
+
+        if not os.path.exists(file_path):
+            return record
+
+        with open(file_path, "r", encoding="utf-8") as handle:
+            detail = json.load(handle)
+
+        # Return the crawler's list_detail shape: general/listing under `list`,
+        # profile under `detail`, id lifted to the top -- so mapping addresses
+        # `list.*` and `detail.*` just like a crawled CFTC record.
+        return {
+            config.get("id_field", "source_record_id"): key,
+            config.get("list_field", "list"): record,
+            config.get("detail_field", "detail"): detail,
+        }
 
     def detect_entity_type(self, record, config):
         input_field = config["input_field"]

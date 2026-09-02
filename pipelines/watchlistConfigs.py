@@ -1,5 +1,3 @@
-# pipelines/watchlist_configs.py
-
 WATCHLIST_CONFIGS = {
     "DFAT": {
         "source_name": "DFAT",
@@ -111,11 +109,7 @@ WATCHLIST_CONFIGS = {
         "schedule": "daily",
         "versioning_strategy": "continuous",
         "bypass_config": {
-            # Declare the challenge; the collector picks the engine that
-            # clears it (cloudflare -> stealth browser). No runtime detection.
             "challenge": "cloudflare",
-            # False = run a VISIBLE browser window (often needed so the
-            # anti-bot challenge clears); set True only on a headless server.
             "headless": False,
             "timeout_seconds": 90,
             "success_criteria": ["Designated Terrorist Individuals"],
@@ -236,11 +230,7 @@ WATCHLIST_CONFIGS = {
         "external_id_path": "unique_id",
         "schedule": "daily",
         "bypass_config": {
-            # Declare the challenge; the collector picks the engine that
-            # clears it (cloudflare -> stealth browser). No runtime detection.
             "challenge": "cloudflare",
-            # False = run a VISIBLE browser window (often needed so the
-            # anti-bot challenge clears); set True only on a headless server.
             "headless": False,
             "timeout_seconds": 90,
             "success_criteria": ["Designated Terrorist Groups"],
@@ -581,5 +571,167 @@ WATCHLIST_CONFIGS = {
                 },
             },
         ],
+    },
+
+    "INTERPOL-RED-NOTICES": {
+        "source_name": "INTERPOL",
+        "list_name": "INTERPOL-RED-NOTICES",
+        "date_order": "DMY",
+        "download_method": "API",
+        "url": "https://ws-public.interpol.int/notices/v1/red",
+        "file_type": "jsonl",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                # Join each overview stub to its saved profile, matched by
+                # entity_id -> attachments/members/{id}.json, into the crawler's
+                # list_detail shape ({source_record_id, list, detail}). General
+                # handler; any "one primary file + key-matched attachments"
+                # source reuses it with a rule row.
+                "handler": "enrich_from_attachment",
+                "level": "record",
+                "relative_path_fields": ["attachments_dir"],
+                "config": {
+                    "attachments_dir": "attachments/members",
+                    "key_field": "entity_id",
+                },
+            },
+        ],
+        "api_config": {
+            "transport": "browser",
+            "bypass_config": {
+                "headless": False,
+                "warmup_url": "https://www.interpol.int/How-we-work/Notices/Red-Notices/View-Red-Notices",
+                "timeout_seconds": 90,
+                # The warrant facet probes ~250 countries per over-cap slice --
+                # a burst that rate-limited us ("Failed to fetch"). Pace every
+                # request and back off hard so the burst self-throttles and any
+                # limit self-heals instead of aborting the run.
+                "min_request_interval": 0.2,
+                "fetch_retries": 6,
+                "fetch_retry_delay": 1.0,
+                "fetch_backoff": 2.0,
+                "fetch_max_delay": 30.0,
+            },
+            "pagination": {
+                "type": "page",
+                "page_param": "page",
+                "size_param": "resultPerPage",
+                "page_size": 160,
+                "start_page": 1,
+            },
+            "faceting": {
+                "enabled": True,
+                "cap": 160,
+                "total_path": "total",
+                "facets": [
+                    {
+                        "type": "enum",
+                        "param": "sexId",
+                        "values": ["M", "F", "U"],
+                    },
+                    {
+                        "type": "range",
+                        "min_param": "ageMin",
+                        "max_param": "ageMax",
+                        "low": 0,
+                        "high": 120,
+                        # Some notices have no date of birth (so no age) and the
+                        # API has no filter that selects them, so age ranges
+                        # cannot cover everyone. complete: False hands the
+                        # age-less remainder down to the next facets so those
+                        # records are still fetched (recovered 4 confirmed here).
+                        "complete": False,
+                    },
+                    {
+                        # PRIMARY splitter (runs before the country facets):
+                        # split by single-letter PRESENCE ("forename contains
+                        # A".."Z"). Single letters are position-independent
+                        # (suffix-safe), and every non-empty forename contains
+                        # some letter, so the alphabet covers every named record.
+                        # This 26x26 name grid is a COMPLETE catch-all that
+                        # shrinks almost any slice cheaply -- so the ~249-code
+                        # country sweeps below are reached only for the rare
+                        # record the name grid can't place, instead of running on
+                        # every slice (which is what made planning take hours).
+                        # complete: False so records with NO forename fall
+                        # through to the surname pass.
+                        "type": "substring",
+                        "param": "forename",
+                        "max_depth": 1,
+                        "complete": False,
+                    },
+                    {
+                        # Second grid axis: same single-letter presence on the
+                        # surname. Together the two form the forename x surname
+                        # grid, leaving no named record uncovered. complete: False
+                        # so a record with no surname either falls through to the
+                        # country fallbacks below rather than being dropped.
+                        "type": "substring",
+                        "param": "name",
+                        "max_depth": 1,
+                        "complete": False,
+                    },
+                    {
+                        # Fallback, reached only for a record the name grid can't
+                        # place (no forename AND no surname) or a name-cell still
+                        # over cap: split by nationality. A person can hold several
+                        # nationalities, so the value-slices OVERLAP -- NOT a clean
+                        # partition. disjoint: False turns off the early-stop
+                        # (which double-counts dual nationals, hits the slice total
+                        # too soon, and drops the untouched tail of countries) and
+                        # probes every code instead.
+                        "type": "enum",
+                        "param": "nationality",
+                        "values_ref": "country_codes",
+                        "disjoint": False,
+                        # Some notices carry no nationality at all and the API has
+                        # no value that selects them; complete: False hands that
+                        # leftover down to the warrant fallback. (Named records
+                        # with null nationality are already covered above by the
+                        # name grid, so this null-handling is only a backstop for
+                        # the rare no-name record.)
+                        "complete": False,
+                    },
+                    {
+                        # Deepest fallback: split by the country whose arrest
+                        # warrant drives the notice ("wanted by"). Reached only for
+                        # a slice still over cap after sex+age+name+nationality. A
+                        # person can be wanted by several countries, so these
+                        # slices overlap -> disjoint: False (probe every value, no
+                        # early-stop); the collector's dedup drops any record that
+                        # lands under two warrant countries.
+                        "type": "enum",
+                        "param": "arrestWarrantCountryId",
+                        "values_ref": "country_codes",
+                        "disjoint": False,
+                        # Not every notice names a warrant country either, so this
+                        # facet cannot cover everyone: a record with none is
+                        # flagged unresolved rather than silently dropped.
+                        "complete": False,
+                    },
+                ],
+            },
+            "items_path": "_embedded.notices",
+            "detail": {
+                "url_path": "_links.self.href",
+                "concurrency": 10,
+            },
+            "record_shape": {
+                # list_detail uses only id_path -- to name each profile file
+                # attachments/members/{entity_id}.json and to dedup the overview.
+                "id_path": "entity_id",
+                "id_field": "source_record_id",
+                "list_field": "list",
+                "detail_field": "detail",
+            },
+            "dedup_path": "source_record_id",
+            "throttle_delay": 0.3,
+            # CFTC-style two-phase output: a primary listing JSONL of unique
+            # notices + one raw profile per person under attachments/members/.
+            "write_mode": "list_detail",
+        },
     },
 }
