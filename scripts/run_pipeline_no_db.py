@@ -66,6 +66,9 @@ def main(argv=None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("watchlist", help="e.g. EU-FINANCIAL-SANCTIONS")
     ap.add_argument("--source-file", default=None, help="override the input file (file mode only)")
+    ap.add_argument("--no-normalize", action="store_true",
+                    help="stop after preprocessing: write <list>_preprocessed.jsonl and skip normalization "
+                         "(use while mapping rules are not built yet)")
     args = ap.parse_args(argv)
 
     config = WATCHLIST_CONFIGS[args.watchlist]
@@ -124,6 +127,17 @@ def main(argv=None) -> None:
         records=parsed_records, rules=preprocessing_rules
     )
     print(f"Preprocessed: {len(processed_records)} records")
+
+    # Stop here when normalization can't run yet (no mapping rules): write the
+    # preprocessed records so the enrich/join result is inspectable on its own.
+    if args.no_normalize:
+        FINAL_DIR.mkdir(parents=True, exist_ok=True)
+        out_path = FINAL_DIR / f"{list_name}_preprocessed.jsonl"
+        with open(out_path, "w", encoding="utf-8") as fout:
+            for rec in processed_records:
+                fout.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        print(f"Wrote       : {len(processed_records)} preprocessed records -> {out_path}")
+        return
 
     # --- Stage 3: NORMALIZE (real engines) -> JSONL instead of DB ---
     pre, mapper, post = create_normalization_engines(config)
