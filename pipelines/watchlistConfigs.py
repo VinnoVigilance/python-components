@@ -574,25 +574,27 @@ WATCHLIST_CONFIGS = {
     },
 
     "COMELEC-2025-SENATORS": {
-        "source_name": "COMELEC-2025-ELECTION-RESULTS",
+        "source_name": "COMELEC",
         "list_name": "COMELEC-2025-SENATORS",
         "date_order": "YMD",
-        "download_method": "API",
-        "url": "https://2025electionresults.comelec.gov.ph/data/coc/0.json",
-        "file_type": "jsonl",
+        "download_method": "BYPASS",
+        "url": "https://2025electionresults.comelec.gov.ph/coc-result",
+        "file_type": "json",
+        "items_path": "national",
         "external_id_path": "ballot_number",
         "schedule": "daily",
         "versioning_strategy": "continuous",
-        "api_config": {
-            "transport": "browser",
-            "bypass_config": {
-                "headless": False,
-                "warmup_url": "https://2025electionresults.comelec.gov.ph/coc-result",
-                "timeout_seconds": 90,
-            },
-            "pagination": {"type": "none"},
-            "items_path": "national",
-            "write_mode": "single_jsonl",
+        "bypass_config": {
+            "challenge": "cloudflare",
+            "headless": False,
+            "timeout_seconds": 120,
+            "actions": [
+                {
+                    "action": "save_json",
+                    "url": "https://2025electionresults.comelec.gov.ph/data/coc/0.json",
+                    "filename_pattern": "{list}_{timestamp}.json",
+                },
+            ],
         },
         "preprocessing": [
             {
@@ -626,6 +628,18 @@ WATCHLIST_CONFIGS = {
                         "ballot_number": "ballot_number",
                         "name": "name",
                         "party": "party",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name",
+                    "pattern": r"^(?P<last_name>[^,]+),\s*(?P<first_name>.+)$",
+                    "outputs": {
+                        "last_name": "last_name",
+                        "first_name": "first_name",
                     },
                 },
             },
