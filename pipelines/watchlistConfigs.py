@@ -629,6 +629,22 @@ WATCHLIST_CONFIGS = {
                     },
                 },
             },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "country_code",
+                    "value": "PH",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "election_year",
+                    "value": "2025",
+                },
+            },
         ],
     },
 }
