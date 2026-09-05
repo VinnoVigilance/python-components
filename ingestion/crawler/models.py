@@ -23,6 +23,7 @@ class CrawlerTask:
     retry: int = 3
 
     download_dir: Optional[str] = None
+    source_file_path: Optional[str] = None
 
 
 @dataclass

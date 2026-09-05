@@ -1,0 +1,713 @@
+fetch_strategy: saved_html
+
+record_mode: list_detail
+
+detail_fetch_strategy: browser
+
+detail_browser:
+  headless: false
+  wait_selector: ".hm-show-panel"
+  timeout_seconds: 90
+
+  success_criteria:
+    - "Committee Membership"
+
+
+discovery:
+  selector_type: xpath
+
+  row_selector: >-
+    //table//tbody/tr[
+      .//a[contains(@href, '/house-members/view/')]
+    ]
+
+  detail_link_selector_type: xpath
+
+  detail_link_selector: >-
+    .//a[contains(@href, '/house-members/view/')][1]
+
+  detail_link_attribute: href
+
+
+list_fields:
+  full_name:
+    selector_type: xpath
+    selector: >-
+      .//a[contains(@href, '/house-members/view/')][1]//text()
+    value: text
+
+  representing:
+    selector_type: xpath
+    selector: >-
+      .//td[
+        normalize-space(.) = 'District'
+        or normalize-space(.) = 'Party-list'
+      ][1]//text()
+    value: text
+
+  district_or_party_list:
+    selector_type: xpath
+    selector: "./td[last()]//text()"
+    value: text
+
+
+detail_fields:
+  profile_name:
+    selector_type: xpath
+    selector: >-
+      normalize-space(
+        string(
+          (
+            //div[contains(@class, 'hm-show-hero')]
+            //h2[contains(@class, 'hm-show-name')]
+          )[1]
+        )
+      )
+    value: text
+
+  representative_role:
+    selector_type: xpath
+    selector: >-
+      normalize-space(
+        string(
+          (
+            //div[contains(@class, 'hm-show-hero')]
+            //p[contains(@class, 'hm-show-role')]
+          )[1]
+        )
+      )
+    value: text
+
+  room:
+    selector_type: xpath
+    selector: >-
+      normalize-space(
+        string(
+          (
+            //div[contains(@class, 'hm-show-hero')]
+            //span[contains(@class, 'hm-chip')]
+            [
+              .//i[
+                contains(
+                  concat(' ', normalize-space(@class), ' '),
+                  ' ri-building-4-line '
+                )
+              ]
+            ]
+          )[1]
+        )
+      )
+    value: text
+
+  phone:
+    selector_type: xpath
+    selector: >-
+      normalize-space(
+        string(
+          (
+            //div[contains(@class, 'hm-show-hero')]
+            //span[contains(@class, 'hm-chip')]
+            [
+              .//i[
+                contains(
+                  concat(' ', normalize-space(@class), ' '),
+                  ' ri-phone-line '
+                )
+              ]
+            ]
+          )[1]
+        )
+      )
+    value: text
+
+  direct_phone:
+    selector_type: xpath
+    selector: >-
+      normalize-space(
+        string(
+          (
+            //div[contains(@class, 'hm-show-hero')]
+            //span[contains(@class, 'hm-chip')]
+            [
+              .//i[
+                contains(
+                  concat(' ', normalize-space(@class), ' '),
+                  ' ri-phone-fill '
+                )
+              ]
+            ]
+          )[1]
+        )
+      )
+    value: text
+
+
+  principal_authored_bills:
+    selector_type: xpath
+    selector: >-
+      //div[@id='nav-border-top-principal']
+      //div[contains(@class, 'hm-bill-card')]
+
+    fields:
+      bill_number:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[contains(@class, 'hm-bill-header')]
+              //h5
+            )
+          )
+        value: text
+
+      full_title:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Full Title:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      date_filed:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Date Filed:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      significance:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Significance:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      principal_authors:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Principal Authors:']
+          /following-sibling::div[1]
+          //a//text()
+        value: text
+        multiple: true
+
+      principal_author_urls:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Principal Authors:']
+          /following-sibling::div[1]
+          //a/@href
+        value: attribute
+        multiple: true
+
+      date_read:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Date Read:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      primary_referral:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Primary Referral:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      primary_referral_url:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Primary Referral:']
+          /following-sibling::div[1]
+          //a[1]/@href
+        value: attribute
+
+      committee_report_number:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Committee Report:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      committee_report_page_url:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Committee Report:']
+          /following-sibling::div[1]
+          //a[1]/@href
+        value: attribute
+
+      bill_status:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Bill Status:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      bill_status_related_url:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Bill Status:']
+          /following-sibling::div[1]
+          //a[1]/@href
+        value: attribute
+
+      mother_bill_status:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Mother Bill Status:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      history_bill_number:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            @data-bs-target='#HistoryModal'
+            or @data-billno
+          ][1]/@data-billno
+        value: attribute
+
+      history_congress:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            @data-bs-target='#HistoryModal'
+            or @data-congress
+          ][1]/@data-congress
+        value: attribute
+
+      text_as_filed_url:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'text as filed'
+            )
+          ][1]/@href
+        value: attribute
+
+      committee_report_document_url:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'committee report'
+            )
+            and contains(
+              translate(@href, 'PDF', 'pdf'),
+              '.pdf'
+            )
+          ][1]/@href
+        value: attribute
+
+      third_reading_copy_url:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'third reading copy'
+            )
+          ][1]/@href
+        value: attribute
+
+      adopted_resolution_url:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'adopted resolution'
+            )
+            or contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'adopted rbh'
+            )
+          ][1]/@href
+        value: attribute
+
+
+  coauthored_bills:
+    selector_type: xpath
+    selector: >-
+      //div[@id='nav-border-top-coauthored']
+      //div[contains(@class, 'hm-bill-card')]
+
+    fields:
+      bill_number:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[contains(@class, 'hm-bill-header')]
+              //h5
+            )
+          )
+        value: text
+
+      full_title:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Full Title:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      date_filed:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Date Filed:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      significance:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Significance:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      principal_authors:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Principal Authors:']
+          /following-sibling::div[1]
+          //a//text()
+        value: text
+        multiple: true
+
+      principal_author_urls:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Principal Authors:']
+          /following-sibling::div[1]
+          //a/@href
+        value: attribute
+        multiple: true
+
+      date_read:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Date Read:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      primary_referral:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Primary Referral:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      primary_referral_url:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Primary Referral:']
+          /following-sibling::div[1]
+          //a[1]/@href
+        value: attribute
+
+      committee_report_number:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Committee Report:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      committee_report_page_url:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Committee Report:']
+          /following-sibling::div[1]
+          //a[1]/@href
+        value: attribute
+
+      bill_status:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Bill Status:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      bill_status_related_url:
+        selector_type: xpath
+        selector: >-
+          .//div[normalize-space()='Bill Status:']
+          /following-sibling::div[1]
+          //a[1]/@href
+        value: attribute
+
+      mother_bill_status:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              .//div[normalize-space()='Mother Bill Status:']
+              /following-sibling::div[1]
+            )
+          )
+        value: text
+
+      history_bill_number:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            @data-bs-target='#HistoryModal'
+            or @data-billno
+          ][1]/@data-billno
+        value: attribute
+
+      history_congress:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            @data-bs-target='#HistoryModal'
+            or @data-congress
+          ][1]/@data-congress
+        value: attribute
+
+      text_as_filed_url:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'text as filed'
+            )
+          ][1]/@href
+        value: attribute
+
+      committee_report_document_url:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'committee report'
+            )
+            and contains(
+              translate(@href, 'PDF', 'pdf'),
+              '.pdf'
+            )
+          ][1]/@href
+        value: attribute
+
+      third_reading_copy_url:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'third reading copy'
+            )
+          ][1]/@href
+        value: attribute
+
+      adopted_resolution_url:
+        selector_type: xpath
+        selector: >-
+          .//a[
+            contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'adopted resolution'
+            )
+            or contains(
+              translate(
+                normalize-space(.),
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'abcdefghijklmnopqrstuvwxyz'
+              ),
+              'adopted rbh'
+            )
+          ][1]/@href
+        value: attribute
+
+
+  committee_memberships:
+    selector_type: xpath
+    selector: >-
+      //div[@id='nav-border-top-committee']
+      //tbody/tr[
+        .//a[contains(@href, '/committees/committee/view/')]
+      ]
+
+    fields:
+      sequence:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            substring-before(
+              string(./td[1]/a),
+              '.'
+            )
+          )
+        value: text
+
+      committee:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            substring-after(
+              string(./td[1]/a),
+              '.'
+            )
+          )
+        value: text
+
+      committee_url:
+        selector_type: xpath
+        selector: >-
+          ./td[1]
+          /a[contains(@href, '/committees/committee/view/')]
+          [1]/@href
+        value: attribute
+
+      position:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              ./td[2]
+              //span[contains(@class, 'hm-position')]
+            )
+          )
+        value: text
+
+      journal:
+        selector_type: xpath
+        selector: >-
+          normalize-space(
+            string(
+              ./td[2]
+              //span[contains(@class, 'journal-chip')]
+            )
+          )
+        value: text
+
+
+attachments:
+  - type: DETAIL_PAGE
+
+  - type: IMAGE
+    selector: "div.hm-show-avatar img.profile-img"
+    attribute: src
+
+
+record_id:
+  strategy: url_regex
+  source: detail_url
+  pattern: "/house-members/view/([^/?#]+)"
+
+
+pagination:
+  type: none
+
+
+storage:
+  save_listing_page: false
+  save_detail_pages: true
+
+  reuse_saved_detail_pages: true
+  minimum_detail_size_bytes: 1000
+
+  listing_role: primary
+  detail_role: attachment
+
+  detail_directory: attachments/members
