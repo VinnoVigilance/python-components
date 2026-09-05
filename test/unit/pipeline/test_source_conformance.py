@@ -53,6 +53,7 @@ SAMPLES = {
     "DNFBP": "DNFBP_raw_sample.jsonl",
     "FBI-WANTED": "FBI-WANTED_raw_sample.jsonl",
     "DMW-RECRUITMENT-AGENCIES": "DMW-RECRUITMENT-AGENCIES_raw_sample.jsonl",
+    "INTERPOL-RED-NOTICES": "INTERPOL-RED-NOTICES_raw_sample.jsonl",
 }
 
 VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel"}

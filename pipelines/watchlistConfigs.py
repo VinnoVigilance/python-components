@@ -638,78 +638,67 @@ WATCHLIST_CONFIGS = {
                         "max_param": "ageMax",
                         "low": 0,
                         "high": 120,
-                        # Some notices have no date of birth (so no age) and the
-                        # API has no filter that selects them, so age ranges
-                        # cannot cover everyone. complete: False hands the
-                        # age-less remainder down to the next facets so those
-                        # records are still fetched (recovered 4 confirmed here).
-                        "complete": False,
+                        # complete defaults True: a notice with no date of birth
+                        # (so no age) is intentionally NOT given its own extra
+                        # subtree -- the null-age catch-all pass is dropped for
+                        # speed. 0% of notices here have a null DOB.
                     },
                     {
-                        # PRIMARY splitter (runs before the country facets):
-                        # split by single-letter PRESENCE ("forename contains
-                        # A".."Z"). Single letters are position-independent
-                        # (suffix-safe), and every non-empty forename contains
-                        # some letter, so the alphabet covers every named record.
-                        # This 26x26 name grid is a COMPLETE catch-all that
-                        # shrinks almost any slice cheaply -- so the ~249-code
-                        # country sweeps below are reached only for the rare
-                        # record the name grid can't place, instead of running on
-                        # every slice (which is what made planning take hours).
-                        # complete: False so records with NO forename fall
-                        # through to the surname pass.
-                        "type": "substring",
-                        "param": "forename",
-                        "max_depth": 1,
-                        "complete": False,
-                    },
-                    {
-                        # Second grid axis: same single-letter presence on the
-                        # surname. Together the two form the forename x surname
-                        # grid, leaving no named record uncovered. complete: False
-                        # so a record with no surname either falls through to the
-                        # country fallbacks below rather than being dropped.
+                        # FIRST name axis -- runs before forename because it has
+                        # NO null values in the data (a null-free facet splits
+                        # without ever dropping a record, so it goes first).
+                        # Single-letter PRESENCE on the surname ("name contains
+                        # A".."Z"): position-independent (suffix-safe), and every
+                        # non-empty surname contains some letter, so A-Z covers
+                        # every named record.
                         "type": "substring",
                         "param": "name",
                         "max_depth": 1,
-                        "complete": False,
                     },
                     {
-                        # Fallback, reached only for a record the name grid can't
-                        # place (no forename AND no surname) or a name-cell still
-                        # over cap: split by nationality. A person can hold several
-                        # nationalities, so the value-slices OVERLAP -- NOT a clean
-                        # partition. disjoint: False turns off the early-stop
-                        # (which double-counts dual nationals, hits the slice total
-                        # too soon, and drops the untouched tail of countries) and
-                        # probes every code instead.
-                        "type": "enum",
-                        "param": "nationality",
-                        "values_ref": "country_codes",
-                        "disjoint": False,
-                        # Some notices carry no nationality at all and the API has
-                        # no value that selects them; complete: False hands that
-                        # leftover down to the warrant fallback. (Named records
-                        # with null nationality are already covered above by the
-                        # name grid, so this null-handling is only a backstop for
-                        # the rare no-name record.)
-                        "complete": False,
+                        # SECOND name axis: same single-letter presence on the
+                        # forename. Together with surname above they form the
+                        # forename x surname grid -- a COMPLETE catch-all that
+                        # shrinks almost any slice cheaply, so the country sweeps
+                        # below are reached only for the rare record the grid can't
+                        # place (this is what made planning take hours before).
+                        # Forename runs AFTER surname because it, not surname,
+                        # carries nulls (0.3%). complete defaults True: a notice
+                        # with NO forename is intentionally not given an extra
+                        # pass -- that null subtree is dropped for speed.
+                        "type": "substring",
+                        "param": "forename",
+                        "max_depth": 1,
                     },
                     {
-                        # Deepest fallback: split by the country whose arrest
-                        # warrant drives the notice ("wanted by"). Reached only for
-                        # a slice still over cap after sex+age+name+nationality. A
-                        # person can be wanted by several countries, so these
+                        # FIRST country fallback -- runs before nationality because
+                        # it has NO null values here (drops nobody). Split by the
+                        # country whose arrest warrant drives the notice ("wanted
+                        # by"), reached only for a slice the name grid could not
+                        # place. A person can be wanted by several countries, so
                         # slices overlap -> disjoint: False (probe every value, no
-                        # early-stop); the collector's dedup drops any record that
-                        # lands under two warrant countries.
+                        # early-stop); dedup drops any record under two warrant
+                        # countries. complete defaults True: 0% null here.
                         "type": "enum",
                         "param": "arrestWarrantCountryId",
                         "values_ref": "country_codes",
                         "disjoint": False,
-                        # Not every notice names a warrant country either, so this
-                        # facet cannot cover everyone: a record with none is
-                        # flagged unresolved rather than silently dropped.
+                    },
+                    {
+                        # LAST fallback: split by nationality. Runs last because it
+                        # carries the most nulls (1.5%), so exposing it to the
+                        # fewest records minimises drops. A person can hold several
+                        # nationalities, so slices OVERLAP -> disjoint: False (no
+                        # early-stop, else dual-nationals drop the country tail);
+                        # dedup drops repeats. complete: False here is the safety
+                        # backstop on the LAST facet -- it costs NO extra probes
+                        # (nothing after it to sweep) but flags any slice still over
+                        # cap as unresolved, so the collector raises loudly instead
+                        # of silently losing records.
+                        "type": "enum",
+                        "param": "nationality",
+                        "values_ref": "country_codes",
+                        "disjoint": False,
                         "complete": False,
                     },
                 ],

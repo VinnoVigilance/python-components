@@ -1,6 +1,7 @@
 import json
 import re
 import pandas as pd
+import pycountry
 from pathlib import Path
 from copy import deepcopy
 
@@ -334,6 +335,32 @@ class FlattenDictHandler(BaseHandler):
 
 
 # =========================================================
+# Language Name Handler
+# =========================================================
+
+class LanguageNameHandler(BaseHandler):
+
+    """Resolve an ISO 639-2 language code to its English language name.
+
+    INTERPOL supplies spoken languages as ISO 639-2/B (bibliographic) codes
+    (e.g. FRE, GER, CHI); pycountry.lookup maps them to a name (French,
+    German, Chinese). A code pycountry cannot resolve -- the rare ISO 639-2
+    collective codes such as CAU (Caucasian) or DRA (Dravidian) -- is left
+    unchanged so we never drop a value. The rule cell is unused.
+    """
+
+    def normalize(self, value, rule):
+
+        if value is None:
+            return value
+
+        try:
+            return pycountry.languages.lookup(str(value).strip()).name
+        except LookupError:
+            return value
+
+
+# =========================================================
 # Handler Registry
 # =========================================================
 
@@ -345,6 +372,7 @@ HANDLERS = {
     "regex_extract": RegexExtractHandler(),
     "split_pattern": SplitPatternHandler(),
     "flatten_dict": FlattenDictHandler(),
+    "language_name": LanguageNameHandler(),
 }
 
 

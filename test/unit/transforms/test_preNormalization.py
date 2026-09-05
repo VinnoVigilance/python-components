@@ -18,6 +18,7 @@ from transforms.preNormalization import (
     DateFormatHandler,
     EnumHandler,
     FlattenDictHandler,
+    LanguageNameHandler,
     PreNormalizationEngine,
     RegexExtractHandler,
     RemoveListMarkersHandler,
@@ -56,6 +57,34 @@ class TestFlattenDictHandler:
         assert handler.normalize("already a string", "") == "already a string"
         assert handler.normalize(None, "") is None
         assert handler.normalize({}, "") == ""
+
+
+class TestLanguageNameHandler:
+    """INTERPOL sends spoken languages as ISO 639-2/B codes; the handler
+    resolves each to its English name via pycountry, leaving anything it
+    cannot resolve (or a null) untouched so no value is ever dropped."""
+
+    def test_maps_iso_639_2_codes_to_english_names(self):
+        handler = LanguageNameHandler()
+        assert handler.normalize("FRE", "") == "French"
+        assert handler.normalize("GER", "") == "German"
+        assert handler.normalize("CHI", "") == "Chinese"
+
+    def test_tolerates_whitespace_and_case(self):
+        handler = LanguageNameHandler()
+        assert handler.normalize(" fre ", "") == "French"
+
+    def test_unresolvable_collective_code_passes_through_unchanged(self):
+        # ISO 639-2 collective codes (e.g. CAU Caucasian, DRA Dravidian) have
+        # no single language name -> kept as-is rather than dropped.
+        handler = LanguageNameHandler()
+        assert handler.normalize("CAU", "") == "CAU"
+        assert handler.normalize("DRA", "") == "DRA"
+
+    def test_none_and_empty_pass_through_unchanged(self):
+        handler = LanguageNameHandler()
+        assert handler.normalize(None, "") is None
+        assert handler.normalize("", "") == ""
 
 
 class TestHandlers:
