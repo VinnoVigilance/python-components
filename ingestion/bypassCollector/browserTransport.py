@@ -178,13 +178,17 @@ class BrowserTransport:
                         f"{full_url}. The bot wall rejected the request."
                     )
 
-                if status == 0:
-                    # status 0 = the in-page fetch failed or timed out (a
-                    # network blip / abort). The body carries the JS error.
-                    # Retryable.
-                    transient = result.get("body")
+                if status == 0 or status >= 500:
+                    # status 0 = the in-page fetch failed or timed out (a network
+                    # blip / abort); 5xx = a server-side hiccup (overload / a
+                    # momentary 500-503). Both are transient and usually succeed
+                    # on retry, so back off and retry rather than aborting a
+                    # multi-hour run on one bad response. A persistent 5xx still
+                    # surfaces once the retries are exhausted.
+                    transient = result.get("body") or f"HTTP {status}"
                 elif not 200 <= status < 300:
-                    # A real HTTP error (404, 500, ...) is not a transient blip.
+                    # A real client-side HTTP error (404, 400, ...) will not fix
+                    # itself on retry: fail fast.
                     raise RuntimeError(
                         f"Browser transport HTTP {status} for {full_url}"
                     )
