@@ -91,10 +91,73 @@ class SaveHtmlAction(BaseAction):
         }
         
         filename = pattern
-        
+
         for key, value in variables.items():
             placeholder = "{" + key + "}"
             if placeholder in filename:
                 filename = filename.replace(placeholder, str(value))
-        
+
         return filename
+
+
+class SaveJsonAction(SaveHtmlAction):
+    """
+    Fetch a JSON endpoint from inside the cleared browser session and save
+    the raw response body to file.
+
+    Unlike ``save_html`` (which stores the rendered DOM), this pulls the raw
+    JSON via the browser's XHR, so a .json endpoint is saved as clean JSON
+    rather than HTML-wrapped text.
+
+    Config:
+        url: JSON endpoint to fetch (uses the browser's cleared session/cookies)
+        filename_pattern: Pattern for filename (e.g. "{source}_{list}_{timestamp}.json")
+        outputDir: Optional output directory override
+
+    Context updates:
+        savedFile: Path to saved file
+    """
+
+    def execute(
+        self,
+        actionConfig: Dict[str, Any],
+        context: Dict[str, Any],
+        engine: Any
+    ) -> bool:
+        """Fetch the JSON body and save it."""
+
+        url = actionConfig.get("url", "")
+
+        if not url:
+            logger.error("save_json requires a 'url'")
+            return False
+
+        text = engine.fetchText(url)
+
+        if not text:
+            logger.error("No JSON to save")
+            return False
+
+        filename = self._buildFilename(actionConfig, context)
+
+        outputDir = actionConfig.get(
+            "outputDir",
+            context.get("outputDir", Path("data/downloads"))
+        )
+
+        filepath = Path(outputDir) / filename
+
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(text)
+
+            logger.info(f"JSON saved: {filepath}")
+
+            context["savedFile"] = str(filepath)
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save JSON: {type(e).__name__}: {e}")
+            return False

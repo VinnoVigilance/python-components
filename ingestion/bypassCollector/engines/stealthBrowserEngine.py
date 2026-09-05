@@ -2,6 +2,7 @@
 StealthBot browser engine implementation.
 """
 
+import json
 import logging
 from typing import Optional, Any
 import time
@@ -126,7 +127,43 @@ class StealthBrowserEngine(BaseEngine):
         except Exception as e:
             logger.error(f"Failed to retrieve HTML: {type(e).__name__}: {e}")
             return None
-    
+
+    def fetchText(self, url: str) -> Optional[str]:
+        """
+        Fetch a URL's raw body from inside the cleared browser session.
+
+        Runs a same-origin XHR in the page, so the Cloudflare clearance
+        cookies set during navigate() are sent automatically. This is the
+        "bypass then API" step: the challenge is already cleared, so we pull
+        the JSON straight from the endpoint instead of reading the <pre> the
+        browser wraps around a rendered .json page.
+        """
+        logger.info(f"Fetching body via browser session: {url}")
+
+        try:
+            # UC/CDP mode evaluates the script as an expression, so a top-level
+            # `return` is illegal and script arguments are not passed. Wrap the
+            # synchronous XHR in an IIFE (an expression) with the URL embedded.
+            script = (
+                "(function(u){"
+                "var xhr = new XMLHttpRequest();"
+                "xhr.open('GET', u, false);"
+                "xhr.send(null);"
+                "return xhr.responseText;"
+                "})(" + json.dumps(url) + ")"
+            )
+            text = self.sb.execute_script(script)
+
+            if text:
+                logger.info(f"Fetched {len(text):,} characters")
+                return text
+
+            logger.error("Fetched empty response")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to fetch body: {type(e).__name__}: {e}")
+            return None
+
     def getPageTitle(self) -> Optional[str]:
         """Get current page title."""
         try:
