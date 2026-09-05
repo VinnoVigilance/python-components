@@ -13,9 +13,12 @@ from repositories import (
 )
 from services.watchlistPipeline import watchlistFileService
 from transforms.preProcessingEngine import PreProcessingEngine
+from ingestion.crawler.interface import crawl
+from ingestion.crawler.models import CrawlerTask
 
 
 logger = logging.getLogger(__name__)
+ROOT_DIR = Path(__file__).resolve().parents[2]
 
 
 def process_watchlist_source(
@@ -27,15 +30,79 @@ def process_watchlist_source(
 
     file_path = acquisition.source_file_path
 
+    extraction_method = str(
+    config.get(
+        "extraction_method",
+        "",
+    )
+).strip().upper()
+
     if acquisition.records is not None:
         parsed_records = acquisition.records
+
+    elif extraction_method == "SAVED_HTML_SPIDER":
+        source_config_path = config.get(
+            "source_config"
+        )
+
+        if not source_config_path:
+            raise ValueError(
+                "SAVED_HTML_SPIDER source must define "
+                "'source_config'."
+            )
+
+        crawl_result = crawl(
+            CrawlerTask(
+                url=config["url"],
+                source_name=config["source_name"],
+                list_name=config.get(
+                    "list_name",
+                    config["source_name"],
+                ),
+                source_config_path=str(
+                    (
+                        ROOT_DIR
+                        / source_config_path
+                    ).resolve()
+                ),
+                source_file_path=str(
+                    file_path
+                ),
+                download_dir=str(
+                    ROOT_DIR
+                    / "data"
+                    / "downloads"
+                ),
+            )
+        )
+
+        parsed_records = list(
+            crawl_result.records
+        )
+
     else:
-        parser = create_parser(file_type=config["file_type"])
+        parser = create_parser(
+            file_type=config["file_type"]
+        )
+
         parsed_records = list(
             parser.parse(
                 file_path=file_path,
                 config=config,
             )
+        )
+
+    minimum_record_count = config.get(
+        "minimum_record_count"
+    )
+
+    if (
+        minimum_record_count is not None
+        and len(parsed_records) < int(minimum_record_count)
+    ):
+        raise ValueError(
+            f"Only {len(parsed_records)} records were extracted; "
+            f"minimum expected count is {minimum_record_count}."
         )
 
     return process_records(

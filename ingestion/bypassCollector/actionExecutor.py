@@ -7,7 +7,7 @@ from typing import Dict, Any, List
 
 from ingestion.bypassCollector.actions.navigateAction import NavigateAction
 from ingestion.bypassCollector.actions.waitAction import WaitAction
-from ingestion.bypassCollector.actions.saveAction import SaveHtmlAction
+from ingestion.bypassCollector.actions.saveAction import SaveHtmlAction, SaveJsonAction
 logger = logging.getLogger(__name__)
 
 
@@ -26,6 +26,7 @@ class ActionExecutor:
             "navigate": NavigateAction(),
             "wait": WaitAction(),
             "save_html": SaveHtmlAction(),
+            "save_json": SaveJsonAction(),
             # Future actions:
             # "click": ClickAction(),
             # "scroll": ScrollAction(),

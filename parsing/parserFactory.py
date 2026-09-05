@@ -5,6 +5,7 @@ from parsing.pdfParser import PdfParser
 from parsing.htmlParser import HtmlParser
 from parsing.tabularParser import TabularParser
 from parsing.jsonlParser import JsonlParser
+from parsing.jsonParser import JsonParser
 
 
 PARSER_REGISTRY = {
@@ -15,6 +16,7 @@ PARSER_REGISTRY = {
     "xlsx": TabularParser,
     "xls": TabularParser,
     "jsonl": JsonlParser,
+    "json": JsonParser,
 }
 
 

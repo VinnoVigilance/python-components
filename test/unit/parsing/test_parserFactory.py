@@ -11,12 +11,17 @@ import pytest
 from parsing.parserFactory import create_parser
 from parsing.tabularParser import TabularParser
 from parsing.xmlParser import XmlParser
+from parsing.jsonParser import JsonParser
 
 pytestmark = pytest.mark.unit
 
 
 def test_creates_xml_parser():
     assert isinstance(create_parser("xml"), XmlParser)
+
+
+def test_creates_json_parser():
+    assert isinstance(create_parser("json"), JsonParser)
 
 
 def test_spreadsheet_types_share_the_tabular_parser():

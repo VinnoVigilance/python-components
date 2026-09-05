@@ -723,4 +723,195 @@ WATCHLIST_CONFIGS = {
             "write_mode": "list_detail",
         },
     },
+"COMELEC-2025-SENATORS": {
+        "source_name": "COMELEC",
+        "list_name": "COMELEC-2025-SENATORS",
+        "date_order": "YMD",
+        "download_method": "BYPASS",
+        "url": "https://2025electionresults.comelec.gov.ph/coc-result",
+        "file_type": "json",
+        "items_path": "national",
+        "external_id_path": "ballot_number",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "bypass_config": {
+            "challenge": "cloudflare",
+            "headless": False,
+            "timeout_seconds": 120,
+            "actions": [
+                {
+                    "action": "save_json",
+                    "url": "https://2025electionresults.comelec.gov.ph/data/coc/0.json",
+                    "filename_pattern": "{list}_{timestamp}.json",
+                },
+            ],
+        },
+        "preprocessing": [
+            {
+                "handler": "explode_nested_records",
+                "level": "dataset",
+                "config": {
+                    "match_field": "contestCode",
+                    "match_value": "00399000",
+                    "list_path": "candidates.candidates",
+                    "carry_fields": {
+                        "contestCode": "contestCode",
+                        "contestName": "contestName",
+                        "statistic.overVotes": "overVotes",
+                        "statistic.underVotes": "underVotes",
+                        "statistic.validVotes": "validVotes",
+                        "statistic.obtainedVotes": "obtainedVotes",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name",
+                    "pattern": (
+                        r"^(?P<ballot_number>\d+)\.\s*"
+                        r"(?P<name>[^(]+?)\s*"
+                        r"(?:\((?P<party>[^)]*)\))?\s*$"
+                    ),
+                    "outputs": {
+                        "ballot_number": "ballot_number",
+                        "name": "name",
+                        "party": "party",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name",
+                    "pattern": r"^(?P<last_name>[^,]+),\s*(?P<first_name>.+)$",
+                    "outputs": {
+                        "last_name": "last_name",
+                        "first_name": "first_name",
+                    },
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "country_code",
+                    "value": "PH",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "election_year",
+                    "value": "2025",
+                },
+            },
+        ],
+    },
+    "PH-HOUSE-MEMBERS": {
+        "source_name": "CONGRESS-PH",
+        "date_order": "MDY",
+        "list_name": "PH-HOUSE-MEMBERS",
+
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+
+        "url": (
+            "https://www.congress.gov.ph/"
+            "house-members"
+        ),
+
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+
+        "source_config": (
+            "config/watchlistSources/"
+            "ph_house_members.yaml"
+        ),
+
+        "minimum_record_count": 250,
+
+        "bypass_config": {
+            "challenge": "cloudflare",
+            "headless": False,
+            "timeout_seconds": 120,
+
+            "success_criteria": [
+                "House Members",
+            ],
+
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "a[href*='/house-members/view/']"
+                    ),
+                    "timeout": 90,
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": (
+                        "{source}_{list}_"
+                        "{timestamp}.html"
+                    ),
+                },
+            ],
+
+            "validation": {
+                "required_content": [
+                    "Full Name",
+                    "Representing",
+                    "/house-members/view/",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": (
+                        "jurisdiction_country"
+                    ),
+                    "value": "Philippines",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": (
+                        "jurisdiction_code"
+                    ),
+                    "value": "PH",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "congress",
+                    "value": "20th Congress",
+                },
+            },
+        ],
+    },
+  
 }
