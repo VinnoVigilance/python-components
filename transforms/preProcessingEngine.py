@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import re
 from urllib.parse import unquote, urlparse
@@ -277,6 +278,48 @@ class PreProcessingEngine:
         }
 
         return record
+
+    def enrich_from_attachment(self, record, config):
+        """Load a per-record detail file (keyed off a stub field) and return the
+        list_detail shape ``{source_record_id, list, detail}``, so mapping reads
+        ``list.*``/``detail.*``. Unchanged if the key or detail file is missing.
+
+        config: attachments_dir, key_field, filename_template (default
+        "{key}.json"), id_field/list_field/detail_field."""
+
+        attachments_dir = config.get("attachments_dir")
+        key_field = config.get("key_field")
+
+        if not attachments_dir or not key_field:
+            return record
+
+        key = str(record.get(key_field, "")).strip()
+
+        if not key:
+            return record
+
+        safe_key = key
+
+        for char in '/\\:*?"<>|':
+            safe_key = safe_key.replace(char, "-")
+
+        filename = config.get(
+            "filename_template", "{key}.json"
+        ).format(key=safe_key)
+
+        file_path = os.path.join(attachments_dir, filename)
+
+        if not os.path.exists(file_path):
+            return record
+
+        with open(file_path, "r", encoding="utf-8") as handle:
+            detail = json.load(handle)
+
+        return {
+            config.get("id_field", "source_record_id"): key,
+            config.get("list_field", "list"): record,
+            config.get("detail_field", "detail"): detail,
+        }
 
     def detect_entity_type(self, record, config):
         input_field = config["input_field"]

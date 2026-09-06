@@ -49,6 +49,7 @@ SAMPLES = {
     "DNFBP": "DNFBP_raw_sample.jsonl",
     "FBI-WANTED": "FBI-WANTED_raw_sample.jsonl",
     "DMW-RECRUITMENT-AGENCIES": "DMW-RECRUITMENT-AGENCIES_raw_sample.jsonl",
+    "INTERPOL-RED-NOTICES": "INTERPOL-RED-NOTICES_raw_sample.jsonl",
 }
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
@@ -113,6 +114,10 @@ GOLDEN = {
     "DMW-RECRUITMENT-AGENCIES": {
         "SourceType": "Official", "DatasetCategory": "Regulatory",
         "ListName": "DMW-RECRUITMENT-AGENCIES", "SourceName": "DMW",
+    },
+    "INTERPOL-RED-NOTICES": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "INTERPOL-RED-NOTICES", "SourceName": "INTERPOL",
     },
 }
 

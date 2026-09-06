@@ -21,6 +21,7 @@ nameparser==1.4.0
 # --- Ingestion / infrastructure ---
 requests==2.34.2         # source file downloads
 sb-stealth-wrapper==0.4.0  # stealth browser engine for bypassCollector (Cloudflare-protected sources)
+seleniumbase==4.51.11    # SeleniumBase driver, pinned to a device-matched chromedriver (compatibleDriver.py)
 psycopg2-binary==2.9.12  # PostgreSQL access
 boto3                    # SeaweedFS/S3 storage client (not pinned: install if using infrastructure/storage)
 python-dotenv==1.0.1     # load config/secrets from a local .env file
