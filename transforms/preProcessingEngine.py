@@ -566,3 +566,112 @@ class PreProcessingEngine:
             record[output_field] = digest
 
         return record
+
+    def explode_nested_records(self, records, config):
+        """
+        Fan a nested list out into one record per item (dataset-level).
+
+        Turns a parent that carries a nested list (e.g. one election contest
+        holding many candidates) into many flat records -- one per child --
+        so each child can become its own watchlist member downstream. Nothing
+        here is source-specific: any "parent object -> nested list of
+        children" shape reuses it by writing config, not code.
+
+        config:
+            match_field   only explode parents whose match_field equals
+                          match_value; omit to explode every parent.
+            match_value   the value match_field must equal (compared as text).
+            list_path     dot-path to the child list inside each parent,
+                          e.g. "candidates.candidates".
+            carry_fields  {source_dot_path: output_field} -- values read from
+                          the parent by dot-path and copied onto every child,
+                          so parent-level context (contest code, statistics)
+                          rides along with each exploded record.
+
+        A child that is not a dict is wrapped as {"value": child}. carry_fields
+        use setdefault, so a child that already holds the key keeps its value.
+        """
+        match_field = config.get("match_field")
+        match_value = config.get("match_value")
+        list_path = config["list_path"]
+        carry_fields = config.get("carry_fields", {})
+
+        exploded = []
+
+        for record in records:
+            if (
+                match_field is not None
+                and str(record.get(match_field, "")) != str(match_value)
+            ):
+                continue
+
+            children = record
+
+            for part in list_path.split("."):
+                children = (
+                    children.get(part, {})
+                    if isinstance(children, dict)
+                    else {}
+                )
+
+            if not isinstance(children, list):
+                continue
+
+            carried = {}
+
+            for source_path, output_field in carry_fields.items():
+                value = record
+
+                for part in source_path.split("."):
+                    value = (
+                        value.get(part)
+                        if isinstance(value, dict)
+                        else None
+                    )
+
+                carried[output_field] = value
+
+            for child in children:
+                new_record = (
+                    dict(child)
+                    if isinstance(child, dict)
+                    else {"value": child}
+                )
+
+                for key, value in carried.items():
+                    new_record.setdefault(key, value)
+
+                exploded.append(new_record)
+
+        return exploded
+
+    def split_field_regex(self, record, config):
+        """
+        Split one field into several sibling fields via a named-group regex.
+
+        The record-level counterpart of pre-normalization's SplitPatternHandler:
+        instead of emitting a list of objects for an array field, it writes each
+        captured group onto the SAME record as a plain field. Use it when a
+        source packs several values into one string
+        ("66. VILLAR, CAMILLE (NP)" -> ballot number, name, party) and those
+        parts are needed early -- e.g. the ballot number becomes the record's
+        external id, which must exist before the raw member is stored (so this
+        cannot wait for pre-normalization). Generic: the regex and the
+        group->field mapping live in config, so any packed-string field is
+        handled by config, not code.
+
+        config:
+            input_field   field to read and split.
+            pattern       regex with (?P<name>...) named groups.
+            outputs       {group_name: output_field}. A group that did not
+                          match (optional group, or no overall match) writes ""
+                          so the output field always exists.
+        """
+        value = str(record.get(config["input_field"], "")).strip()
+        match = re.match(config["pattern"], value)
+
+        for group_name, output_field in config["outputs"].items():
+            captured = match.group(group_name) if match else None
+            record[output_field] = captured.strip() if captured else ""
+
+        return record

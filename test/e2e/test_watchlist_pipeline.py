@@ -86,7 +86,7 @@ def _mock_services(monkeypatch, duplicate_status, extra_dup=None):
     monkeypatch.setattr(fs, "store_source_file", mocks["store_source_file"])
     monkeypatch.setattr(fs, "insert_watchlist_file", mocks["insert_watchlist_file"])
     monkeypatch.setattr(fs, "insert_file_log", mocks["insert_file_log"])
-    monkeypatch.setattr(raw, "process_watchlist_file", mocks["process_raw"])
+    monkeypatch.setattr(raw, "process_watchlist_source", mocks["process_raw"])
     monkeypatch.setattr(att, "process_attachments", mocks["process_attachments"])
     monkeypatch.setattr(core, "process_watchlist_file", mocks["process_core"])
 
