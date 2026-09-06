@@ -50,3 +50,26 @@ DB_PORT = int(os.getenv("DB_PORT", "5432"))
 DB_NAME = os.getenv("DB_NAME", "vinno_vigilance")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = _require("DB_PASSWORD")
+
+# --- Elasticsearch ---
+ELASTICSEARCH_URL = os.getenv(
+    "ELASTICSEARCH_URL",
+    "https://localhost:9200",
+)
+
+ELASTICSEARCH_USERNAME = os.getenv(
+    "ELASTICSEARCH_USERNAME",
+    "elastic",
+)
+
+ELASTICSEARCH_PASSWORD = _require(
+    "ELASTICSEARCH_PASSWORD"
+)
+
+ELASTICSEARCH_VERIFY_CERTS = (
+    os.getenv(
+        "ELASTICSEARCH_VERIFY_CERTS",
+        "true",
+    ).lower()
+    == "true"
+)

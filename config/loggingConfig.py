@@ -13,3 +13,15 @@ def configure_logging() -> None:
             logging.StreamHandler(sys.stdout),
         ],
     )
+
+    logging.getLogger(
+        "elastic_transport.transport"
+    ).setLevel(logging.WARNING)
+
+    logging.getLogger(
+        "elasticsearch"
+    ).setLevel(logging.WARNING)
+
+    logging.getLogger(
+        "urllib3.connectionpool"
+    ).setLevel(logging.WARNING)
