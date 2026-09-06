@@ -1,6 +1,8 @@
 import logging
 
+import urllib3
 from elasticsearch import Elasticsearch
+from urllib3.exceptions import InsecureRequestWarning
 
 from config.settings import (
     ELASTICSEARCH_PASSWORD,
@@ -14,9 +16,16 @@ logger = logging.getLogger(__name__)
 
 
 def create_elasticsearch_client() -> Elasticsearch:
-    """Create and return an Elasticsearch client."""
+    """
+    Create and return an Elasticsearch client.
+    """
 
-    client = Elasticsearch(
+    if not ELASTICSEARCH_VERIFY_CERTS:
+        urllib3.disable_warnings(
+            InsecureRequestWarning
+        )
+
+    return Elasticsearch(
         ELASTICSEARCH_URL,
         basic_auth=(
             ELASTICSEARCH_USERNAME,
@@ -25,13 +34,13 @@ def create_elasticsearch_client() -> Elasticsearch:
         verify_certs=ELASTICSEARCH_VERIFY_CERTS,
     )
 
-    return client
-
 
 def check_elasticsearch_connection(
     client: Elasticsearch,
 ) -> bool:
-    """Check whether Elasticsearch is reachable."""
+    """
+    Check whether Elasticsearch is reachable.
+    """
 
     try:
         return bool(client.ping())
@@ -46,6 +55,8 @@ def check_elasticsearch_connection(
 def close_elasticsearch_client(
     client: Elasticsearch,
 ) -> None:
-    """Close Elasticsearch client resources."""
+    """
+    Close Elasticsearch client resources.
+    """
 
     client.close()

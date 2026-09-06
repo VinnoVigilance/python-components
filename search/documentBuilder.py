@@ -5,8 +5,9 @@ def build_watchlist_document(
     member: dict[str, Any],
 ) -> dict[str, Any]:
     """
-    Build the Elasticsearch document for one canonical watchlist member.
+    Build one Elasticsearch document from a canonical watchlist member.
 
+    PostgreSQL remains the source of truth.
     The canonical payload is preserved without restructuring.
     """
 
@@ -14,6 +15,7 @@ def build_watchlist_document(
         "record_id": str(member["vv_member_id"]),
         "source_id": str(member["source_id"]),
         "list_type_id": str(member["list_type_id"]),
+        "entity_type_id": str(member["entity_type_id"]),
         "external_id": (
             str(member["external_id"])
             if member["external_id"] is not None
@@ -21,6 +23,7 @@ def build_watchlist_document(
         ),
         "version_no": member["version_no"],
         "is_current": member["is_current"],
+        "record_hash": member["record_hash"],
         "change_type": member["change_type"],
         "valid_from": member["valid_from"],
         "valid_to": member["valid_to"],

@@ -12,9 +12,10 @@ def ensure_index(
     schema: dict[str, Any],
 ) -> str:
     """
-    Ensure that the physical index and alias exist.
+    Ensure that the physical Elasticsearch index exists.
 
-    Returns the physical index name.
+    This function does not change the alias.
+    The alias must be switched only after a successful synchronization.
     """
 
     index_config = schema["index"]
@@ -22,26 +23,65 @@ def ensure_index(
     alias_name = index_config["alias"]
     version = index_config["version"]
 
-    index_name = (
-        f"{alias_name}-{version}"
-    )
+    index_name = f"{alias_name}-{version}"
 
-    if not client.indices.exists(
-        index=index_name
-    ):
+    if not client.indices.exists(index=index_name):
         _create_index(
             client=client,
             index_name=index_name,
             schema=schema,
         )
 
-    _ensure_alias(
+    return index_name
+
+
+def switch_alias(
+    client: Elasticsearch,
+    alias_name: str,
+    index_name: str,
+) -> None:
+    """
+    Atomically point the alias to the requested physical index.
+
+    If the alias already points only to that index, nothing changes.
+    """
+
+    current_index_names = _find_alias_indices(
         client=client,
         alias_name=alias_name,
-        index_name=index_name,
     )
 
-    return index_name
+    if current_index_names == {index_name}:
+        return
+
+    actions: list[dict[str, Any]] = []
+
+    for current_index_name in current_index_names:
+        actions.append(
+            {
+                "remove": {
+                    "index": current_index_name,
+                    "alias": alias_name,
+                }
+            }
+        )
+
+    actions.append(
+        {
+            "add": {
+                "index": index_name,
+                "alias": alias_name,
+            }
+        }
+    )
+
+    client.indices.update_aliases(actions=actions)
+
+    logger.info(
+        "Elasticsearch alias switched. alias=%s index=%s",
+        alias_name,
+        index_name,
+    )
 
 
 def _create_index(
@@ -49,24 +89,19 @@ def _create_index(
     index_name: str,
     schema: dict[str, Any],
 ) -> None:
-    """Create Elasticsearch index."""
+    """
+    Create a physical Elasticsearch index.
+    """
 
     logger.info(
         "Creating Elasticsearch index: %s",
         index_name,
     )
 
-    settings = schema.get(
-        "settings",
-        {},
-    )
-
-    mapping = schema["mapping"]
-
     client.indices.create(
         index=index_name,
-        settings=settings,
-        mappings=mapping,
+        settings=schema.get("settings", {}),
+        mappings=schema["mapping"],
     )
 
     logger.info(
@@ -75,25 +110,17 @@ def _create_index(
     )
 
 
-def _ensure_alias(
+def _find_alias_indices(
     client: Elasticsearch,
     alias_name: str,
-    index_name: str,
-) -> None:
-    """Ensure alias points to the expected index."""
+) -> set[str]:
+    """
+    Return the physical indices currently connected to an alias.
+    """
 
-    if client.indices.exists_alias(
-        name=alias_name
-    ):
-        return
+    if not client.indices.exists_alias(name=alias_name):
+        return set()
 
-    client.indices.put_alias(
-        index=index_name,
-        name=alias_name,
-    )
+    response = client.indices.get_alias(name=alias_name)
 
-    logger.info(
-        "Created Elasticsearch alias %s -> %s",
-        alias_name,
-        index_name,
-    )
+    return set(response.keys())

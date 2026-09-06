@@ -32,4 +32,5 @@ ollama==0.6.2
 
 # --- Analyst UI (utils/vvAnalystApp.py) ---
 streamlit==1.59.2
+tqdm>=4.66,<5
 

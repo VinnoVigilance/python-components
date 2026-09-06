@@ -27,13 +27,22 @@ def find_current_member(
     list_type_id: int,
     external_id: str,
 ) -> dict[str, Any] | None:
+    """
+    Return the current version of one watchlist member.
+
+    The current row may be an active member or a DELETED tombstone.
+    Returning change_type allows the Core Service to distinguish
+    between these two states.
+    """
+
     cursor.execute(
         """
         SELECT
             id,
             vv_member_id,
             version_no,
-            record_hash
+            record_hash,
+            change_type
         FROM core.watchlist_member
         WHERE source_id = %s
           AND list_type_id = %s
@@ -60,6 +69,7 @@ def find_current_member(
         "vv_member_id": row[1],
         "version_no": row[2],
         "record_hash": row[3],
+        "change_type": row[4],
     }
 
 
@@ -211,12 +221,20 @@ def insert_updated_member(
         "version_no": row[2],
     }
 
+
 def find_deleted_current_members(
     cursor,
     source_id: int,
     list_type_id: int,
     watchlist_file_id: int,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
+    """
+    Return active members that disappeared from the latest source file.
+
+    Current DELETED tombstones are excluded so repeated pipeline runs
+    do not create multiple DELETED versions for the same member.
+    """
+
     cursor.execute(
         """
         SELECT
@@ -264,11 +282,19 @@ def find_deleted_current_members(
         for row in cursor.fetchall()
     ]
 
+
 def insert_deleted_member(
     cursor,
-    current_member: dict,
+    current_member: dict[str, Any],
     watchlist_file_id: int,
 ) -> int:
+    """
+    Insert a DELETED tombstone as the new current member version.
+
+    The previous payload and record hash are retained so the complete
+    version history remains available in PostgreSQL.
+    """
+
     cursor.execute(
         """
         INSERT INTO core.watchlist_member (
@@ -314,13 +340,12 @@ def insert_deleted_member(
             current_member["entity_type_id"],
             current_member["version_no"] + 1,
             current_member["record_hash"],
-            # full_payload arrives as a dict (jsonb read back by find_deleted_
-            # current_members); psycopg2 cannot adapt a bare dict, so wrap it.
             Json(current_member["full_payload"]),
         ),
     )
 
     return cursor.fetchone()[0]
+
 
 def find_current_members_batch(
     cursor,
@@ -328,9 +353,11 @@ def find_current_members_batch(
     batch_size: int = 1000,
 ) -> list[dict[str, Any]]:
     """
-    Return a keyset-paginated batch of current watchlist members.
+    Return a keyset-paginated batch of active watchlist members.
 
-    Used by downstream consumers such as Elasticsearch indexing.
+    Only members that should currently be searchable are returned.
+    Current DELETED tombstones remain in PostgreSQL for history but
+    are intentionally excluded from the search synchronization input.
     """
 
     cursor.execute(
@@ -351,6 +378,7 @@ def find_current_members_batch(
             full_payload
         FROM core.watchlist_member
         WHERE is_current = TRUE
+          AND change_type IS DISTINCT FROM 'DELETED'
           AND id > %s
         ORDER BY id
         LIMIT %s
@@ -379,3 +407,21 @@ def find_current_members_batch(
         }
         for row in cursor.fetchall()
     ]
+
+def count_current_members(
+    cursor,
+) -> int:
+    """
+    Return the number of active watchlist members.
+    """
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM core.watchlist_member
+        WHERE is_current = TRUE
+          AND change_type IS DISTINCT FROM 'DELETED'
+        """
+    )
+
+    return cursor.fetchone()[0]
