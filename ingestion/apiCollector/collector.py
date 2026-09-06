@@ -1,11 +1,5 @@
-"""
-API collector orchestration (the I/O layer).
-
-Drives the page loop using the pure helpers in ``pagination.py``, then writes
-the collected records as a raw JSONL snapshot under the standard
-``data/downloads`` convention. It performs acquisition only -- no mapping,
-normalization, entity detection, or database work.
-"""
+"""API collector orchestration: the I/O layer that pages an API and writes a raw
+JSONL snapshot under ``data/downloads``. Acquisition only."""
 
 import json
 import logging
@@ -16,14 +10,12 @@ from typing import Any, Iterable, Iterator, List
 
 import requests
 
+from .browserTransport import BrowserTransport
 from .faceting import plan_fanout
 from .models import ApiCollectorTask
 from .pagination import (
-    assemble_record,
-    build_detail_url,
     build_query,
     extract_items,
-    merge_records,
     no_more_pages,
     read_path,
     should_stop,
@@ -39,39 +31,21 @@ DOWNLOAD_ROOT = ROOT_DIR / "data" / "downloads"
 
 
 def collect_source(task: ApiCollectorTask) -> str:
-    """
-    Collect every page of an API source and write a snapshot to disk.
-
-    Returns the path of the written snapshot.
-    """
+    """Collect every page of an API source and return the snapshot path."""
 
     collected_at = datetime.now()
-
-    # The transport is opened once for the whole run (the browser transport
-    # keeps a single warm session across every page and detail fetch) and
-    # closed when collection finishes.
     transport = _build_transport(task)
 
     with transport:
-        # "list_detail" writes its own CFTC-style layout -- a primary listing
-        # file plus one profile file per person -- so it owns its paths and its
-        # two phases; hand off before the single-file machinery below.
         if task.write_mode == "list_detail":
             return _collect_list_detail(task, transport, collected_at)
 
-        output_path = _build_output_path(
-            task=task,
-            collected_at=collected_at,
-        )
+        if task.write_mode != "single_jsonl":
+            raise ValueError(f"Unsupported write_mode: {task.write_mode}")
 
-        output_path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        output_path = _build_output_path(task=task, collected_at=collected_at)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # A total up front (from the API's reported count) lets the progress
-        # logger show a percentage and an ETA while the long detail phase runs,
-        # and lets us detect a changed site cap.
         total_hint = _startup_probe(task, transport)
 
         pages = _iter_pages(task, transport)
@@ -81,18 +55,11 @@ def collect_source(task: ApiCollectorTask) -> str:
 
         pages = _log_progress(pages, total_hint, task.list_name)
 
-        if task.write_mode == "single_jsonl":
-            written = _write_single_jsonl(pages, output_path)
-            logger.info(
-                f"{task.list_name}: wrote {written} records to {output_path}"
-            )
-            _check_completeness(task, written, total_hint)
-        elif task.write_mode == "per_entity":
-            _write_per_entity(pages, output_path.parent)
-        else:
-            raise ValueError(
-                f"Unsupported write_mode: {task.write_mode}"
-            )
+        written = _write_single_jsonl(pages, output_path)
+        logger.info(
+            f"{task.list_name}: wrote {written} records to {output_path}"
+        )
+        _check_completeness(task, written, total_hint)
 
     return str(output_path)
 
@@ -102,27 +69,10 @@ def _collect_list_detail(
     transport: Any,
     collected_at: datetime,
 ) -> str:
-    """
-    Two-phase CFTC-style acquisition for a capped list+detail API.
-
-    Phase A (overview): run the fan-out, fetch only the listing pages (no
-    profile hydration), dedup to unique records, and write them as one primary
-    JSONL -- ``data/downloads/{source}/{list}/.../{list}.jsonl``.
-
-    Phase B (profiles): stream that overview file and, for each record, follow
-    its detail URL and save the whole profile JSON as its own file under
-    ``attachments/members/{id}.json`` -- one file per person, linked back to the
-    overview by id (the same layout the crawler's ``CrawlerStorage`` produces).
-    Sequential by design (the browser transport has no parallel fetch), and
-    resumable: a profile whose file already exists is skipped.
-
-    Returns the overview (primary) file path.
-    """
+    """Two-phase acquisition: a deduped overview JSONL, then one profile file per
+    record under ``attachments/members/{id}.json``. Returns the overview path."""
 
     base_dir = _list_detail_base_dir(task, collected_at)
-    # Timestamp the overview like the single_jsonl/FBI snapshots
-    # ({list}_{ts}.jsonl); the per-person profiles stay in the day-level
-    # attachments/members/ dir, keyed and deduped by id across runs.
     timestamp = collected_at.strftime("%Y%m%d_%H%M%S")
     overview_name = task.filename or f"{task.list_name}_{timestamp}.jsonl"
     overview_path = base_dir / overview_name
@@ -132,12 +82,9 @@ def _collect_list_detail(
 
     total_hint = _startup_probe(task, transport)
 
-    # --- Phase A: listing only, deduped to unique people ---
-    # The raw list stub has no assembled "source_record_id" yet, so dedup on the
-    # stub's own id path (e.g. "entity_id") rather than task.dedup_path.
     overview_dedup_path = task.record_shape.get("id_path") or task.dedup_path
 
-    pages = _iter_pages(task, transport, hydrate=False)
+    pages = _iter_pages(task, transport)
 
     if overview_dedup_path:
         pages = _dedup_pages(pages, overview_dedup_path)
@@ -153,12 +100,9 @@ def _collect_list_detail(
 
     _check_completeness(task, written, total_hint)
 
-    # --- Phase B: one raw-profile file per person ---
     saved = _fetch_profiles(task, overview_path, members_dir, transport)
 
-    logger.info(
-        f"{task.list_name}: saved {saved} profiles under {members_dir}"
-    )
+    logger.info(f"{task.list_name}: saved {saved} profiles under {members_dir}")
 
     return str(overview_path)
 
@@ -170,14 +114,7 @@ def _fetch_profiles(
     transport: Any,
     log_every: int = 200,
 ) -> int:
-    """
-    Fetch and save each person's profile listed in the overview file.
-
-    For every record it resolves the detail URL, fetches the profile JSON
-    sequentially through the warm transport, and writes it verbatim to
-    ``attachments/members/{id}.json``. A record whose file already exists is
-    skipped, so an interrupted run resumes without re-fetching.
-    """
+    """Save each record's profile JSON; skip one already on disk (resumable)."""
 
     members_dir.mkdir(parents=True, exist_ok=True)
 
@@ -233,16 +170,10 @@ def _list_detail_base_dir(
     task: ApiCollectorTask,
     collected_at: datetime,
 ) -> Path:
-    """
-    Date-partitioned base directory for a list_detail run, matching the
-    downloader/crawler convention:
-    ``data/downloads/{source}/{list}/year=/month=/day=/``.
-    """
+    """Date-partitioned base directory for a list_detail run."""
 
     download_root = (
-        Path(task.download_dir)
-        if task.download_dir
-        else DOWNLOAD_ROOT
+        Path(task.download_dir) if task.download_dir else DOWNLOAD_ROOT
     )
 
     return (
@@ -256,11 +187,7 @@ def _list_detail_base_dir(
 
 
 def _safe_member_filename(record_id: Any) -> str:
-    """
-    Make a record id safe as a file name. Interpol ids carry a '/'
-    (e.g. "2024/64373"), illegal in a path, so path-unsafe characters are
-    replaced with '-' -> "2024-64373". The record keeps its real id inside.
-    """
+    """Make a record id safe as a file name (Interpol ids carry a '/')."""
 
     text = str(record_id)
 
@@ -271,37 +198,19 @@ def _safe_member_filename(record_id: Any) -> str:
 
 
 def _build_transport(task: ApiCollectorTask):
-    """
-    Pick the transport that fetches this source's JSON.
-
-    "browser" is imported lazily so a run that only touches open APIs never
-    loads the stealth browser (and its heavy dependencies).
-    """
+    """Pick the transport that fetches this source's JSON."""
 
     if task.transport == "browser":
-        from ingestion.bypassCollector.browserTransport import (
-            BrowserTransport,
-        )
-
         return BrowserTransport(task.bypass_config)
 
-    return RequestsTransport(
-        headers=task.headers,
-        timeout=task.timeout,
-    )
+    return RequestsTransport(headers=task.headers, timeout=task.timeout)
 
 
 def _dedup_pages(
     pages: Iterable[List[Any]],
     dedup_path: str,
 ) -> Iterator[List[Any]]:
-    """
-    Drop records whose dedup key has already been seen.
-
-    Fan-out filters (e.g. by nationality) can overlap, so the same record may
-    arrive under two variants; this keeps the first and skips the rest. A
-    record with no key at ``dedup_path`` is always kept.
-    """
+    """Drop records whose key at ``dedup_path`` was already seen (keyless kept)."""
 
     seen = set()
 
@@ -326,21 +235,9 @@ def _dedup_pages(
 def _iter_pages(
     task: ApiCollectorTask,
     transport: Any,
-    hydrate: bool = True,
 ) -> Iterator[List[Any]]:
-    """
-    Yield every page of the source.
-
-    Variants partition the dataset so several slices land in one snapshot:
-      * ``faceting`` enabled -> slices are computed adaptively from the API's
-        reported total (splitting only where a slice exceeds the cap).
-      * else ``param_variants`` -> a fixed, hand-declared list of slices.
-      * else a single fetch using ``params``, exactly as before.
-
-    ``hydrate`` False yields the raw list stubs without following each record's
-    detail endpoint -- used by the list_detail overview phase, which fetches the
-    profiles separately.
-    """
+    """Yield every page: fan-out slices when faceting is on, else param_variants,
+    else a single fetch with ``params``."""
 
     if task.faceting.get("enabled"):
         variants = _adaptive_variants(task, transport)
@@ -350,20 +247,14 @@ def _iter_pages(
     for index, variant in enumerate(variants):
         params = {**task.params, **variant}
 
-        yield from _iter_variant_pages(task, params, transport, hydrate)
+        yield from _iter_variant_pages(task, params, transport)
 
-        # Space consecutive variant fetches like pages when throttling is on.
         if task.throttle_delay and index < len(variants) - 1:
             time.sleep(task.throttle_delay)
 
 
 def _make_get_total(task: ApiCollectorTask, transport: Any):
-    """
-    Build the ``get_total(params)`` used by the planner and the progress hint.
-
-    Asks the list endpoint for a single record and reads the ``total`` it
-    reports for the given filters -- one cheap "how many?" query.
-    """
+    """Build ``get_total(params)``: one "how many?" query against the endpoint."""
 
     total_path = task.faceting.get("total_path", "total")
     page_param = task.pagination.get("page_param", "page")
@@ -379,8 +270,6 @@ def _make_get_total(task: ApiCollectorTask, transport: Any):
 
         total = read_path(payload, total_path) or 0
 
-        # Planning is otherwise silent; show each probe's answer so the phase is
-        # visibly progressing and the fan-out decisions are traceable.
         logger.info(
             f"{task.list_name}: total for {facet_params or 'root'} = {total}"
         )
@@ -390,51 +279,21 @@ def _make_get_total(task: ApiCollectorTask, transport: Any):
     return get_total
 
 
-def plan_source(task: ApiCollectorTask):
-    """
-    Dry run: compute and return the fan-out plan WITHOUT paging or hydrating.
-
-    Opens the transport and runs only the cheap "how many?" queries the planner
-    needs, then stops -- no list pages are read and no profile details are
-    fetched. Returns the ``FanoutPlan`` (leaves, unresolved over-cap slices, and
-    the root total) so a caller can inspect the cap behaviour for a fraction of
-    a full run's cost. Returns None when the source has no faceting enabled
-    (nothing to plan -- it fetches directly).
-    """
-
-    if not task.faceting.get("enabled"):
-        return None
-
-    transport = _build_transport(task)
-
-    with transport:
-        return _build_plan(task, transport)
-
-
 def _build_plan(task: ApiCollectorTask, transport: Any):
-    """
-    Run the fan-out planner against the live "how many?" endpoint and return the
-    full plan. Shared by the real collection path (``_adaptive_variants``) and
-    the dry-run ``plan_source`` above, so both compute the plan identically.
-    """
+    """Run the fan-out planner against the live "how many?" endpoint."""
 
     cap = task.faceting.get("cap", 160)
     facets = task.faceting.get("facets", [])
 
-    get_total = _make_get_total(task, transport)
-
-    return plan_fanout(get_total, {}, cap, facets)
+    return plan_fanout(_make_get_total(task, transport), {}, cap, facets)
 
 
 def _adaptive_variants(
     task: ApiCollectorTask,
     transport: Any,
 ) -> List[dict]:
-    """
-    Compute the fan-out slices from the API's reported total, using the facets
-    declared in config. Returns a materialised list so the plan is built up
-    front (all "how many?" queries) before any page is fetched.
-    """
+    """Compute the fan-out slices; raise if any stays over the cap after every
+    facet (fetching would silently drop records)."""
 
     plan = _build_plan(task, transport)
 
@@ -443,9 +302,6 @@ def _adaptive_variants(
         f"slices (root total {plan.root_total})"
     )
 
-    # The facets/cap no longer cover the data: some slice stays over the cap
-    # even after every facet. Say so loudly, with an example, so a new facet
-    # type can be added to faceting.facets.
     if plan.unresolved:
         example = plan.unresolved[0]
         cap = task.faceting.get("cap", 160)
@@ -454,8 +310,8 @@ def _adaptive_variants(
         raise RuntimeError(
             f"{task.list_name}: {len(plan.unresolved)} slice(s) still exceed "
             f"the cap ({cap}) after all {len(facets)} facets -- fetching would "
-            f"SILENTLY DROP records. Deepen a name facet (raise max_depth) or "
-            f"add a facet type. Example over-cap slice: {example['params']} "
+            f"drop records. Deepen a name facet (raise max_depth) or add a facet "
+            f"type. Example over-cap slice: {example['params']} "
             f"= {example['total']} records."
         )
 
@@ -463,15 +319,8 @@ def _adaptive_variants(
 
 
 def _startup_probe(task: ApiCollectorTask, transport: Any) -> int:
-    """
-    One request that returns the whole-dataset total (for the progress ETA) and
-    checks whether the site's real result cap still matches the configured one.
-
-    If the site returns fewer records for a full page than both the configured
-    cap and the reported total, the site cap has dropped below our cap -- which
-    would silently lose records on slices between the two -- so warn to lower
-    ``faceting.cap``. Only runs for faceted sources; returns 0 otherwise.
-    """
+    """Return the dataset total for the progress ETA; warn if the site's real cap
+    dropped below the configured one. Faceted sources only, else 0."""
 
     if not task.faceting.get("enabled"):
         return 0
@@ -496,9 +345,8 @@ def _startup_probe(task: ApiCollectorTask, transport: Any) -> int:
 
     if total > got and got < cap:
         logger.warning(
-            f"🔴 {task.list_name}: the site returned only {got} records for a "
-            f"page of {cap} while {total} exist -- the site cap looks like "
-            f"{got}, not {cap}. Lower faceting.cap to {got}."
+            f"{task.list_name}: the site returned only {got} records for a page "
+            f"of {cap} while {total} exist -- lower faceting.cap to {got}."
         )
 
     return total
@@ -509,14 +357,7 @@ def _check_completeness(
     written: int,
     total_hint: int,
 ) -> None:
-    """
-    Compare what we wrote against the total the API reported, and warn if the
-    shortfall is more than a small tolerance.
-
-    A tiny gap is normal (records with no facet value, and the dataset changing
-    during a run). A large gap means records were not retrieved -- the facets no
-    longer cover the data, or the site cap changed.
-    """
+    """Warn if what we wrote falls short of the API's reported total."""
 
     if total_hint <= 0:
         return
@@ -526,10 +367,8 @@ def _check_completeness(
 
     if gap > tolerance:
         logger.warning(
-            f"🔴 {task.list_name}: collected {written} of {total_hint} "
-            f"(missing {gap}). Records were not retrieved -- the data may have "
-            f"outgrown the facets, or the site cap changed. Add another facet "
-            f"to faceting.facets, or lower faceting.cap."
+            f"{task.list_name}: collected {written} of {total_hint} (missing "
+            f"{gap}). Add another facet, or lower faceting.cap."
         )
     else:
         logger.info(
@@ -543,13 +382,7 @@ def _log_progress(
     list_name: str,
     every: int = 200,
 ) -> Iterator[List[Any]]:
-    """
-    Pass pages through unchanged while logging throughput and an ETA.
-
-    Records are counted as they are yielded (i.e. after their detail has been
-    fetched), so the rate reflects real progress. Every ``every`` records it
-    logs a line to the terminal; nothing is stored.
-    """
+    """Pass pages through unchanged while logging throughput and an ETA."""
 
     start = time.time()
     count = 0
@@ -568,9 +401,7 @@ def _log_progress(
 
     elapsed = time.time() - start
 
-    logger.info(
-        f"done: {count} records in {_format_duration(elapsed)}"
-    )
+    logger.info(f"done: {count} records in {_format_duration(elapsed)}")
 
 
 def _progress_line(count: int, total_hint: int, start: float) -> str:
@@ -612,15 +443,9 @@ def _iter_variant_pages(
     task: ApiCollectorTask,
     params: dict,
     transport: Any,
-    hydrate: bool = True,
 ) -> Iterator[List[Any]]:
-    """
-    Yield each page's list of records for one param-set until the API returns
-    an empty page. A source declared ``type: "none"`` is not paged: it yields
-    a single request's records and stops.
-
-    ``hydrate`` False skips detail hydration and yields the raw list stubs.
-    """
+    """Page one param-set until an empty (or, for a capped API, a short/over-cap)
+    page. A ``type: "none"`` source yields one request and stops."""
 
     pagination_type = task.pagination.get("type", "page")
     page = task.pagination.get("start_page", 1)
@@ -643,24 +468,13 @@ def _iter_variant_pages(
         if should_stop(items):
             return
 
-        # When a detail endpoint is configured, replace each thin list stub
-        # with its fully-hydrated record before yielding the page.
-        if task.detail and hydrate:
-            items = _hydrate_items(task, items, transport)
-
         yield items
 
         fetched += page_count
 
-        # A single-request source (``type: "none"``) has no next page: one
-        # fetch is the whole dataset, so stop instead of re-requesting it.
         if pagination_type == "none":
             return
 
-        # Capped-API guard against a runaway loop: some endpoints (Interpol)
-        # answer an out-of-range page number with a non-empty page instead of an
-        # empty one, so "stop on empty page" alone never fires. A capped query
-        # yields at most ``cap`` records, and a short page is the last one.
         if no_more_pages(fetched, page_count, cap, page_size):
             return
 
@@ -671,13 +485,8 @@ def _iter_variant_pages(
 
 
 def _detail_url_for(stub: dict, detail_cfg: dict):
-    """
-    Resolve one stub's detail URL.
-
-    Prefers a ready URL in the stub (``url_path`` -- follows the API's own link,
-    avoiding id-formatting quirks); otherwise builds it from an id plus a
-    template (``id_path`` + ``url_template``). Returns None when unresolvable.
-    """
+    """Resolve a stub's detail URL from ``url_path``, else ``id_path`` +
+    ``url_template``. None when unresolvable."""
 
     url_path = detail_cfg.get("url_path")
 
@@ -689,73 +498,11 @@ def _detail_url_for(stub: dict, detail_cfg: dict):
     if not id_value:
         return None
 
-    return build_detail_url(detail_cfg["url_template"], id_value)
-
-
-def _hydrate_items(
-    task: ApiCollectorTask,
-    items: List[dict],
-    transport: Any,
-) -> List[dict]:
-    """
-    Enrich a page of list stubs with their detail responses.
-
-    Each stub is merged with its detail (nested under ``target_field`` when
-    set). When ``detail.concurrency`` > 1 and the transport supports it, the
-    page's detail requests run in parallel (a bounded pool) -- the big speed
-    win, since detail is one request per record. Otherwise they run one by one.
-    Stubs with no resolvable detail URL pass through unchanged.
-    """
-
-    detail_cfg = task.detail
-    shape = task.record_shape
-    target_field = detail_cfg.get("target_field")
-    concurrency = int(detail_cfg.get("concurrency", 1))
-
-    urls = []
-    positions = []
-
-    for position, stub in enumerate(items):
-        url = _detail_url_for(stub, detail_cfg)
-
-        if url:
-            urls.append(url)
-            positions.append(position)
-
-    if urls:
-        if concurrency > 1 and hasattr(transport, "get_json_many"):
-            fetched = transport.get_json_many(urls, concurrency)
-        else:
-            fetched = [
-                _get_json_with_retry(task, url, None, transport)
-                for url in urls
-            ]
-    else:
-        fetched = []
-
-    detail_by_position = dict(zip(positions, fetched))
-
-    hydrated = list(items)
-
-    for position, stub in enumerate(items):
-        detail = detail_by_position.get(position)
-
-        if shape:
-            # Structured record: id + list + detail + attachment links.
-            hydrated[position] = assemble_record(stub, detail, shape)
-        elif detail is not None:
-            hydrated[position] = merge_records(stub, detail, target_field)
-
-    if task.throttle_delay:
-        time.sleep(task.throttle_delay)
-
-    return hydrated
+    return detail_cfg["url_template"].format(id=id_value)
 
 
 def _get_page(task: ApiCollectorTask, query: dict, transport: Any) -> Any:
-    """
-    Fetch and parse one page of JSON, retrying on request errors.
-    """
+    """Fetch and parse one page of JSON, retrying on request errors."""
 
     return _get_json_with_retry(task, task.url, params=query, transport=transport)
 
@@ -766,14 +513,8 @@ def _get_json_with_retry(
     params: Any,
     transport: Any,
 ) -> Any:
-    """
-    Fetch one JSON document through the transport, retrying on request errors.
-
-    The transport does the actual request (plain ``requests`` or a warm
-    browser); this shared loop provides the retry/backoff for both. A
-    ``RuntimeError`` (e.g. a 401/403 block) is not retried -- it is raised so
-    the failure is loud and immediate.
-    """
+    """Fetch one JSON document, retrying on request errors; a RuntimeError (e.g.
+    a 401/403 block) is raised immediately, not retried."""
 
     for attempt in range(1, task.retry + 1):
         try:
@@ -783,24 +524,17 @@ def _get_json_with_retry(
             if attempt == task.retry:
                 raise
 
-    raise RuntimeError(
-        f"Failed to collect API page: {url} {params}"
-    )
+    raise RuntimeError(f"Failed to collect API page: {url} {params}")
 
 
 def _build_output_path(
     task: ApiCollectorTask,
     collected_at: datetime,
 ) -> Path:
-    """
-    Build the dated snapshot path, matching the downloader's convention:
-    ``data/downloads/{source}/{list}/year=/month=/day=/{list}_{ts}.jsonl``.
-    """
+    """Build the dated snapshot path, matching the downloader's convention."""
 
     download_root = (
-        Path(task.download_dir)
-        if task.download_dir
-        else DOWNLOAD_ROOT
+        Path(task.download_dir) if task.download_dir else DOWNLOAD_ROOT
     )
 
     directory = (
@@ -814,10 +548,7 @@ def _build_output_path(
 
     timestamp = collected_at.strftime("%Y%m%d_%H%M%S")
 
-    filename = (
-        task.filename
-        or f"{task.list_name}_{timestamp}.jsonl"
-    )
+    filename = task.filename or f"{task.list_name}_{timestamp}.jsonl"
 
     return directory / filename
 
@@ -826,37 +557,15 @@ def _write_single_jsonl(
     pages: Iterable[List[Any]],
     output_path: Path,
 ) -> int:
-    """
-    Write every record as one raw JSON line into a single JSONL file.
-
-    Streams page by page, so memory stays flat regardless of dataset size.
-    Returns the number of records written.
-    """
+    """Write every record as one raw JSON line; return the number written."""
 
     written = 0
 
     with output_path.open("w", encoding="utf-8") as handle:
         for items in pages:
             for item in items:
-                handle.write(
-                    json.dumps(item, ensure_ascii=False)
-                )
+                handle.write(json.dumps(item, ensure_ascii=False))
                 handle.write("\n")
                 written += 1
 
     return written
-
-
-def _write_per_entity(
-    pages: Iterable[List[Any]],
-    output_dir: Path,
-) -> None:
-    """
-    Write one file per record (adverse-media mode).
-
-    Extension point for future adverse-media sources; not implemented yet.
-    """
-
-    raise NotImplementedError(
-        "write_mode 'per_entity' (adverse media) is not implemented yet"
-    )

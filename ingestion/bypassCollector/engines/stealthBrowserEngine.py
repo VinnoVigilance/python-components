@@ -39,10 +39,8 @@ class StealthBrowserEngine(BaseEngine):
             headless: Run browser in headless mode
             successCriteria: Text indicating successful page load
             timeoutSeconds: Default timeout for operations
-            driverVersion: chromedriver selector. Default "mlatest" matches the
-                driver to the Chrome installed on THIS device, so the engine
-                runs on any machine without a version mismatch. Override to pin
-                an exact build (e.g. "152.0.7977.64") or "keep" for offline.
+            driverVersion: chromedriver selector; "mlatest" matches the device's
+                Chrome. Override to pin an exact build or "keep" for offline.
             binaryLocation: explicit Chrome binary path; None = auto-detect.
         """
         self.headless = headless
@@ -72,8 +70,6 @@ class StealthBrowserEngine(BaseEngine):
             self._bot = StealthBot(
                 headless=self.headless,
                 success_criteria=success_criteria,
-                # Match the chromedriver to this device's Chrome, so a version
-                # mismatch never stops the browser from launching.
                 driver_strategy=CompatibleSeleniumBaseDriver(
                     driver_version=self.driverVersion,
                     binary_location=self.binaryLocation,
@@ -316,19 +312,8 @@ class StealthBrowserEngine(BaseEngine):
             return None
 
     def evaluateAwait(self, expression: str) -> Any:
-        """
-        Evaluate a JS expression that returns a Promise, waiting for it to
-        resolve, and return its value.
-
-        In UC/CDP mode a plain ``execute_script`` cannot await a Promise, so an
-        async ``fetch`` would never hand a value back (and a blocking sync XHR
-        can hang the page forever). This reaches the CDP page's ``evaluate`` with
-        ``await_promise=True`` -- the supported way to run async JS and collect
-        its result -- so the caller can use a timeout-guarded ``fetch`` that
-        never hangs.
-
-        Falls back to a blocking ``executeScript`` if CDP mode is not active.
-        """
+        """Evaluate a Promise-returning JS expression and return its value (CDP
+        ``await_promise``); falls back to ``executeScript`` without CDP."""
         cdp = getattr(self.sb, "cdp", None)
 
         if cdp is None:
@@ -339,31 +324,5 @@ class StealthBrowserEngine(BaseEngine):
                 cdp.page.evaluate(expression, await_promise=True)
             )
         except Exception as e:
-            logger.error(
-                f"Async evaluate failed: {type(e).__name__}: {e}"
-            )
-            return None
-
-    def executeAsyncScript(self, script: str, *args, timeout: int = 180) -> Any:
-        """
-        Execute asynchronous JavaScript.
-
-        The browser injects a callback as the script's last argument; the script
-        calls it to return a value. This lets the page run many ``fetch``
-        requests in parallel (via Promise scheduling) and hand back all the
-        results in one round-trip -- used for concurrent detail hydration.
-        """
-        driver = getattr(self.sb, "driver", self.sb)
-
-        try:
-            driver.set_script_timeout(timeout)
-        except Exception:
-            pass
-
-        try:
-            return driver.execute_async_script(script, *args)
-        except Exception as e:
-            logger.error(
-                f"Async script execution failed: {type(e).__name__}: {e}"
-            )
+            logger.error(f"Async evaluate failed: {type(e).__name__}: {e}")
             return None

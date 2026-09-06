@@ -340,14 +340,8 @@ class FlattenDictHandler(BaseHandler):
 
 class LanguageNameHandler(BaseHandler):
 
-    """Resolve an ISO 639-2 language code to its English language name.
-
-    INTERPOL supplies spoken languages as ISO 639-2/B (bibliographic) codes
-    (e.g. FRE, GER, CHI); pycountry.lookup maps them to a name (French,
-    German, Chinese). A code pycountry cannot resolve -- the rare ISO 639-2
-    collective codes such as CAU (Caucasian) or DRA (Dravidian) -- is left
-    unchanged so we never drop a value. The rule cell is unused.
-    """
+    """Resolve an ISO 639-2 language code (e.g. FRE) to its English name via
+    pycountry; an unresolvable code is left unchanged."""
 
     def normalize(self, value, rule):
 

@@ -585,11 +585,6 @@ WATCHLIST_CONFIGS = {
         "versioning_strategy": "continuous",
         "preprocessing": [
             {
-                # Join each overview stub to its saved profile, matched by
-                # entity_id -> attachments/members/{id}.json, into the crawler's
-                # list_detail shape ({source_record_id, list, detail}). General
-                # handler; any "one primary file + key-matched attachments"
-                # source reuses it with a rule row.
                 "handler": "enrich_from_attachment",
                 "level": "record",
                 "relative_path_fields": ["attachments_dir"],
@@ -605,10 +600,6 @@ WATCHLIST_CONFIGS = {
                 "headless": False,
                 "warmup_url": "https://www.interpol.int/How-we-work/Notices/Red-Notices/View-Red-Notices",
                 "timeout_seconds": 90,
-                # The warrant facet probes ~250 countries per over-cap slice --
-                # a burst that rate-limited us ("Failed to fetch"). Pace every
-                # request and back off hard so the burst self-throttles and any
-                # limit self-heals instead of aborting the run.
                 "min_request_interval": 0.2,
                 "fetch_retries": 6,
                 "fetch_retry_delay": 1.0,
@@ -627,74 +618,23 @@ WATCHLIST_CONFIGS = {
                 "cap": 160,
                 "total_path": "total",
                 "facets": [
-                    {
-                        "type": "enum",
-                        "param": "sexId",
-                        "values": ["M", "F", "U"],
-                    },
+                    {"type": "enum", "param": "sexId", "values": ["M", "F", "U"]},
                     {
                         "type": "range",
                         "min_param": "ageMin",
                         "max_param": "ageMax",
                         "low": 0,
                         "high": 120,
-                        # complete defaults True: a notice with no date of birth
-                        # (so no age) is intentionally NOT given its own extra
-                        # subtree -- the null-age catch-all pass is dropped for
-                        # speed. 0% of notices here have a null DOB.
                     },
+                    {"type": "substring", "param": "name", "max_depth": 1},
+                    {"type": "substring", "param": "forename", "max_depth": 1},
                     {
-                        # FIRST name axis -- runs before forename because it has
-                        # NO null values in the data (a null-free facet splits
-                        # without ever dropping a record, so it goes first).
-                        # Single-letter PRESENCE on the surname ("name contains
-                        # A".."Z"): position-independent (suffix-safe), and every
-                        # non-empty surname contains some letter, so A-Z covers
-                        # every named record.
-                        "type": "substring",
-                        "param": "name",
-                        "max_depth": 1,
-                    },
-                    {
-                        # SECOND name axis: same single-letter presence on the
-                        # forename. Together with surname above they form the
-                        # forename x surname grid -- a COMPLETE catch-all that
-                        # shrinks almost any slice cheaply, so the country sweeps
-                        # below are reached only for the rare record the grid can't
-                        # place (this is what made planning take hours before).
-                        # Forename runs AFTER surname because it, not surname,
-                        # carries nulls (0.3%). complete defaults True: a notice
-                        # with NO forename is intentionally not given an extra
-                        # pass -- that null subtree is dropped for speed.
-                        "type": "substring",
-                        "param": "forename",
-                        "max_depth": 1,
-                    },
-                    {
-                        # FIRST country fallback -- runs before nationality because
-                        # it has NO null values here (drops nobody). Split by the
-                        # country whose arrest warrant drives the notice ("wanted
-                        # by"), reached only for a slice the name grid could not
-                        # place. A person can be wanted by several countries, so
-                        # slices overlap -> disjoint: False (probe every value, no
-                        # early-stop); dedup drops any record under two warrant
-                        # countries. complete defaults True: 0% null here.
                         "type": "enum",
                         "param": "arrestWarrantCountryId",
                         "values_ref": "country_codes",
                         "disjoint": False,
                     },
                     {
-                        # LAST fallback: split by nationality. Runs last because it
-                        # carries the most nulls (1.5%), so exposing it to the
-                        # fewest records minimises drops. A person can hold several
-                        # nationalities, so slices OVERLAP -> disjoint: False (no
-                        # early-stop, else dual-nationals drop the country tail);
-                        # dedup drops repeats. complete: False here is the safety
-                        # backstop on the LAST facet -- it costs NO extra probes
-                        # (nothing after it to sweep) but flags any slice still over
-                        # cap as unresolved, so the collector raises loudly instead
-                        # of silently losing records.
                         "type": "enum",
                         "param": "nationality",
                         "values_ref": "country_codes",
@@ -704,22 +644,10 @@ WATCHLIST_CONFIGS = {
                 ],
             },
             "items_path": "_embedded.notices",
-            "detail": {
-                "url_path": "_links.self.href",
-                "concurrency": 10,
-            },
-            "record_shape": {
-                # list_detail uses only id_path -- to name each profile file
-                # attachments/members/{entity_id}.json and to dedup the overview.
-                "id_path": "entity_id",
-                "id_field": "source_record_id",
-                "list_field": "list",
-                "detail_field": "detail",
-            },
+            "detail": {"url_path": "_links.self.href"},
+            "record_shape": {"id_path": "entity_id"},
             "dedup_path": "source_record_id",
             "throttle_delay": 0.3,
-            # CFTC-style two-phase output: a primary listing JSONL of unique
-            # notices + one raw profile per person under attachments/members/.
             "write_mode": "list_detail",
         },
     },
