@@ -128,8 +128,6 @@ def main(argv=None) -> None:
     )
     print(f"Preprocessed: {len(processed_records)} records")
 
-    # Stop here when normalization can't run yet (no mapping rules): write the
-    # preprocessed records so the enrich/join result is inspectable on its own.
     if args.no_normalize:
         FINAL_DIR.mkdir(parents=True, exist_ok=True)
         out_path = FINAL_DIR / f"{list_name}_preprocessed.jsonl"
