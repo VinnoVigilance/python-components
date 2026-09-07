@@ -50,6 +50,11 @@ SAMPLES = {
     "FBI-WANTED": "FBI-WANTED_raw_sample.jsonl",
     "DMW-RECRUITMENT-AGENCIES": "DMW-RECRUITMENT-AGENCIES_raw_sample.jsonl",
     "INTERPOL-RED-NOTICES": "INTERPOL-RED-NOTICES_raw_sample.jsonl",
+    "GPPB-BLACKLISTED-ENTITIES": "GPPB-BLACKLISTED-ENTITIES_raw_sample.jsonl",
+    "COMELEC-2025-SENATORS": "COMELEC-2025-SENATORS_raw_sample.jsonl",
+    "DILG-LOCAL-OFFICIALS": "DILG-LOCAL-OFFICIALS_raw_sample.jsonl",
+    "SECO-SANCTIONS": "SECO-SANCTIONS_raw_sample.jsonl",
+    "CFTC-RED-LIST": "CFTC-RED-LIST_raw_sample.jsonl",
 }
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
@@ -118,6 +123,26 @@ GOLDEN = {
     "INTERPOL-RED-NOTICES": {
         "SourceType": "Official", "DatasetCategory": "Law Enforcement",
         "ListName": "INTERPOL-RED-NOTICES", "SourceName": "INTERPOL",
+    },
+    "GPPB-BLACKLISTED-ENTITIES": {
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
+        "ListName": "GPPB-BLACKLISTED-ENTITIES", "SourceName": "GPPB",
+    },
+    "COMELEC-2025-SENATORS": {
+        "SourceType": "Official", "DatasetCategory": "PEP (Politically Exposed Person)",
+        "ListName": "COMELEC-2025-SENATORS", "SourceName": "COMELEC",
+    },
+    "DILG-LOCAL-OFFICIALS": {
+        "SourceType": "Official", "DatasetCategory": "PEP (Politically Exposed Person)",
+        "ListName": "DILG-LOCAL-OFFICIALS", "SourceName": "DILG",
+    },
+    "SECO-SANCTIONS": {
+        "SourceType": "Official", "DatasetCategory": "Sanctions",
+        "ListName": "SECO-SANCTIONS", "SourceName": "SECO",
+    },
+    "CFTC-RED-LIST": {
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
+        "ListName": "CFTC-RED-LIST", "SourceName": "CFTC",
     },
 }
 

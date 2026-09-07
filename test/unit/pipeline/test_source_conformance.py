@@ -54,6 +54,11 @@ SAMPLES = {
     "FBI-WANTED": "FBI-WANTED_raw_sample.jsonl",
     "DMW-RECRUITMENT-AGENCIES": "DMW-RECRUITMENT-AGENCIES_raw_sample.jsonl",
     "INTERPOL-RED-NOTICES": "INTERPOL-RED-NOTICES_raw_sample.jsonl",
+    "GPPB-BLACKLISTED-ENTITIES": "GPPB-BLACKLISTED-ENTITIES_raw_sample.jsonl",
+    "COMELEC-2025-SENATORS": "COMELEC-2025-SENATORS_raw_sample.jsonl",
+    "DILG-LOCAL-OFFICIALS": "DILG-LOCAL-OFFICIALS_raw_sample.jsonl",
+    "SECO-SANCTIONS": "SECO-SANCTIONS_raw_sample.jsonl",
+    "CFTC-RED-LIST": "CFTC-RED-LIST_raw_sample.jsonl",
 }
 
 VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel"}
