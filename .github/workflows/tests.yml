@@ -25,6 +25,7 @@ jobs:
     env:
       DB_PASSWORD: ci_dummy_password
       STORAGE_SECRET_KEY_INGESTION: ci_dummy_secret
+      ELASTICSEARCH_PASSWORD: ci_dummy_password
 
     steps:
       - name: Check out the code
@@ -75,6 +76,7 @@ jobs:
     env:
       DB_PASSWORD: ci_dummy_password
       STORAGE_SECRET_KEY_INGESTION: ci_dummy_secret
+      ELASTICSEARCH_PASSWORD: ci_dummy_password
 
     steps:
       - name: Check out the code
