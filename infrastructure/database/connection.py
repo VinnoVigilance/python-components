@@ -1,4 +1,4 @@
-"""PostgreSQL connection pool.
+"""PostgreSQL connection pool with transaction safety.
 
 The pool is created LAZILY -- on first use, not at import time. This matters
 for two reasons:
@@ -13,10 +13,15 @@ for two reasons:
 
 Call sites are unchanged: ``connection_pool.getconn()`` and
 ``connection_pool.putconn(conn)`` work exactly as before.
-"""
 
+you can also use get_db_connection() for safe transactions with rollback on failure and release 
+"""
+import logging
+from contextlib import contextmanager
 from psycopg2.pool import ThreadedConnectionPool
 
+# Initialize a basic logger for the database rollbacks
+logger = logging.getLogger(__name__)
 
 class _LazyConnectionPool:
     """A stand-in for ThreadedConnectionPool that builds itself on first use."""
@@ -38,14 +43,13 @@ class _LazyConnectionPool:
 
             self._pool = ThreadedConnectionPool(
                 minconn=1,
-                maxconn=10,
+                maxconn=20, # Bumped maxconn to 20 to support background workers
                 host=DB_HOST,
                 port=DB_PORT,
                 dbname=DB_NAME,
                 user=DB_USER,
                 password=DB_PASSWORD,
             )
-
         return self._pool
 
     def getconn(self, *args, **kwargs):
@@ -59,4 +63,28 @@ class _LazyConnectionPool:
             self._pool.closeall()
 
 
+# Original singleton instance
 connection_pool = _LazyConnectionPool()
+
+# ==============================================================================
+# Transaction-Safe Context Manager
+# ==============================================================================
+@contextmanager
+def get_db_connection():
+    """
+    Safely checks out a connection from the lazy pool, auto-rollbacks on errors, 
+    and guarantees the connection returns to the pool.
+    """
+    conn = connection_pool.getconn()
+    try:
+        yield conn
+        # Automatically commit if no errors occurred
+        conn.commit()
+    except Exception as e:
+        # If any python error happens inside the block, safely rollback the DB transaction
+        conn.rollback()
+        logger.error(f"Transaction rolled back automatically due to error: {str(e)}")
+        raise e
+    finally:
+        # Always return the connection to the pool, no matter what
+        connection_pool.putconn(conn)
