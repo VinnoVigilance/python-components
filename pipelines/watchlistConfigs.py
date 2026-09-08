@@ -593,6 +593,20 @@ WATCHLIST_CONFIGS = {
                     "key_field": "entity_id",
                 },
             },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "source_record_id",
+                        "list.name",
+                        "list.forename",
+                        "detail.date_of_birth",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "INTERPOL",
+                },
+            },
         ],
         "api_config": {
             "transport": "browser",
@@ -841,5 +855,70 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
-  
+
+    "US-MARSHALS-PROFILED-FUGITIVES": {
+        "source_name": "US-MARSHALS",
+        "list_name": "US-MARSHALS-PROFILED-FUGITIVES",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.usmarshals.gov/what-we-do/"
+            "fugitive-apprehension/profiled-fugitives"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "us_marshals_profiled_fugitives.yaml"
+        ),
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "source_record_id",
+                        "list.name",
+                        "detail.date_of_birth",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "US-MARSHALS",
+                },
+            },
+        ],
+        "bypass_config": {
+            "challenge": "akamai",
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": ["Profiled Fugitives"],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "div.usms-most-wanted",
+                    "timeout": 60,
+                },
+                {
+                    "action": "save_paginated_html",
+                    "page_param": "page",
+                    "start_page": 0,
+                    "max_pages": 40,
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "usms-most-wanted",
+                    "Learn more",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+    },
+
 }
