@@ -204,6 +204,12 @@ class GenericSpider(scrapy.Spider):
         if selector_type == "xpath":
             values = node.xpath(selector).getall()
 
+            if "@href" in selector or "@src" in selector:
+                values = [
+                    urljoin(self.current_url, value) if value else value
+                    for value in values
+                ]
+
         elif selector_type == "css":
             if value_type == "text":
                 values = node.css(f"{selector}::text").getall()
