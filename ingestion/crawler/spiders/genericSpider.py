@@ -200,6 +200,7 @@ class GenericSpider(scrapy.Spider):
         selector_type = field_config.get("selector_type", "css")
         multiple = field_config.get("multiple", False)
         value_type = field_config.get("value", "text")
+        join = field_config.get("join")
 
         if selector_type == "xpath":
             values = node.xpath(selector).getall()
@@ -232,6 +233,9 @@ class GenericSpider(scrapy.Spider):
 
         cleaned_values = [self._clean_text(value) for value in values]
         cleaned_values = [value for value in cleaned_values if value]
+
+        if join is not None:
+            return join.join(cleaned_values)
 
         if multiple:
             return cleaned_values
