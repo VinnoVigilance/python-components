@@ -589,9 +589,16 @@ class PreProcessingEngine:
         values = []
 
         for field in fields:
-            value = str(
-                record.get(field, "")
-            ).strip()
+            resolved = record
+
+            for part in field.split("."):
+                resolved = (
+                    resolved.get(part)
+                    if isinstance(resolved, dict)
+                    else None
+                )
+
+            value = str(resolved or "").strip()
 
             values.append(value.upper())
 

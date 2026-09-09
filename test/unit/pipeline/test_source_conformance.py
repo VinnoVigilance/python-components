@@ -59,6 +59,7 @@ SAMPLES = {
     "DILG-LOCAL-OFFICIALS": "DILG-LOCAL-OFFICIALS_raw_sample.jsonl",
     "SECO-SANCTIONS": "SECO-SANCTIONS_raw_sample.jsonl",
     "CFTC-RED-LIST": "CFTC-RED-LIST_raw_sample.jsonl",
+    "US-MARSHALS-PROFILED-FUGITIVES": "US-MARSHALS-PROFILED-FUGITIVES_raw_sample.jsonl",
 }
 
 VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel"}
