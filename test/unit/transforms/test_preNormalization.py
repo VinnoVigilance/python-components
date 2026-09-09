@@ -22,6 +22,7 @@ from transforms.preNormalization import (
     PreNormalizationEngine,
     RegexExtractHandler,
     RemoveListMarkersHandler,
+    SplitPatternHandler,
     get_nested_values,
     parse_path,
     set_nested_value,
@@ -57,6 +58,49 @@ class TestFlattenDictHandler:
         assert handler.normalize("already a string", "") == "already a string"
         assert handler.normalize(None, "") is None
         assert handler.normalize({}, "") == ""
+
+
+class TestSplitPatternHandler:
+    """The handler splits a field into one object per named-group MATCH, using
+    ``finditer`` so a single line that packs several values (e.g. a name with
+    many ``a.k.a.`` aliases) yields several objects, not just the first."""
+
+    RULE = r"a\.k\.a\.\s*(?P<alias>[^;)]+)"
+
+    def test_one_line_with_many_matches_yields_one_object_each(self):
+        handler = SplitPatternHandler()
+        assert handler.normalize(
+            "Afghan Support Committee (a.k.a. Ahya ul Turas; a.k.a. Jamiat Ayat)",
+            self.RULE,
+        ) == [{"alias": "Ahya ul Turas"}, {"alias": "Jamiat Ayat"}]
+
+    def test_single_match_yields_single_object(self):
+        handler = SplitPatternHandler()
+        assert handler.normalize("Group (a.k.a. Solo)", self.RULE) == [
+            {"alias": "Solo"}
+        ]
+
+    def test_unmatched_line_is_kept_whole_under_first_key(self):
+        handler = SplitPatternHandler()
+        assert handler.normalize("no markers here", self.RULE) == [
+            {"alias": "no markers here"}
+        ]
+
+    def test_underscore_group_is_matched_but_discarded(self):
+        handler = SplitPatternHandler()
+        rule = r"(?P<name>.+?)\s*\((?P<_lang>[^()]+)\)\s*$"
+        assert handler.normalize("Mohamed Ragab (Arabic)", rule) == [
+            {"name": "Mohamed Ragab"}
+        ]
+
+    def test_non_string_passes_through_unchanged(self):
+        handler = SplitPatternHandler()
+        assert handler.normalize(None, self.RULE) is None
+        assert handler.normalize(["already", "a", "list"], self.RULE) == [
+            "already",
+            "a",
+            "list",
+        ]
 
 
 class TestLanguageNameHandler:
