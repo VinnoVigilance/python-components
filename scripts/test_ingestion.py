@@ -71,7 +71,7 @@ def main(argv=None) -> None:
     configure_logging()
 
     # --- set the list you want to test here ---
-    LIST_NAME = "US-MARSHALS-PROFILED-FUGITIVES"
+    LIST_NAME = "US-STATE-TERRORIST-EXCLUSION"
 
     # Optional one-off override from the command line, e.g.
     #   python scripts/test_ingestion.py DFAT

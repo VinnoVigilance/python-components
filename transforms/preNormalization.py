@@ -194,7 +194,8 @@ class SplitPatternHandler(BaseHandler):
 
     Conventions:
 
-      * The field is split on line breaks; each non-empty line is matched.
+      * The field is split on line breaks; every match found on each non-empty
+        line becomes an entry, so one line can yield several objects.
       * A named group whose name starts with ``_`` is matched but **discarded**
         (use it to swallow a redundant fragment without emitting it).
       * A line that does not match is emitted as ``{first_key: line}`` so nothing
@@ -244,17 +245,19 @@ class SplitPatternHandler(BaseHandler):
             if not line:
                 continue
 
-            match = regex.search(line)
+            matches = list(regex.finditer(line))
 
-            if match:
+            if matches:
 
-                obj = {}
+                for match in matches:
 
-                for key in keys:
-                    captured = match.group(key)
-                    obj[key] = captured.strip() if captured else ""
+                    obj = {}
 
-                results.append(obj)
+                    for key in keys:
+                        captured = match.group(key)
+                        obj[key] = captured.strip() if captured else ""
+
+                    results.append(obj)
 
             else:
 

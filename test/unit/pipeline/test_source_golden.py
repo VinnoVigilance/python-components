@@ -56,6 +56,7 @@ SAMPLES = {
     "SECO-SANCTIONS": "SECO-SANCTIONS_raw_sample.jsonl",
     "CFTC-RED-LIST": "CFTC-RED-LIST_raw_sample.jsonl",
     "US-MARSHALS-PROFILED-FUGITIVES": "US-MARSHALS-PROFILED-FUGITIVES_raw_sample.jsonl",
+    "US-STATE-TERRORIST-EXCLUSION": "US-STATE-TERRORIST-EXCLUSION_raw_sample.jsonl",
 }
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
@@ -148,6 +149,10 @@ GOLDEN = {
     "US-MARSHALS-PROFILED-FUGITIVES": {
         "SourceType": "Official", "DatasetCategory": "Law Enforcement",
         "ListName": "US-MARSHALS-PROFILED-FUGITIVES", "SourceName": "US-MARSHALS",
+    },
+    "US-STATE-TERRORIST-EXCLUSION": {
+        "SourceType": "Official", "DatasetCategory": {"Crime", "Sanctions"},
+        "ListName": "US-STATE-TERRORIST-EXCLUSION", "SourceName": "US-STATE",
     },
 }
 
