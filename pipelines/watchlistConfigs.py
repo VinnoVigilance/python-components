@@ -921,4 +921,73 @@ WATCHLIST_CONFIGS = {
         },
     },
 
+    "US-STATE-TERRORIST-EXCLUSION": {
+        "source_name": "US-STATE",
+        "list_name": "US-STATE-TERRORIST-EXCLUSION",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.state.gov/terrorist-exclusion-list/"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "us_state_terrorist_exclusion.yaml"
+        ),
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "list.name",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "US-STATE-TEL",
+                },
+            },
+        ],
+        "bypass_config": {
+            "challenge": "akamai",
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": [
+                "Terrorist Exclusion List Designees",
+            ],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "div.entry-content",
+                    "timeout": 60,
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "Terrorist Exclusion List Designees",
+                    "Delisted",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+    },
+
 }

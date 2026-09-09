@@ -1,0 +1,58 @@
+fetch_strategy: saved_html
+
+record_mode: listing_only
+
+discovery:
+  selector_type: xpath
+  row_selector: >-
+    //h2[contains(., 'Designees (alphabetical') or
+    contains(., 'Delisted from')]/following-sibling::ul[1]/li
+
+list_fields:
+  name:
+    selector: "normalize-space(string(.))"
+    selector_type: xpath
+    value: text
+
+  primary_name:
+    selector: "normalize-space(string(.))"
+    selector_type: xpath
+    value: text
+
+  alias_blob:
+    selector: "normalize-space(string(.))"
+    selector_type: xpath
+    value: text
+
+  section:
+    selector: "string(./ancestor::ul[1]/preceding-sibling::h2[1])"
+    selector_type: xpath
+    value: text
+
+  designation_criteria:
+    selector: "//h2[normalize-space()='Designation Criteria']/following-sibling::*[not(self::h2)][preceding-sibling::h2[1][normalize-space()='Designation Criteria']]//text()"
+    selector_type: xpath
+    value: text
+    join: " "
+
+  designation_process:
+    selector: "//h2[normalize-space()='Designation Process']/following-sibling::*[not(self::h2)][preceding-sibling::h2[1][normalize-space()='Designation Process']]//text()"
+    selector_type: xpath
+    value: text
+    join: " "
+
+  effects_of_designation:
+    selector: "//h2[normalize-space()='Effects of Designation']/following-sibling::*[not(self::h2)][preceding-sibling::h2[1][normalize-space()='Effects of Designation']]//text()"
+    selector_type: xpath
+    value: text
+    join: " "
+
+  tags:
+    selector: "//div[contains(@class,'related-tags')]//a/text()"
+    selector_type: xpath
+    value: text
+    multiple: true
+
+storage:
+  save_listing_page: false
+  save_detail_pages: false
