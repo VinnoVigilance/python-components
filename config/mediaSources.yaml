@@ -1,0 +1,111 @@
+global:
+  mapping:
+    file: data/rules/mediaMapping.xlsx
+
+  pre_normalization:
+    file: data/rules/mediaPreNormalization.xlsx
+
+  post_normalization:
+    file: data/rules/mediaPostNormalization.xlsx
+
+
+sources:
+  NBI_PRESS_RELEASES:
+    enabled: true
+    active: true
+
+    source_name: NBI
+    dataset_name: NBI_PRESS_RELEASES
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+
+    url: https://nbi.gov.ph/press_releases/
+
+    date_order: MDY
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 2
+        randomize_download_delay: true
+        retry_times: 3
+
+        retry_http_codes:
+          - 408
+          - 429
+          - 500
+          - 502
+          - 503
+          - 504
+          - 521
+          - 522
+          - 524
+
+    discovery:
+      strategy: list_detail
+
+      start_url: https://nbi.gov.ph/press_releases/
+      start_page: 1
+
+      pagination:
+        type: page_number
+        url_pattern: "https://nbi.gov.ph/press_releases/page/{page}/"
+
+      article:
+        link_selector: "h2 a"
+
+      known_record:
+        field: SourceRecordId
+
+      stop_condition:
+        type: consecutive_known_records
+        threshold: 10
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: "/(\\d+)/?$"
+
+      Title:
+        selector: "h1"
+        output: text
+
+      date.originalValue:
+        selector: "body"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: "Posted on\\s+([A-Za-z]+\\s+\\d{1,2},\\s+\\d{4})\\s+by\\s+"
+
+      AuthorName:
+        selector: "body"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: "Posted on\\s+[A-Za-z]+\\s+\\d{1,2},\\s+\\d{4}\\s+by\\s+(.+?)\\s+PRESS STATEMENT\\b"
+
+      BodyText:
+        selector: ".entry-content"
+        output: text
+
+    parser:
+      type: html
+
+    identity:
+      external_id:
+        field: SourceRecordId
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId

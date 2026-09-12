@@ -6,13 +6,26 @@ from typing import Any, Dict, Optional
 class CrawlerTask:
     """
     Source-agnostic description of a crawler acquisition run.
+
+    Watchlist usually uses source_config_path.
+
+    Adverse Media can pass an already-loaded
+    source_config directly.
     """
 
     url: str
     source_name: str
     list_name: str
-    source_config_path: str
 
+    # Existing Watchlist config path.
+    # Optional now because Media can pass source_config directly.
+    source_config_path: Optional[str] = None
+
+    # Used by Adverse Media or any caller that already
+    # has the crawler/source config loaded.
+    source_config: Optional[Dict[str, Any]] = None
+
+    # Existing behavior is preserved.
     fetch_strategy: str = "direct"
 
     headers: Dict[str, str] = field(

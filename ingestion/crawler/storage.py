@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 
 class CrawlerStorage:
@@ -8,7 +9,7 @@ class CrawlerStorage:
         source_name: str,
         list_name: str,
         base_dir: str = "data/downloads",
-        detail_directory: str = "attachments/members",
+        detail_directory: Optional[str] = "attachments/members",
     ):
         now = datetime.now()
 
@@ -29,10 +30,23 @@ class CrawlerStorage:
             exist_ok=True,
         )
 
-        self.detail_path = (
-            self.base_path
-            / detail_directory
-        )
+        # Existing Watchlist behavior:
+        #
+        # detail_directory = "attachments/members"
+        #
+        # Media:
+        #
+        # detail_directory = None
+        #
+        # which means save detail HTML files
+        # directly inside the date folder.
+        if detail_directory:
+            self.detail_path = (
+                self.base_path
+                / detail_directory
+            )
+        else:
+            self.detail_path = self.base_path
 
         self.detail_path.mkdir(
             parents=True,

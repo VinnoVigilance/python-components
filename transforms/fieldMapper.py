@@ -284,6 +284,9 @@ def detect_entity_type(raw_json: dict) -> str:
     if val == "vessel":
         return "Vessel"
 
+    if val == "media":
+        return "Media"
+
     if (
         raw_json.get("IMO number")
         or raw_json.get("Vessel name at designation time")
