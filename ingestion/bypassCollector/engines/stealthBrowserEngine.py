@@ -10,6 +10,9 @@ import time
 from sb_stealth_wrapper import StealthBot
 
 from ingestion.bypassCollector.engines.baseEngine import BaseEngine
+from ingestion.bypassCollector.engines.compatibleDriver import (
+    CompatibleSeleniumBaseDriver,
+)
 logger = logging.getLogger(__name__)
 
 
@@ -25,19 +28,26 @@ class StealthBrowserEngine(BaseEngine):
         self,
         headless: bool = False,
         successCriteria: Optional[list] = None,
-        timeoutSeconds: int = 90
+        timeoutSeconds: int = 90,
+        driverVersion: str = "mlatest",
+        binaryLocation: Optional[str] = None
     ):
         """
         Initialize StealthBrowserEngine.
-        
+
         Args:
             headless: Run browser in headless mode
             successCriteria: Text indicating successful page load
             timeoutSeconds: Default timeout for operations
+            driverVersion: chromedriver selector; "mlatest" matches the device's
+                Chrome. Override to pin an exact build or "keep" for offline.
+            binaryLocation: explicit Chrome binary path; None = auto-detect.
         """
         self.headless = headless
         self.successCriteria = successCriteria or []
         self.timeoutSeconds = timeoutSeconds
+        self.driverVersion = driverVersion
+        self.binaryLocation = binaryLocation
         self._bot = None
         self.sb = None
     
@@ -59,7 +69,11 @@ class StealthBrowserEngine(BaseEngine):
             
             self._bot = StealthBot(
                 headless=self.headless,
-                success_criteria=success_criteria
+                success_criteria=success_criteria,
+                driver_strategy=CompatibleSeleniumBaseDriver(
+                    driver_version=self.driverVersion,
+                    binary_location=self.binaryLocation,
+                ),
             )
             
             self._bot.__enter__()
@@ -283,11 +297,11 @@ class StealthBrowserEngine(BaseEngine):
     def executeScript(self, script: str, *args) -> Any:
         """
         Execute JavaScript.
-        
+
         Args:
             script: JavaScript code to execute
             *args: Arguments for script
-            
+
         Returns:
             Script result
         """
@@ -295,4 +309,20 @@ class StealthBrowserEngine(BaseEngine):
             return self.sb.execute_script(script, *args)
         except Exception as e:
             logger.error(f"Script execution failed: {type(e).__name__}: {e}")
+            return None
+
+    def evaluateAwait(self, expression: str) -> Any:
+        """Evaluate a Promise-returning JS expression and return its value (CDP
+        ``await_promise``); falls back to ``executeScript`` without CDP."""
+        cdp = getattr(self.sb, "cdp", None)
+
+        if cdp is None:
+            return self.executeScript(expression)
+
+        try:
+            return cdp.loop.run_until_complete(
+                cdp.page.evaluate(expression, await_promise=True)
+            )
+        except Exception as e:
+            logger.error(f"Async evaluate failed: {type(e).__name__}: {e}")
             return None

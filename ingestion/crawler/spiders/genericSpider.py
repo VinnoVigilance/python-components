@@ -67,6 +67,13 @@ class GenericSpider(scrapy.Spider):
             detail_url=detail_url,
         )
 
+        for field_name, field_config in self.config.get("list_fields", {}).items():
+            attach_type = field_config.get("as_attachment")
+            if attach_type:
+                value = list_data.pop(field_name, None)
+                if value:
+                    attachments.append({"type": attach_type, "url": response.urljoin(value)})
+
         record = {
             "source_record_id": record_id,
             "list": list_data,
@@ -193,9 +200,16 @@ class GenericSpider(scrapy.Spider):
         selector_type = field_config.get("selector_type", "css")
         multiple = field_config.get("multiple", False)
         value_type = field_config.get("value", "text")
+        join = field_config.get("join")
 
         if selector_type == "xpath":
             values = node.xpath(selector).getall()
+
+            if "@href" in selector or "@src" in selector:
+                values = [
+                    urljoin(self.current_url, value) if value else value
+                    for value in values
+                ]
 
         elif selector_type == "css":
             if value_type == "text":
@@ -219,6 +233,9 @@ class GenericSpider(scrapy.Spider):
 
         cleaned_values = [self._clean_text(value) for value in values]
         cleaned_values = [value for value in cleaned_values if value]
+
+        if join is not None:
+            return join.join(cleaned_values)
 
         if multiple:
             return cleaned_values
@@ -263,6 +280,26 @@ class GenericSpider(scrapy.Spider):
                 "attribute",
                 "src",
             )
+
+            if config.get("multiple"):
+                seen = set()
+
+                for node in response.css(selector):
+                    url = node.attrib.get(attribute)
+
+                    if not url or url in seen:
+                        continue
+
+                    seen.add(url)
+
+                    attachments.append(
+                        {
+                            "type": config["type"],
+                            "url": response.urljoin(url),
+                        }
+                    )
+
+                continue
 
             url = response.css(
                 selector

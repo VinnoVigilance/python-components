@@ -787,7 +787,7 @@ class ExplodeHandler(BaseHandler):
             # -------------------------------------------------
             for token in tokens:
 
-                token = token.strip().strip(".")
+                token = token.strip().strip(".").strip('"').strip("'").strip()
 
                 if (
                     token

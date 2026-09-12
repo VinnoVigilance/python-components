@@ -572,6 +572,99 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
+    "INTERPOL-RED-NOTICES": {
+        "source_name": "INTERPOL",
+        "list_name": "INTERPOL-RED-NOTICES",
+        "date_order": "DMY",
+        "download_method": "API",
+        "url": "https://ws-public.interpol.int/notices/v1/red",
+        "file_type": "jsonl",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "enrich_from_attachment",
+                "level": "record",
+                "relative_path_fields": ["attachments_dir"],
+                "config": {
+                    "attachments_dir": "attachments/members",
+                    "key_field": "entity_id",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "source_record_id",
+                        "list.name",
+                        "list.forename",
+                        "detail.date_of_birth",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "INTERPOL",
+                },
+            },
+        ],
+        "api_config": {
+            "transport": "browser",
+            "bypass_config": {
+                "headless": False,
+                "warmup_url": "https://www.interpol.int/How-we-work/Notices/Red-Notices/View-Red-Notices",
+                "timeout_seconds": 90,
+                "min_request_interval": 0.2,
+                "fetch_retries": 6,
+                "fetch_retry_delay": 1.0,
+                "fetch_backoff": 2.0,
+                "fetch_max_delay": 30.0,
+            },
+            "pagination": {
+                "type": "page",
+                "page_param": "page",
+                "size_param": "resultPerPage",
+                "page_size": 160,
+                "start_page": 1,
+            },
+            "faceting": {
+                "enabled": True,
+                "cap": 160,
+                "total_path": "total",
+                "facets": [
+                    {"type": "enum", "param": "sexId", "values": ["M", "F", "U"]},
+                    {
+                        "type": "range",
+                        "min_param": "ageMin",
+                        "max_param": "ageMax",
+                        "low": 0,
+                        "high": 120,
+                    },
+                    {"type": "substring", "param": "name", "max_depth": 1},
+                    {"type": "substring", "param": "forename", "max_depth": 1},
+                    {
+                        "type": "enum",
+                        "param": "arrestWarrantCountryId",
+                        "values_ref": "country_codes",
+                        "disjoint": False,
+                    },
+                    {
+                        "type": "enum",
+                        "param": "nationality",
+                        "values_ref": "country_codes",
+                        "disjoint": False,
+                        "complete": False,
+                    },
+                ],
+            },
+            "items_path": "_embedded.notices",
+            "detail": {"url_path": "_links.self.href"},
+            "record_shape": {"id_path": "entity_id"},
+            "dedup_path": "source_record_id",
+            "throttle_delay": 0.3,
+            "write_mode": "list_detail",
+        },
+    },
 "COMELEC-2025-SENATORS": {
         "source_name": "COMELEC",
         "list_name": "COMELEC-2025-SENATORS",
@@ -762,5 +855,139 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
-  
+
+    "US-MARSHALS-PROFILED-FUGITIVES": {
+        "source_name": "US-MARSHALS",
+        "list_name": "US-MARSHALS-PROFILED-FUGITIVES",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.usmarshals.gov/what-we-do/"
+            "fugitive-apprehension/profiled-fugitives"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "us_marshals_profiled_fugitives.yaml"
+        ),
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "source_record_id",
+                        "list.name",
+                        "detail.date_of_birth",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "US-MARSHALS",
+                },
+            },
+        ],
+        "bypass_config": {
+            "challenge": "akamai",
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": ["Profiled Fugitives"],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "div.usms-most-wanted",
+                    "timeout": 60,
+                },
+                {
+                    "action": "save_paginated_html",
+                    "page_param": "page",
+                    "start_page": 0,
+                    "max_pages": 40,
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "usms-most-wanted",
+                    "Learn more",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+    },
+
+    "US-STATE-TERRORIST-EXCLUSION": {
+        "source_name": "US-STATE",
+        "list_name": "US-STATE-TERRORIST-EXCLUSION",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.state.gov/terrorist-exclusion-list/"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "us_state_terrorist_exclusion.yaml"
+        ),
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "list.name",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "US-STATE-TEL",
+                },
+            },
+        ],
+        "bypass_config": {
+            "challenge": "akamai",
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": [
+                "Terrorist Exclusion List Designees",
+            ],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "div.entry-content",
+                    "timeout": 60,
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "Terrorist Exclusion List Designees",
+                    "Delisted",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+    },
+
 }

@@ -10,7 +10,6 @@ from ingestion.apiCollector.interface import ApiCollectorTask, collect
 from ingestion.crawler.interface import crawl
 from ingestion.crawler.models import CrawlerTask
 from ingestion.downloader.models import DownloadTask
-from ingestion.apiCollector.interface import collect, ApiCollectorTask
 from ingestion.bypassCollector import BypassCollector
 from repositories import watchlistFileLogRepository
 from repositories import watchlistFileRepository
@@ -147,24 +146,7 @@ def _get_manual_file(local_path: str) -> Path:
 def _collect_api_source(config: dict[str, Any]) -> Path:
     """Acquire an API-based source into a JSONL snapshot."""
 
-    api_config = config.get("api_config", {})
-
-    task = ApiCollectorTask(
-        url=config["url"],
-        source_name=config["source_name"],
-        list_name=config.get("list_name", config["source_name"]),
-        pagination=api_config.get("pagination", {}),
-        items_path=api_config.get("items_path", "items"),
-        params=api_config.get("params", {}),
-        param_variants=api_config.get("param_variants", []),
-        headers=api_config.get("headers", {}),
-        timeout=api_config.get("timeout", 30),
-        retry=api_config.get("retry", 3),
-        throttle_delay=api_config.get("throttle_delay", 0.0),
-        write_mode=api_config.get("write_mode", "single_jsonl"),
-    )
-
-    collected_path = collect(task)
+    collected_path = collect(ApiCollectorTask.from_config(config))
     source_file_path = Path(collected_path).resolve()
 
     if not source_file_path.exists():

@@ -42,6 +42,7 @@ class BypassCollector:
     # handles it -- the challenge is never detected from the page at runtime.
     CHALLENGE_ENGINES = {
         "cloudflare": "stealth_browser",
+        "akamai": "stealth_browser",
     }
 
     def __init__(

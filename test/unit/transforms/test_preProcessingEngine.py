@@ -59,6 +59,45 @@ class TestGenerateAtcUniqueId:
         assert record["unique_id"].startswith("ATC-UNKNOWN-")
 
 
+class TestGenerateCompositeId:
+    def test_reads_nested_dotted_fields(self, engine):
+        record = {
+            "source_record_id": "aaron-durnell-williams",
+            "list": {"name": "Aaron Durnell Williams"},
+            "detail": {"date_of_birth": "June 04, 1980"},
+        }
+        config = {
+            "fields": ["source_record_id", "list.name", "detail.date_of_birth"],
+            "output_field": "source_record_id",
+            "prefix": "US-MARSHALS",
+        }
+        out = engine.generate_composite_id(dict(record), config)
+
+        assert out["source_record_id"].startswith("US-MARSHALS-")
+        # 64-char sha256 hex digest after the prefix
+        digest = out["source_record_id"][len("US-MARSHALS-"):]
+        assert len(digest) == 64
+
+    def test_deterministic_and_distinct(self, engine):
+        config = {
+            "fields": ["list.name"],
+            "output_field": "id",
+            "prefix": "X",
+        }
+        a = engine.generate_composite_id({"list": {"name": "Alice"}}, config)["id"]
+        a2 = engine.generate_composite_id({"list": {"name": "Alice"}}, config)["id"]
+        b = engine.generate_composite_id({"list": {"name": "Bob"}}, config)["id"]
+
+        assert a == a2  # same input -> same id
+        assert a != b   # different input -> different id
+
+    def test_missing_nested_field_is_treated_as_empty(self, engine):
+        config = {"fields": ["detail.missing"], "output_field": "id"}
+        out = engine.generate_composite_id({"detail": {}}, config)
+        # no prefix -> bare 64-char digest, computed over the empty value
+        assert len(out["id"]) == 64
+
+
 class TestExtractNameFromUrl:
     def test_extracts_slug(self, engine):
         record = engine.extract_name_from_url(

@@ -123,19 +123,20 @@ class TestIterPages:
             3: {"items": []},
         }
 
-        def fake_get_page(_task, query):
+        def fake_get_page(_task, query, _transport=None):
             return pages[query["page"]]
 
         with patch.object(collector, "_get_page", side_effect=fake_get_page):
-            result = list(collector._iter_pages(task))
+            result = list(collector._iter_pages(task, None))
 
         assert result == [[{"id": 1}], [{"id": 2}]]
 
     def test_auth_failure_raises_immediately_without_retry(self):
         # A 401/403 will not fix itself on retry and must not look like an
-        # empty result; _get_page raises a clear error on the first attempt.
-        task = _task({"type": "page"})
-        task.retry = 3
+        # empty result. The transport now owns the HTTP call, so it is the
+        # transport that raises a clear error on the first response -- without
+        # a second request.
+        from ingestion.apiCollector import transport as transport_mod
 
         calls = {"count": 0}
 
@@ -152,9 +153,11 @@ class TestIterPages:
             calls["count"] += 1
             return _Resp()
 
-        with patch.object(collector.requests, "get", side_effect=fake_get):
+        with patch.object(transport_mod.requests, "get", side_effect=fake_get):
             with pytest.raises(RuntimeError, match="authentication failed"):
-                collector._get_page(task, {"page": 1})
+                transport_mod.RequestsTransport().get_json(
+                    "https://example.test/api", {"page": 1}
+                )
 
         assert calls["count"] == 1
 
@@ -167,13 +170,13 @@ class TestIterPages:
         full_list = [{"id": 1}, {"id": 2}]
         calls = {"count": 0}
 
-        def fake_get_page(_task, query):
+        def fake_get_page(_task, query, _transport=None):
             calls["count"] += 1
             assert "page" not in query  # no page param for single-request
             return full_list
 
         with patch.object(collector, "_get_page", side_effect=fake_get_page):
-            result = list(collector._iter_pages(task))
+            result = list(collector._iter_pages(task, None))
 
         assert result == [full_list]
         assert calls["count"] == 1
@@ -194,12 +197,12 @@ class TestIterPages:
 
         seen = []
 
-        def fake_get_page(_task, query):
+        def fake_get_page(_task, query, _transport=None):
             seen.append(query["category"])
             return [{"cat": query["category"]}]
 
         with patch.object(collector, "_get_page", side_effect=fake_get_page):
-            result = list(collector._iter_pages(task))
+            result = list(collector._iter_pages(task, None))
 
         assert seen == [
             "BLACKLISTED_ENTITIES",
@@ -219,13 +222,13 @@ class TestIterPages:
 
         calls = {"count": 0}
 
-        def fake_get_page(_task, query):
+        def fake_get_page(_task, query, _transport=None):
             calls["count"] += 1
             assert query == {"category": "X"}
             return [{"id": 1}]
 
         with patch.object(collector, "_get_page", side_effect=fake_get_page):
-            result = list(collector._iter_pages(task))
+            result = list(collector._iter_pages(task, None))
 
         assert result == [[{"id": 1}]]
         assert calls["count"] == 1

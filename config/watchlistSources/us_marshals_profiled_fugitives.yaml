@@ -1,0 +1,272 @@
+fetch_strategy: saved_html
+
+record_mode: list_detail
+
+detail_fetch_strategy: browser
+
+detail_browser:
+  headless: false
+  wait_selector: ".fugitivedetails-content"
+  timeout_seconds: 90
+  success_criteria:
+    - "Wanted"
+
+
+discovery:
+  row_selector: "div.usa-card__container.usms-most-wanted"
+  detail_link_selector: ".usa-card__footer a"
+  detail_link_attribute: "href"
+
+
+list_fields:
+  name:
+    selector: ".usa-card__heading span"
+    selector_type: css
+    value: text
+
+  wanted_in:
+    selector: ".usms-most-wanted__wanted-in"
+    selector_type: css
+    value: text
+
+  description:
+    selector: ".usms-most-wanted__description"
+    selector_type: css
+    value: text
+    multiple: true
+
+  thumbnail:
+    selector: ".usa-card__img img"
+    as_attachment: "THUMBNAIL"
+    selector_type: css
+    value: attribute
+    attribute: src
+
+
+detail_fields:
+  wanted_for:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-wanted-for')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  wanted_since:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-wanted-since')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  date_of_birth:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-date-of-birth')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  sex:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-sex')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  eyes:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-eyes')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  weight:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-weight')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  wanted_in:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-wanted-in')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  place_of_birth:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-place-of-birth')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  race_ethnicity:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-race-ethnicity')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  hair:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-hair')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  height:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-height')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  warrant_issued:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-warrant-issued')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  warrant_date:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-warrant-date')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  case_outline:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'blocknodefugitivebody')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  aliases:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-aliases')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  caution:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-caution')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  reward:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-reward')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  scar_tattoo:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-scar-tattoo')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  skin_tone:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-skin-tone')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  warrant_case_nr:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[contains(@class, 'fugitivefield-fugitive-warrant-case-nr')]
+        //div[contains(@class, 'fugitivedetails-content')]
+      )[1]))
+    value: text
+
+  related_news:
+    selector_type: xpath
+    selector: >-
+      //div[contains(@class, 'fugitivefield-fugitive-related-news')]
+      //div[contains(@class, 'fugitivedetails-content')]//a
+    fields:
+      title:
+        selector_type: xpath
+        selector: "normalize-space(string(.))"
+        value: text
+      url:
+        selector_type: xpath
+        selector: "@href"
+        value: text
+
+
+attachments:
+  - type: DETAIL_PAGE
+
+  - type: IMAGE
+    selector: ".block-field-blocknodefugitivefield-fugitive-image-asset-file img"
+    attribute: "src"
+    multiple: true
+
+  - type: DOCUMENT
+    selector: ".block-field-blocknodefugitivefield-fugitive-poster a"
+    attribute: "href"
+
+
+record_id:
+  strategy: url_regex
+  source: detail_url
+  pattern: "/([^/?#]+)$"
+
+
+storage:
+  save_listing_page: false
+  save_detail_pages: true
+
+  reuse_saved_detail_pages: true
+  minimum_detail_size_bytes: 1000
+
+  listing_role: primary
+  detail_role: attachment
+
+  detail_directory: attachments/members

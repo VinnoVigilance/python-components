@@ -18,9 +18,11 @@ from transforms.preNormalization import (
     DateFormatHandler,
     EnumHandler,
     FlattenDictHandler,
+    LanguageNameHandler,
     PreNormalizationEngine,
     RegexExtractHandler,
     RemoveListMarkersHandler,
+    SplitPatternHandler,
     get_nested_values,
     parse_path,
     set_nested_value,
@@ -56,6 +58,77 @@ class TestFlattenDictHandler:
         assert handler.normalize("already a string", "") == "already a string"
         assert handler.normalize(None, "") is None
         assert handler.normalize({}, "") == ""
+
+
+class TestSplitPatternHandler:
+    """The handler splits a field into one object per named-group MATCH, using
+    ``finditer`` so a single line that packs several values (e.g. a name with
+    many ``a.k.a.`` aliases) yields several objects, not just the first."""
+
+    RULE = r"a\.k\.a\.\s*(?P<alias>[^;)]+)"
+
+    def test_one_line_with_many_matches_yields_one_object_each(self):
+        handler = SplitPatternHandler()
+        assert handler.normalize(
+            "Afghan Support Committee (a.k.a. Ahya ul Turas; a.k.a. Jamiat Ayat)",
+            self.RULE,
+        ) == [{"alias": "Ahya ul Turas"}, {"alias": "Jamiat Ayat"}]
+
+    def test_single_match_yields_single_object(self):
+        handler = SplitPatternHandler()
+        assert handler.normalize("Group (a.k.a. Solo)", self.RULE) == [
+            {"alias": "Solo"}
+        ]
+
+    def test_unmatched_line_is_kept_whole_under_first_key(self):
+        handler = SplitPatternHandler()
+        assert handler.normalize("no markers here", self.RULE) == [
+            {"alias": "no markers here"}
+        ]
+
+    def test_underscore_group_is_matched_but_discarded(self):
+        handler = SplitPatternHandler()
+        rule = r"(?P<name>.+?)\s*\((?P<_lang>[^()]+)\)\s*$"
+        assert handler.normalize("Mohamed Ragab (Arabic)", rule) == [
+            {"name": "Mohamed Ragab"}
+        ]
+
+    def test_non_string_passes_through_unchanged(self):
+        handler = SplitPatternHandler()
+        assert handler.normalize(None, self.RULE) is None
+        assert handler.normalize(["already", "a", "list"], self.RULE) == [
+            "already",
+            "a",
+            "list",
+        ]
+
+
+class TestLanguageNameHandler:
+    """INTERPOL sends spoken languages as ISO 639-2/B codes; the handler
+    resolves each to its English name via pycountry, leaving anything it
+    cannot resolve (or a null) untouched so no value is ever dropped."""
+
+    def test_maps_iso_639_2_codes_to_english_names(self):
+        handler = LanguageNameHandler()
+        assert handler.normalize("FRE", "") == "French"
+        assert handler.normalize("GER", "") == "German"
+        assert handler.normalize("CHI", "") == "Chinese"
+
+    def test_tolerates_whitespace_and_case(self):
+        handler = LanguageNameHandler()
+        assert handler.normalize(" fre ", "") == "French"
+
+    def test_unresolvable_collective_code_passes_through_unchanged(self):
+        # ISO 639-2 collective codes (e.g. CAU Caucasian, DRA Dravidian) have
+        # no single language name -> kept as-is rather than dropped.
+        handler = LanguageNameHandler()
+        assert handler.normalize("CAU", "") == "CAU"
+        assert handler.normalize("DRA", "") == "DRA"
+
+    def test_none_and_empty_pass_through_unchanged(self):
+        handler = LanguageNameHandler()
+        assert handler.normalize(None, "") is None
+        assert handler.normalize("", "") == ""
 
 
 class TestHandlers:

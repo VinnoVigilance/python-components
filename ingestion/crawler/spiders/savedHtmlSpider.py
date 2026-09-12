@@ -161,6 +161,35 @@ class SavedHtmlSpider(GenericSpider):
                 )
             )
 
+            if record_mode == "listing_only":
+                record_id = (
+                    self._extract_record_id(detail_url)
+                    if detail_url
+                    else None
+                )
+
+                if record_id is not None:
+                    if record_id in seen_record_ids:
+                        self.logger.debug(
+                            "Skipping duplicate record: %s",
+                            record_id,
+                        )
+                        continue
+
+                    seen_record_ids.add(record_id)
+
+                record = {
+                    "source_record_id": record_id,
+                    "list": list_data,
+                }
+
+                if detail_url:
+                    record["detail_url"] = detail_url
+
+                self.records.append(record)
+                yield record
+                continue
+
             if not detail_url:
                 continue
 
@@ -179,17 +208,6 @@ class SavedHtmlSpider(GenericSpider):
                 continue
 
             seen_record_ids.add(record_id)
-
-            if record_mode == "listing_only":
-                record = {
-                    "source_record_id": record_id,
-                    "list": list_data,
-                    "detail_url": detail_url,
-                }
-
-                self.records.append(record)
-                yield record
-                continue
 
             pending_details.append(
                 {
