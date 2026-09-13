@@ -1,0 +1,203 @@
+fetch_strategy: direct
+
+record_mode: list_detail
+
+discovery:
+  row_selector: ".eumwlist .views-row"
+  detail_link_selector: ".views-field-view-node .field-content"
+  detail_link_attribute: "text"
+
+list_fields:
+  nid:
+    selector: ".views-field-nid .field-content"
+    selector_type: css
+    value: text
+
+  name:
+    selector: ".views-field-title .field-content"
+    selector_type: css
+    value: text
+
+  wanted_by_country:
+    selector: ".views-field-field-enfast-country .field-content"
+    selector_type: css
+    value: text
+
+  country_code:
+    selector: ".views-field-field-country-code .field-content"
+    selector_type: css
+    value: text
+
+  crime:
+    selector: ".views-field-field-crime .field-content"
+    selector_type: css
+    value: text
+
+  status:
+    selector: ".views-field-field-status .field-content"
+    selector_type: css
+    value: text
+
+  years_sentenced:
+    selector: ".views-field-field-years-sentenced .field-content"
+    selector_type: css
+    value: text
+
+  has_reward:
+    selector: ".views-field-field-reward .field-content"
+    selector_type: css
+    value: text
+
+  probable_locations:
+    selector: ".views-field-field-propable-locations .field-content"
+    selector_type: css
+    value: text
+
+  arrested_info:
+    selector: ".views-field-field-arrested-info .field-content"
+    selector_type: css
+    value: text
+
+  is_dangerous:
+    selector: ".views-field-field-is-dangerous .field-content"
+    selector_type: css
+    value: text
+
+  picture_thumbnail:
+    selector: ".views-field-field-picture .field-content"
+    selector_type: css
+    value: text
+    as_attachment: Thumbnail
+
+detail_fields:
+  gender:
+    selector: ".field--name-field-gender .field__item"
+    selector_type: css
+    value: text
+
+  approximate_height:
+    selector: ".field--name-field-approximate-height .field__item"
+    selector_type: css
+    value: text
+
+  eye_colour:
+    selector: ".field--name-field-eye-colour .field__item"
+    selector_type: css
+    value: text
+
+  distinguishing_marks:
+    selector: ".field--name-field-characteristics .field__item"
+    selector_type: css
+    value: text
+    multiple: true
+
+  date_of_birth:
+    selector: "//div[contains(@class, 'field--name-field-date-of-birth')]//time/@datetime"
+    selector_type: xpath
+    value: text
+
+  nationality:
+    selector: ".field--name-field-nationality .field__item"
+    selector_type: css
+    value: text
+    multiple: true
+
+  alias:
+    selector: ".field--name-field-alias .field__item"
+    selector_type: css
+    value: text
+    multiple: true
+
+  ethnic_origin:
+    selector: ".field--name-field-ethnic-origin .field__item"
+    selector_type: css
+    value: text
+
+  languages:
+    selector: ".field--name-field-languages .field__item"
+    selector_type: css
+    value: text
+    multiple: true
+
+  description:
+    selector: ".field--node-body p"
+    selector_type: css
+    value: text
+    multiple: true
+    join: " "
+
+  reporting_phone:
+    selector: ".field--name-field-enfast-telephone-number"
+    selector_type: css
+    value: text
+    multiple: true
+
+  national_reference_title:
+    selector: ".field--name-field-national-wanted-site-refer a"
+    selector_type: css
+    value: text
+
+  national_reference_url:
+    selector: "//div[contains(@class, 'field--name-field-national-wanted-site-refer')]//a/@href"
+    selector_type: xpath
+    value: text
+
+  state_of_case:
+    selector: ".field--name-field-state-of-case .field__item"
+    selector_type: css
+    value: text
+
+  reward_amount:
+    selector: ".field--name-field-reward-amount .field__item"
+    selector_type: css
+    value: text
+
+  reward_currency:
+    selector: ".field--name-field-reward-currency"
+    selector_type: css
+    value: text
+
+  reward_info:
+    selector: ".field--name-field-reward-info"
+    selector_type: css
+    value: text
+
+  published:
+    selector: ".field--name-field-w-last-name .field__item"
+    selector_type: css
+    value: text
+
+attachments:
+  - type: Profile
+    role: detail_page
+
+  - type: Photograph
+    selector: ".field--name-field-picture img"
+    attribute: "src"
+    multiple: true
+    metadata:
+      date:
+        attribute: "title"
+        pattern: "[0-9]{4}"
+
+  - type: Poster
+    selector: "a[href*='/print/pdf/node/']"
+    attribute: "href"
+
+  - type: Reference
+    selector: ".field--name-field-national-wanted-site-refer a"
+    attribute: "href"
+
+record_id:
+  strategy: url_regex
+  source: detail_url
+  pattern: "/([^/?#]+)$"
+
+storage:
+  save_listing_page: true
+  save_detail_pages: true
+
+  listing_role: primary
+  detail_role: attachment
+
+  detail_directory: attachments/members

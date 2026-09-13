@@ -472,6 +472,37 @@ WATCHLIST_CONFIGS = {
             }
         ],
     },
+    "EU-MOST-WANTED": {
+        "source_name": "EU",
+        "date_order": "MDY",
+        "list_name": "EU-MOST-WANTED",
+        "download_method": "CRAWLER",
+        "url": "https://eumostwanted.eu/",
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/eu_most_wanted.yaml",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["list.nid"],
+                    "output_field": "source_record_id",
+                    "hash": False,
+                },
+            },
+        ],
+    },
     "GPPB-BLACKLISTED-ENTITIES": {
         "source_name": "GPPB",
         "date_order": "YMD",
