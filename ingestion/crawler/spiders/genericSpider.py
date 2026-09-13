@@ -117,9 +117,12 @@ class GenericSpider(scrapy.Spider):
         if not selector:
             return None
 
-        href = row.css(f"{selector}::attr({attribute})").get()
+        if attribute == "text":
+            href = row.css(f"{selector}::text").get()
+        else:
+            href = row.css(f"{selector}::attr({attribute})").get()
 
-        return response.urljoin(href) if href else None
+        return response.urljoin(href.strip()) if href else None
 
     def _extract_fields(
         self,
@@ -260,17 +263,23 @@ class GenericSpider(scrapy.Spider):
     def _extract_attachments(self, response, detail_url):
         attachments = []
 
+        detail_type = "DETAIL_PAGE"
+        selector_configs = []
+
+        for config in self.config.get("attachments", []):
+            if config.get("role") == "detail_page" or config.get("type") == "DETAIL_PAGE":
+                detail_type = config.get("type", "DETAIL_PAGE")
+            else:
+                selector_configs.append(config)
+
         attachments.append(
             {
-                "type": "DETAIL_PAGE",
+                "type": detail_type,
                 "url": detail_url,
             }
         )
 
-        for config in self.config.get("attachments", []):
-            if config["type"] == "DETAIL_PAGE":
-                continue
-
+        for config in selector_configs:
             selector = config.get("selector")
 
             if not selector:
@@ -292,12 +301,19 @@ class GenericSpider(scrapy.Spider):
 
                     seen.add(url)
 
-                    attachments.append(
-                        {
-                            "type": config["type"],
-                            "url": response.urljoin(url),
-                        }
+                    attachment = {
+                        "type": config["type"],
+                        "url": response.urljoin(url),
+                    }
+
+                    metadata = self._extract_attachment_metadata(
+                        node, config.get("metadata")
                     )
+
+                    if metadata:
+                        attachment["metadata"] = metadata
+
+                    attachments.append(attachment)
 
                 continue
 
@@ -314,6 +330,33 @@ class GenericSpider(scrapy.Spider):
                 )
 
         return attachments
+
+    def _extract_attachment_metadata(self, node, metadata_config):
+        """Per-attachment metadata from a node's attributes; a rule's optional
+        `pattern` keeps the value only when it matches (e.g. a photo date)."""
+        if not metadata_config:
+            return None
+
+        metadata = {}
+
+        for key, spec in metadata_config.items():
+            attribute = spec.get("attribute")
+            value = self._clean_text(node.attrib.get(attribute)) if attribute else None
+
+            pattern = spec.get("pattern")
+
+            if value and pattern:
+                match = re.search(pattern, value)
+                value = (
+                    (match.group(1) if match.groups() else match.group(0))
+                    if match
+                    else None
+                )
+
+            if value:
+                metadata[key] = value
+
+        return metadata or None
 
     @staticmethod
     def _clean_text(value):
