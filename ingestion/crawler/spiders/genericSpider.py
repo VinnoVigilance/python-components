@@ -30,8 +30,15 @@ class GenericSpider(scrapy.Spider):
         if not row_selector:
             raise ValueError("row_selector is required")
 
+        page_fields = self.config.get("page_fields", {})
+        page_data = self._extract_fields(response, page_fields) if page_fields else {}
+
         for row in response.css(row_selector):
             list_data = self._extract_fields(row, self.config.get("list_fields", {}))
+
+            if page_data:
+                list_data = {**page_data, **list_data}
+
             detail_url = self._extract_detail_url(row, response)
 
             if not detail_url:
