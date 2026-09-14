@@ -19,6 +19,7 @@ class GenericSpider(scrapy.Spider):
         yield scrapy.Request(url=self._build_start_url(), callback=self.parse, dont_filter=True)
 
     def parse(self, response):
+        self.current_url = response.url
         storage_config = self.config.get("storage", {})
 
         if storage_config.get("save_listing_page", False):
