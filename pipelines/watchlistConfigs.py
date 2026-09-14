@@ -472,6 +472,26 @@ WATCHLIST_CONFIGS = {
             }
         ],
     },
+    "EU-MOST-WANTED": {
+        "source_name": "EU",
+        "date_order": "MDY",
+        "list_name": "EU-MOST-WANTED",
+        "download_method": "CRAWLER",
+        "url": "https://eumostwanted.eu/",
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/eu_most_wanted.yaml",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+    },
     "GPPB-BLACKLISTED-ENTITIES": {
         "source_name": "GPPB",
         "date_order": "YMD",
@@ -988,6 +1008,46 @@ WATCHLIST_CONFIGS = {
                 "min_size_bytes": 10000,
             },
         },
+    },
+
+    "NCA-MOST-WANTED": {
+        "source_name": "NCA",
+        "date_order": "YMD",
+        "list_name": "NCA-MOST-WANTED",
+        "download_method": "CRAWLER",
+        "url": (
+            "https://www.nationalcrimeagency.gov.uk/most-wanted-search"
+            "?view=search&layout=mostwanted&area=mostwanted"
+            "&menuarea=mostwanted"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/nca_most_wanted.yaml",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "list.name",
+                        "detail.crime",
+                        "detail.date_of_incident",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "NCA",
+                },
+            },
+        ],
     },
 
 }

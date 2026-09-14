@@ -19,6 +19,7 @@ class GenericSpider(scrapy.Spider):
         yield scrapy.Request(url=self._build_start_url(), callback=self.parse, dont_filter=True)
 
     def parse(self, response):
+        self.current_url = response.url
         storage_config = self.config.get("storage", {})
 
         if storage_config.get("save_listing_page", False):
@@ -29,14 +30,21 @@ class GenericSpider(scrapy.Spider):
         if not row_selector:
             raise ValueError("row_selector is required")
 
+        page_fields = self.config.get("page_fields", {})
+        page_data = self._extract_fields(response, page_fields) if page_fields else {}
+
         for row in response.css(row_selector):
             list_data = self._extract_fields(row, self.config.get("list_fields", {}))
+
+            if page_data:
+                list_data = {**page_data, **list_data}
+
             detail_url = self._extract_detail_url(row, response)
 
             if not detail_url:
                 continue
 
-            record_id = self._extract_record_id(detail_url)
+            record_id = self._extract_record_id(detail_url, list_data)
 
             if not record_id:
                 continue
@@ -117,9 +125,12 @@ class GenericSpider(scrapy.Spider):
         if not selector:
             return None
 
-        href = row.css(f"{selector}::attr({attribute})").get()
+        if attribute == "text":
+            href = row.css(f"{selector}::text").get()
+        else:
+            href = row.css(f"{selector}::attr({attribute})").get()
 
-        return response.urljoin(href) if href else None
+        return response.urljoin(href.strip()) if href else None
 
     def _extract_fields(
         self,
@@ -242,35 +253,46 @@ class GenericSpider(scrapy.Spider):
 
         return cleaned_values[0] if cleaned_values else None
 
-    def _extract_record_id(self, detail_url):
+    def _extract_record_id(self, detail_url, list_data):
         record_config = self.config.get("record_id", {})
+        strategy = record_config.get("strategy")
 
-        if record_config.get("strategy") != "url_regex":
-            raise ValueError("Only url_regex is currently supported")
+        if strategy == "field":
+            value = list_data.get(record_config.get("source"))
+            return str(value).strip() if value else None
 
-        pattern = record_config.get("pattern")
+        if strategy == "url_regex":
+            pattern = record_config.get("pattern")
 
-        if not pattern:
-            return None
+            if not pattern:
+                return None
 
-        match = re.search(pattern, detail_url)
+            match = re.search(pattern, detail_url)
 
-        return match.group(1) if match else None
+            return match.group(1) if match else None
+
+        raise ValueError(f"Unsupported record_id strategy: {strategy}")
 
     def _extract_attachments(self, response, detail_url):
         attachments = []
 
+        detail_type = "DETAIL_PAGE"
+        selector_configs = []
+
+        for config in self.config.get("attachments", []):
+            if config.get("role") == "detail_page" or config.get("type") == "DETAIL_PAGE":
+                detail_type = config.get("type", "DETAIL_PAGE")
+            else:
+                selector_configs.append(config)
+
         attachments.append(
             {
-                "type": "DETAIL_PAGE",
+                "type": detail_type,
                 "url": detail_url,
             }
         )
 
-        for config in self.config.get("attachments", []):
-            if config["type"] == "DETAIL_PAGE":
-                continue
-
+        for config in selector_configs:
             selector = config.get("selector")
 
             if not selector:
@@ -292,12 +314,19 @@ class GenericSpider(scrapy.Spider):
 
                     seen.add(url)
 
-                    attachments.append(
-                        {
-                            "type": config["type"],
-                            "url": response.urljoin(url),
-                        }
+                    attachment = {
+                        "type": config["type"],
+                        "url": response.urljoin(url),
+                    }
+
+                    metadata = self._extract_attachment_metadata(
+                        node, config.get("metadata")
                     )
+
+                    if metadata:
+                        attachment["metadata"] = metadata
+
+                    attachments.append(attachment)
 
                 continue
 
@@ -314,6 +343,33 @@ class GenericSpider(scrapy.Spider):
                 )
 
         return attachments
+
+    def _extract_attachment_metadata(self, node, metadata_config):
+        """Per-attachment metadata from a node's attributes; a rule's optional
+        `pattern` keeps the value only when it matches (e.g. a photo date)."""
+        if not metadata_config:
+            return None
+
+        metadata = {}
+
+        for key, spec in metadata_config.items():
+            attribute = spec.get("attribute")
+            value = self._clean_text(node.attrib.get(attribute)) if attribute else None
+
+            pattern = spec.get("pattern")
+
+            if value and pattern:
+                match = re.search(pattern, value)
+                value = (
+                    (match.group(1) if match.groups() else match.group(0))
+                    if match
+                    else None
+                )
+
+            if value:
+                metadata[key] = value
+
+        return metadata or None
 
     @staticmethod
     def _clean_text(value):

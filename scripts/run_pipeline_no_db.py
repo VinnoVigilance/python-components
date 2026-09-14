@@ -1,226 +1,44 @@
-"""
-Run the full watchlist transform pipeline WITHOUT a database.
+"""Run the full transform chain for ONE watchlist, DB-free.
 
-This chains the pipeline's own real stages -- the same parser, preprocessing
-engine, and normalization engines that services/watchlistPipeline uses -- and
-writes the canonical output to data/final/<LIST_NAME>_final.jsonl.
-
-The only thing it always skips is the DB handoff (raw-layer insert + core-layer
-upsert). It has two modes, chosen automatically from the source's
-download_method:
-  * file (default): reads the most recent already-downloaded source file under
-    data/downloads/ and parses it by file_type -- fully offline.
-  * crawler (CRAWLER sources, e.g. CFTC): the records are produced by the
-    generic crawler from the source yaml (listing + per-entry detail pages),
-    which has no single re-parseable file, so this mode runs the spider. It
-    still skips the DB, but unlike file mode it does hit the network.
+Chains the pipeline's real stages via the shared harness:
+    extract -> preprocess -> prenorm -> map -> postnorm
+snapshotting each to data/raw/ and data/final/ (previous testing layout). --to stops
+early (e.g. before mapping rules exist). For crawler sources the spider does extract;
+everything else parses the latest download.
 
 Usage:
-    python -m scripts.run_pipeline_no_db EU-FINANCIAL-SANCTIONS
-    python -m scripts.run_pipeline_no_db EU-FINANCIAL-SANCTIONS --source-file <path>
-    python -m scripts.run_pipeline_no_db CFTC-RED-LIST   # crawler mode
+    python -m scripts.run_pipeline_no_db EU-MOST-WANTED
+    python -m scripts.run_pipeline_no_db EU-MOST-WANTED --to preprocess
+    python -m scripts.run_pipeline_no_db DFAT --source-file <path> --preview
 """
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from collections import Counter
-from copy import deepcopy
 from pathlib import Path
 
-# Allow running by path (`python scripts/run_pipeline_no_db.py`) as well as
-# by module (`python -m scripts.run_pipeline_no_db`): put the repo root on
-# sys.path so first-party packages import either way.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ingestion.crawler.interface import crawl
-from ingestion.crawler.models import CrawlerTask
-from ingestion.downloader import interface as downloader
-from parsing.parserFactory import create_parser
-from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
-from services.watchlistPipeline import watchlistFileService
-from services.watchlistPipeline.watchlistNormalizationService import (
-    create_normalization_engines,
-    normalize_record,
-)
-from transforms.preProcessingEngine import PreProcessingEngine
-
-ROOT = Path(__file__).resolve().parents[1]
-DOWNLOADS = ROOT / "data" / "downloads"
-RAW_DIR = ROOT / "data" / "raw"
-FINAL_DIR = ROOT / "data" / "final"
-
-
-def find_latest_source_file(list_name: str, source_name: str) -> Path:
-    """Pick the most recently modified downloaded listing file for this list.
-
-    Files under an ``attachments`` folder (saved detail/profile pages) are
-    excluded so a spider source's saved profiles are never mistaken for the
-    listing page.
-    """
-    candidates: list[Path] = []
-    for base in (DOWNLOADS / source_name / list_name, DOWNLOADS / list_name):
-        if base.exists():
-            candidates += [
-                p
-                for p in base.rglob("*")
-                if p.is_file() and "attachments" not in p.parts
-            ]
-    if not candidates:
-        raise FileNotFoundError(
-            f"No downloaded source file found for {list_name} under {DOWNLOADS}"
-        )
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+from scripts._harness import STAGES, run_chain
 
 
 def main(argv=None) -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("watchlist", help="e.g. EU-FINANCIAL-SANCTIONS")
-    ap.add_argument("--source-file", default=None, help="override the input file (file mode only)")
-    ap.add_argument("--no-normalize", action="store_true",
-                    help="stop after preprocessing: write <list>_preprocessed.jsonl and skip normalization "
-                         "(use while mapping rules are not built yet)")
-    ap.add_argument("--records-file", default=None,
-                    help="read already-extracted records from this .jsonl and SKIP extraction "
-                         "(no spider/no network); use data/raw/<list>_extracted.jsonl from a previous run")
-    args = ap.parse_args(argv)
+    parser = argparse.ArgumentParser(description="Full DB-free transform chain for one list.")
+    parser.add_argument("list_name", help="key in WATCHLIST_CONFIGS")
+    parser.add_argument("--to", choices=STAGES[1:], default="postnorm", help="stop after this stage")
+    parser.add_argument("--source-file", default=None, help="parse this exact file (file sources)")
+    parser.add_argument("--preview", action="store_true", help="print the first --limit records per stage")
+    parser.add_argument("--limit", type=int, default=3)
+    args = parser.parse_args(argv)
 
-    config = WATCHLIST_CONFIGS[args.watchlist]
-    list_name = config["list_name"]
-    download_method = str(config.get("download_method", "")).upper()
-    extraction_method = str(config.get("extraction_method", "")).upper()
-
-    # --- Stage 1: ACQUIRE + PARSE (two DB-less modes) ---
-    # crawler sources (e.g. CFTC) have no single re-parseable file: their
-    # extraction lives in the source yaml (listing + per-entry detail pages), so
-    # the generic crawler produces the records itself. Everything else reads the
-    # latest already-downloaded file and parses it by file_type, no network.
-    if args.records_file:
-        records_path = Path(args.records_file)
-        if not records_path.is_file():
-            raise FileNotFoundError(f"--records-file not found: {records_path}")
-        print("Mode        : records-file (skips extraction, no spider/network)")
-        print(f"Records file: {records_path}")
-        with records_path.open(encoding="utf-8") as fh:
-            parsed_records = [json.loads(line) for line in fh if line.strip()]
-        source_file = None
-    elif download_method == "CRAWLER":
-        source_config = config.get("source_config")
-        if not source_config:
-            raise ValueError(
-                f"Crawler source '{list_name}' must define 'source_config'."
-            )
-        print("Mode        : crawler (runs the spider, still DB-less)")
-        task = CrawlerTask(
-            url=config["url"],
-            source_name=config["source_name"],
-            list_name=list_name,
-            source_config_path=source_config,
-            download_dir=str(DOWNLOADS),
-        )
-        crawl_result = crawl(task)
-        parsed_records = list(crawl_result.records or [])
-        source_file = (
-            Path(crawl_result.source_file_path)
-            if crawl_result.source_file_path
-            else None
-        )
-        print(f"Source file : {source_file}")
-    elif extraction_method == "SAVED_HTML_SPIDER":
-        source_config = config.get("source_config")
-        if not source_config:
-            raise ValueError(
-                f"SAVED_HTML_SPIDER source '{list_name}' must define 'source_config'."
-            )
-        if args.source_file:
-            print("Mode        : saved_html_spider (given --source-file listing)")
-            source_file = Path(args.source_file)
-        else:
-            print("Mode        : saved_html_spider (acquire listing, then spider fetches profiles)")
-            acquisition = watchlistFileService.acquire_source(
-                config=config,
-                downloader=downloader,
-            )
-            source_file = Path(acquisition.source_file_path)
-        print(f"Source file : {source_file}")
-        task = CrawlerTask(
-            url=config["url"],
-            source_name=config["source_name"],
-            list_name=list_name,
-            source_config_path=str((ROOT / source_config).resolve()),
-            source_file_path=str(source_file),
-            download_dir=str(DOWNLOADS),
-        )
-        crawl_result = crawl(task)
-        parsed_records = list(crawl_result.records or [])
-    else:
-        print("Mode        : file (parses latest download, offline)")
-        source_file = (
-            Path(args.source_file)
-            if args.source_file
-            else find_latest_source_file(list_name, config["source_name"])
-        )
-        print(f"Source file : {source_file}")
-        parser = create_parser(file_type=config["file_type"])
-        parsed_records = list(parser.parse(file_path=source_file, config=config))
-
-    print(f"Parsed      : {len(parsed_records)} records")
-
-    # Snapshot the extracted records so preprocessing can be re-run offline
-    # later via --records-file (no spider/network).
-    if not args.records_file:
-        RAW_DIR.mkdir(parents=True, exist_ok=True)
-        extracted_path = RAW_DIR / f"{list_name}_extracted.jsonl"
-        with open(extracted_path, "w", encoding="utf-8") as fout:
-            for rec in parsed_records:
-                fout.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        print(f"Extracted   : {len(parsed_records)} records -> {extracted_path}")
-
-    # --- Stage 2: PREPROCESS (real engine) ---
-    preprocessing_rules = deepcopy(config.get("preprocessing", []))
-    for rule in preprocessing_rules:
-        rule_config = rule.get("config", {})
-        for path_field in rule.get("relative_path_fields", []):
-            rel = rule_config.get(path_field)
-            if rel and source_file is not None:
-                rule_config[path_field] = str(source_file.parent / rel)
-    processed_records = PreProcessingEngine().preprocess(
-        records=parsed_records, rules=preprocessing_rules
+    run_chain(
+        args.list_name,
+        source_file=args.source_file,
+        stop=args.to,
+        preview=args.preview,
+        limit=args.limit,
     )
-    print(f"Preprocessed: {len(processed_records)} records")
-
-    if args.no_normalize:
-        FINAL_DIR.mkdir(parents=True, exist_ok=True)
-        out_path = FINAL_DIR / f"{list_name}_preprocessed.jsonl"
-        with open(out_path, "w", encoding="utf-8") as fout:
-            for rec in processed_records:
-                fout.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        print(f"Wrote       : {len(processed_records)} preprocessed records -> {out_path}")
-        return
-
-    # --- Stage 3: NORMALIZE (real engines) -> JSONL instead of DB ---
-    pre, mapper, post = create_normalization_engines(config)
-    FINAL_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = FINAL_DIR / f"{list_name}_final.jsonl"
-
-    counts: Counter = Counter()
-    n = 0
-    with open(out_path, "w", encoding="utf-8") as fout:
-        for rec in processed_records:
-            canonical = normalize_record(rec, config, pre, mapper, post)
-            counts[canonical.get("EntityType")] += 1
-            fout.write(json.dumps(canonical, ensure_ascii=False) + "\n")
-            n += 1
-
-    print(f"Wrote       : {n} canonical records -> {out_path}")
-    print(f"EntityType  : {dict(counts)}")
 
 
 if __name__ == "__main__":
-    # Quick way to run from an editor / a plain `python run_pipeline_no_db.py`:
-    # set the list name here and run the file. A name passed on the command line
-    # still wins (e.g. `python -m scripts.run_pipeline_no_db DMW-RECRUITMENT-AGENCIES`).
-    WATCHLIST = "CFTC-RED-LIST"
-
-    main() if len(sys.argv) > 1 else main([WATCHLIST])
+    main()
