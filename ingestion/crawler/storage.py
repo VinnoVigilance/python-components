@@ -55,7 +55,7 @@ class CrawlerStorage:
 
         self.source_file_path = (
             self.base_path
-            / f"{list_name}.html"
+            / f"{list_name}_{now:%Y%m%d_%H%M%S}.html"
         )
 
     def save_source_html(
