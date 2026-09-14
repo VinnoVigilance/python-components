@@ -20,6 +20,29 @@ The service turns config into a typed `CrawlerTask`; the spider takes the Task,
 never the raw config (see `CLAUDE.md` §1). Add behaviour by **data in the yaml**,
 not new spider branches.
 
+### Changing `genericSpider.py` / `storage.py` — the bar is high, and it matters
+
+These are **reusable, list-agnostic layers**. Onboarding a new list should need
+**zero** changes here — a new list is a new yaml + mapping rows, nothing more.
+Before editing either file, be ready to answer a reviewer: *why can't the existing
+spider do this from the yaml, and why isn't this a mapping/data change?*
+
+- **Fixed boilerplate → mapping `constant`; live page-level content → `page_fields`.**
+  If a value is a standing string that never changes and you don't care whether it
+  drifts, a `mapping.xlsx` `constant` is simplest and needs no scraping. If you want
+  the value pulled **live from the source** (so it stays faithful and updates if the
+  site reworries it), use the generic **`page_fields`** yaml section — it is scraped
+  **once** from the listing page and merged into every record's `list.*`. Both are
+  fine; the wrong move is a **list-specific** branch in the spider — keep any spider
+  change generic and yaml-driven (`CLAUDE.md` §1).
+- **Per-record values the spider "can't reach"** (listing vs detail page, an
+  attribute, a repeating field) are almost always a **selector / yaml** problem,
+  not a code problem — see §2.
+- **If you genuinely must change the reusable layer**, it is its **own** justified
+  commit (`refactor(...)` / `feat(...)`) with a test — never smuggled inside an
+  "onboard list X" change. A tweak the onboarded list doesn't even use (e.g.
+  tidying a `storage.py` branch) does **not** belong in that list's PR.
+
 ### yaml anatomy
 ```yaml
 discovery:            # how to find the rows + the link to each detail page
