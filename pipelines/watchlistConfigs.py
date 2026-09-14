@@ -1010,4 +1010,44 @@ WATCHLIST_CONFIGS = {
         },
     },
 
+    "NCA-MOST-WANTED": {
+        "source_name": "NCA",
+        "date_order": "YMD",
+        "list_name": "NCA-MOST-WANTED",
+        "download_method": "CRAWLER",
+        "url": (
+            "https://www.nationalcrimeagency.gov.uk/most-wanted-search"
+            "?view=search&layout=mostwanted&area=mostwanted"
+            "&menuarea=mostwanted"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/nca_most_wanted.yaml",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "list.name",
+                        "detail.crime",
+                        "detail.date_of_incident",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "NCA",
+                },
+            },
+        ],
+    },
+
 }
