@@ -12,7 +12,7 @@ import requests
 
 from .browserTransport import BrowserTransport
 from .faceting import plan_fanout
-from .models import ApiCollectorTask
+from .models import ApiCollectionResult, ApiCollectorTask
 from .pagination import (
     build_query,
     extract_items,
@@ -64,6 +64,21 @@ def collect_source(task: ApiCollectorTask) -> str:
     return str(output_path)
 
 
+def collect_artifacts(task: ApiCollectorTask) -> ApiCollectionResult:
+    """Collect a multi-file API source and return its raw file paths."""
+
+    if task.write_mode != "record_files":
+        raise ValueError(
+            "collect_artifacts() requires write_mode=record_files"
+        )
+
+    collected_at = datetime.now()
+    transport = _build_transport(task)
+
+    with transport:
+        return _collect_record_files(task, transport, collected_at)
+
+
 def _collect_list_detail(
     task: ApiCollectorTask,
     transport: Any,
@@ -105,6 +120,49 @@ def _collect_list_detail(
     logger.info(f"{task.list_name}: saved {saved} profiles under {members_dir}")
 
     return str(overview_path)
+
+
+def _collect_record_files(
+    task: ApiCollectorTask,
+    transport: Any,
+    collected_at: datetime,
+) -> ApiCollectionResult:
+    """Write each collected API record to its own JSON file."""
+
+    if not task.record_id_path:
+        raise ValueError(
+            "record_id_path is required when write_mode=record_files"
+        )
+
+    output_dir = _list_detail_base_dir(task, collected_at)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    total_hint = _startup_probe(task, transport)
+    pages = _iter_pages(task, transport)
+
+    if task.dedup_path:
+        pages = _dedup_pages(pages, task.dedup_path)
+
+    pages = _log_progress(pages, total_hint, task.list_name)
+
+    file_paths = _write_record_files(
+        pages=pages,
+        output_dir=output_dir,
+        record_id_path=task.record_id_path,
+    )
+
+    written = len(file_paths)
+
+    logger.info(
+        f"{task.list_name}: wrote {written} individual JSON files to "
+        f"{output_dir}"
+    )
+    _check_completeness(task, written, total_hint)
+
+    return ApiCollectionResult(
+        file_paths=file_paths,
+        record_count=written,
+    )
 
 
 def _fetch_profiles(
@@ -569,3 +627,45 @@ def _write_single_jsonl(
                 written += 1
 
     return written
+
+
+def _write_record_files(
+    pages: Iterable[List[Any]],
+    output_dir: Path,
+    record_id_path: str,
+) -> List[str]:
+    """Write one JSON file per unique record id and return their paths."""
+
+    file_paths: List[str] = []
+    seen_record_ids = set()
+
+    for items in pages:
+        for item in items:
+            record_id = read_path(item, record_id_path)
+
+            if record_id is None or str(record_id).strip() == "":
+                raise ValueError(
+                    f"Missing record id at path: {record_id_path}"
+                )
+
+            normalized_id = str(record_id).strip()
+
+            if normalized_id in seen_record_ids:
+                logger.warning(
+                    f"Duplicate record id ignored: {normalized_id}"
+                )
+                continue
+
+            seen_record_ids.add(normalized_id)
+
+            filename = f"{_safe_member_filename(normalized_id)}.json"
+            file_path = output_dir / filename
+
+            file_path.write_text(
+                json.dumps(item, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            file_paths.append(str(file_path))
+
+    return file_paths

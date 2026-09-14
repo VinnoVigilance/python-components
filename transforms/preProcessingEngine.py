@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import re
+from string import Formatter
 from urllib.parse import unquote, urlparse
 
 from nameparser import HumanName
@@ -392,6 +393,67 @@ class PreProcessingEngine:
 
         if overwrite or is_empty:
             record[output_field] = value
+
+        return record
+
+    def build_url_from_template(self, record, config):
+        output_field = config.get(
+            "output_field",
+            "SourceURL",
+        )
+
+        template = config.get(
+            "template"
+        )
+
+        if not template:
+            raise ValueError(
+                "build_url_from_template requires template."
+            )
+
+        overwrite = config.get(
+            "overwrite",
+            False,
+        )
+
+        current_value = record.get(
+            output_field
+        )
+
+        if (
+            not overwrite
+            and current_value is not None
+            and str(current_value).strip()
+        ):
+            return record
+
+        template_fields = {
+            field_name
+            for _, field_name, _, _
+            in Formatter().parse(template)
+            if field_name
+        }
+
+        missing_fields = [
+            field_name
+            for field_name in template_fields
+            if (
+                record.get(field_name) is None
+                or str(
+                    record.get(field_name)
+                ).strip() == ""
+            )
+        ]
+
+        if missing_fields:
+            raise ValueError(
+                "Cannot build URL. Missing template "
+                f"field(s): {', '.join(sorted(missing_fields))}"
+            )
+
+        record[output_field] = (
+            template.format_map(record)
+        )
 
         return record
 

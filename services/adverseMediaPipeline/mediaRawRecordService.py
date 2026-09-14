@@ -7,6 +7,33 @@ from transforms.preProcessingEngine import PreProcessingEngine
 
 class MediaRawRecordService:
 
+    def process_acquired_record(
+        self,
+        source_config: dict[str, Any],
+        acquired_record: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+
+        extracted = acquired_record.get(
+            "extracted"
+        )
+
+        if extracted:
+            return self.process(
+                source_config=source_config,
+                records=[
+                    extracted
+                ],
+            )
+
+        return self.process(
+            source_config=source_config,
+            source_file_path=(
+                acquired_record.get(
+                    "detail_file_path"
+                )
+            ),
+        )
+
     def process(
         self,
         source_config: dict[str, Any],

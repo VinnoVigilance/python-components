@@ -109,3 +109,60 @@ sources:
           - source_name
           - dataset_name
           - SourceRecordId
+
+  AMLC_NEWS_AND_ANNOUNCEMENTS:
+    enabled: true
+    active: true
+
+    source_name: AMLC
+    dataset_name: AMLC_NEWS_AND_ANNOUNCEMENTS
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+    date_order: YMD
+
+    source_page_url: https://www.amlc.gov.ph/news-and-announcements
+
+    url: https://www.amlc.gov.ph/api/news/combined/feed
+
+    acquisition:
+      type: api
+      download_method: API
+
+    api_config:
+      pagination:
+        type: page
+        page_param: page
+        size_param: limit
+        page_size: 100
+        start_page: 1
+
+      items_path: data
+
+      write_mode: record_files
+      record_id_path: id
+
+      transport: requests
+      timeout: 30
+      retry: 3
+      throttle_delay: 0.2
+
+    parser:
+      type: json
+
+    identity:
+      external_id:
+        field: id
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - id
+
+    preprocessing:
+      - handler: build_url_from_template
+        level: record
+        config:
+          output_field: SourceURL
+          template: "https://www.amlc.gov.ph/news-and-announcements/{id}?type={type}"

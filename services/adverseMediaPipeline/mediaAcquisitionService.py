@@ -6,6 +6,11 @@ from infrastructure.database.connection import (
     connection_pool,
 )
 
+from ingestion.apiCollector.interface import (
+    ApiCollectorTask,
+    collect_artifacts,
+)
+
 from ingestion.crawler.interface import (
     crawl,
 )
@@ -56,9 +61,8 @@ class MediaAcquisitionService:
     Flow:
 
         Resolve lookup values
-        -> Discovery
-        -> Crawl
-        -> Save local HTML
+        -> Acquire through Crawler or API
+        -> Save local raw file
         -> Build file metadata
         -> Calculate file_hash
         -> Duplicate check
@@ -101,11 +105,17 @@ class MediaAcquisitionService:
             )
         )
 
+        acquisition_type = (
+            self._get_acquisition_type(
+                source_config
+            )
+        )
+
         download_method = (
             str(
                 acquisition_config.get(
                     "download_method",
-                    "CRAWLER",
+                    acquisition_type,
                 )
             )
             .strip()
@@ -157,18 +167,16 @@ class MediaAcquisitionService:
         )
 
         # =================================================
-        # 4. Crawl
+        # 4. Acquire source files
         # =================================================
 
-        crawl_result = (
-            self._crawl_source(
+        acquired_records = (
+            self._acquire_source(
                 source_config=source_config,
+                acquisition_type=acquisition_type,
                 source_id=source_id,
                 dataset_id=dataset_id,
                 known_threshold=known_threshold,
-                source_name=source_name,
-                dataset_name=dataset_name,
-                source_url=source_url,
             )
         )
 
@@ -184,7 +192,7 @@ class MediaAcquisitionService:
         duplicate_count = 0
         failed_count = 0
 
-        for record in crawl_result.records:
+        for record in acquired_records:
 
             try:
                 processed_record = (
@@ -195,6 +203,7 @@ class MediaAcquisitionService:
                         source_name=source_name,
                         dataset_name=dataset_name,
                         download_method=download_method,
+                        acquisition_url=source_url,
                     )
                 )
 
@@ -250,7 +259,7 @@ class MediaAcquisitionService:
             dataset_id=dataset_id,
 
             discovered_count=len(
-                crawl_result.records
+                acquired_records
             ),
 
             stored_count=stored_count,
@@ -320,8 +329,54 @@ class MediaAcquisitionService:
             )
 
     # =====================================================
-    # Crawl
+    # Acquire
     # =====================================================
+
+    @staticmethod
+    def _acquire_source(
+        source_config: dict[str, Any],
+        acquisition_type: str,
+        source_id: int,
+        dataset_id: int,
+        known_threshold: int,
+    ) -> list[dict[str, Any]]:
+
+        if acquisition_type == "crawler":
+            crawl_result = (
+                MediaAcquisitionService
+                ._crawl_source(
+                    source_config=source_config,
+                    source_id=source_id,
+                    dataset_id=dataset_id,
+                    known_threshold=(
+                        known_threshold
+                    ),
+                    source_name=source_config[
+                        "source_name"
+                    ],
+                    dataset_name=source_config[
+                        "dataset_name"
+                    ],
+                    source_url=source_config[
+                        "url"
+                    ],
+                )
+            )
+
+            return crawl_result.records
+
+        if acquisition_type == "api":
+            return (
+                MediaAcquisitionService
+                ._collect_api_source(
+                    source_config=source_config
+                )
+            )
+
+        raise ValueError(
+            f"Unsupported Media acquisition type: "
+            f"{acquisition_type}"
+        )
 
     @staticmethod
     def _crawl_source(
@@ -377,8 +432,29 @@ class MediaAcquisitionService:
                 connection
             )
 
+    @staticmethod
+    def _collect_api_source(
+        source_config: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+
+        collection_result = (
+            collect_artifacts(
+                ApiCollectorTask.from_config(
+                    source_config
+                )
+            )
+        )
+
+        return [
+            {
+                "detail_file_path": file_path,
+            }
+            for file_path
+            in collection_result.file_paths
+        ]
+
     # =====================================================
-    # Persist one crawled record
+    # Persist one acquired record
     # =====================================================
 
     @staticmethod
@@ -389,6 +465,7 @@ class MediaAcquisitionService:
         source_name: str,
         dataset_name: str,
         download_method: str,
+        acquisition_url: str,
     ) -> dict[str, Any]:
 
         detail_file_path = record.get(
@@ -398,16 +475,21 @@ class MediaAcquisitionService:
         if not detail_file_path:
             raise ValueError(
                 "detail_file_path is missing "
-                "from MediaSpider result."
+                "from Media acquisition result."
             )
 
-        extracted = record.get(
-            "extracted",
-            {},
+        extracted = (
+            record.get(
+                "extracted"
+            )
+            or {}
         )
 
-        source_url = extracted.get(
-            "SourceURL"
+        source_url = (
+            extracted.get(
+                "SourceURL"
+            )
+            or acquisition_url
         )
 
         # ---------------------------------------------
@@ -491,6 +573,29 @@ class MediaAcquisitionService:
     # =====================================================
 
     @staticmethod
+    def _get_acquisition_type(
+        source_config: dict[str, Any],
+    ) -> str:
+
+        acquisition_config = (
+            source_config.get(
+                "acquisition",
+                {},
+            )
+        )
+
+        return (
+            str(
+                acquisition_config.get(
+                    "type",
+                    "",
+                )
+            )
+            .strip()
+            .lower()
+        )
+
+    @staticmethod
     def _validate_source_config(
         source_config: dict[str, Any],
     ) -> None:
@@ -525,22 +630,44 @@ class MediaAcquisitionService:
         )
 
         acquisition_type = (
-            str(
-                acquisition_config.get(
-                    "type",
-                    "",
-                )
+            MediaAcquisitionService
+            ._get_acquisition_type(
+                source_config
             )
-            .strip()
-            .lower()
         )
 
-        if acquisition_type != "crawler":
+        if acquisition_type not in {
+            "crawler",
+            "api",
+        }:
             raise ValueError(
                 "MediaAcquisitionService "
-                "currently supports "
-                "acquisition.type=crawler only."
+                "supports acquisition.type "
+                "crawler or api."
             )
+
+        if acquisition_type == "api":
+
+            api_config = source_config.get(
+                "api_config",
+                {},
+            )
+
+            if not api_config:
+                raise ValueError(
+                    "api_config is required for "
+                    "API-based Media sources."
+                )
+
+            if api_config.get(
+                "write_mode"
+            ) != "record_files":
+                raise ValueError(
+                    "API-based Media sources must use "
+                    "api_config.write_mode=record_files."
+                )
+
+            return
 
         spider_type = (
             str(

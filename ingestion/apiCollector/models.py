@@ -5,6 +5,14 @@ from typing import Any, Dict, List, Optional
 
 
 @dataclass
+class ApiCollectionResult:
+    """Result of a single API collection run."""
+
+    file_paths: List[str] = field(default_factory=list)
+    record_count: int = 0
+
+
+@dataclass
 class ApiCollectorTask:
     """Source-agnostic description of a single API acquisition run."""
 
@@ -28,17 +36,23 @@ class ApiCollectorTask:
     record_shape: Dict[str, Any] = field(default_factory=dict)
     dedup_path: Optional[str] = None
     faceting: Dict[str, Any] = field(default_factory=dict)
+    record_id_path: Optional[str] = None
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "ApiCollectorTask":
-        """Build a task from a watchlist config's ``api_config`` block."""
+        """Build a task from a source config's ``api_config`` block."""
 
         api_config = config.get("api_config", {})
+        collection_name = (
+            config.get("list_name")
+            or config.get("dataset_name")
+            or config["source_name"]
+        )
 
         return cls(
             url=config["url"],
             source_name=config["source_name"],
-            list_name=config.get("list_name", config["source_name"]),
+            list_name=collection_name,
             pagination=api_config.get("pagination", {}),
             items_path=api_config.get("items_path", "items"),
             params=api_config.get("params", {}),
@@ -54,4 +68,5 @@ class ApiCollectorTask:
             faceting=api_config.get("faceting", {}),
             record_shape=api_config.get("record_shape", {}),
             dedup_path=api_config.get("dedup_path"),
+            record_id_path=api_config.get("record_id_path"),
         )

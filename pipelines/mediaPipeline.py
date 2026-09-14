@@ -248,20 +248,8 @@ def run_media_pipeline(
                 continue
 
             # -------------------------------------------------
-            # Extracted Raw Record
+            # Validate acquisition result
             # -------------------------------------------------
-
-            extracted = (
-                acquired_record.get(
-                    "extracted"
-                )
-            )
-
-            if not extracted:
-                raise ValueError(
-                    "Acquired Media record "
-                    "has no extracted data."
-                )
 
             if media_file_id is None:
                 raise ValueError(
@@ -273,13 +261,14 @@ def run_media_pipeline(
             # -------------------------------------------------
 
             raw_records = (
-                raw_record_service.process(
+                raw_record_service
+                .process_acquired_record(
                     source_config=(
                         source_config
                     ),
-                    records=[
-                        extracted
-                    ],
+                    acquired_record=(
+                        acquired_record
+                    ),
                 )
             )
 
@@ -566,7 +555,7 @@ if __name__ == "__main__":
         pipeline_result = (
             run_media_pipeline(
                 dataset_name=(
-                    "NBI_PRESS_RELEASES"
+                    "AMLC_NEWS_AND_ANNOUNCEMENTS"
                 )
             )
         )
