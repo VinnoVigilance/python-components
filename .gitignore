@@ -5,6 +5,8 @@ data/preprocessed/
 data/reports/
 data/test
 /db/
+platform_data
+logs
 
 # ============================================
 # Bypass Collector / SeleniumBase runtime files

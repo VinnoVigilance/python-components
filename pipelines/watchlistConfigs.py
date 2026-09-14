@@ -70,12 +70,9 @@ WATCHLIST_CONFIGS = {
         "source_name": "AMLC",
         "date_order": "MDY",
         "list_name": "DNFBP",
-        "download_method": "Manual",
+        "download_method": "Direct",
         "external_id_path": "INSTITUTION CODE",
         "versioning_strategy": "continuous",
-        "local_path": (
-            "data/downloads/a3923f9e-5afc-4102-9899-8fc5a8f07f41_Registered Designated Non-Financial Businesses and Professions (DNFBPs) as of 31 March 2026.pdf"
-        ),
         "url": (
             "https://www.amlc.gov.ph/storage/v1/object/public/"
             "random-uploads/documents/"

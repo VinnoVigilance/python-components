@@ -6,9 +6,11 @@ from dailyDeltaActionsGeneration import generate_watchlist_delta_actions
 from spokeSyncEngine import execute_daily_sync, deploy_database_procedures, execute_full_rebuild
 #sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from infrastructure.database.connection import get_db_connection
-from config.loggingConfig import configure_platform_logging
+import logging
+from config.loggingConfig import configure_logging
 
-logger = configure_platform_logging("post_ingestion_handler")
+configure_logging()
+logger = logging.getLogger("post_ingestion_handler")
 
 # =====================================================================
 # 1. UTILITY FUNCTIONS & GATEKEEPER

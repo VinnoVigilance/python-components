@@ -6,10 +6,12 @@ import sys
 import os
 #sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from infrastructure.database.connection import get_db_connection
-from config.loggingConfig import configure_platform_logging
+import logging
+from config.loggingConfig import configure_logging
 
 # Initialize the centralized rotating logging infrastructure                                                            
-logger = configure_platform_logging("Spoke_Sync_Engine")
+configure_logging()
+logger = logging.getLogger("Spoke_Sync_Engine")
 
 # =====================================================================
 # 1. AUTOMATED SQL PROCEDURAL GENERATORS

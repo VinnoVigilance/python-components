@@ -4,10 +4,12 @@ import sys
 import os
 #sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from infrastructure.database.connection import get_db_connection
-from config.loggingConfig import configure_platform_logging
+import logging
+from config.loggingConfig import configure_logging
 
 # 1. Initialize your custom rotating file logger
-logger = configure_platform_logging("Watchlist_Delta")
+configure_logging()
+logger = logging.getLogger("Watchlist_Delta")
 
 def _generate_date_range(start_date: date, end_date: date):
     """Yields sequential dates from start_date to end_date (inclusive)."""
