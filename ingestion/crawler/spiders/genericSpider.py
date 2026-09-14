@@ -36,7 +36,7 @@ class GenericSpider(scrapy.Spider):
             if not detail_url:
                 continue
 
-            record_id = self._extract_record_id(detail_url)
+            record_id = self._extract_record_id(detail_url, list_data)
 
             if not record_id:
                 continue
@@ -245,20 +245,25 @@ class GenericSpider(scrapy.Spider):
 
         return cleaned_values[0] if cleaned_values else None
 
-    def _extract_record_id(self, detail_url):
+    def _extract_record_id(self, detail_url, list_data):
         record_config = self.config.get("record_id", {})
+        strategy = record_config.get("strategy")
 
-        if record_config.get("strategy") != "url_regex":
-            raise ValueError("Only url_regex is currently supported")
+        if strategy == "field":
+            value = list_data.get(record_config.get("source"))
+            return str(value).strip() if value else None
 
-        pattern = record_config.get("pattern")
+        if strategy == "url_regex":
+            pattern = record_config.get("pattern")
 
-        if not pattern:
-            return None
+            if not pattern:
+                return None
 
-        match = re.search(pattern, detail_url)
+            match = re.search(pattern, detail_url)
 
-        return match.group(1) if match else None
+            return match.group(1) if match else None
+
+        raise ValueError(f"Unsupported record_id strategy: {strategy}")
 
     def _extract_attachments(self, response, detail_url):
         attachments = []
