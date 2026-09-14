@@ -27,12 +27,14 @@ These are **reusable, list-agnostic layers**. Onboarding a new list should need
 Before editing either file, be ready to answer a reviewer: *why can't the existing
 spider do this from the yaml, and why isn't this a mapping/data change?*
 
-- **Identical / boilerplate values → mapping `constant`, never new scraping.** If a
-  value is the same on every record (a site-wide safety warning, a standing
-  disclaimer), it is **data**, not something to scrape. Put it in `mapping.xlsx`
-  as a `constant`. Adding a spider feature (e.g. a `page_fields` extractor) just to
-  fetch a string that never changes is plumbing we don't need — it breaks "keep
-  reusable layers config-agnostic" (`CLAUDE.md` §1).
+- **Fixed boilerplate → mapping `constant`; live page-level content → `page_fields`.**
+  If a value is a standing string that never changes and you don't care whether it
+  drifts, a `mapping.xlsx` `constant` is simplest and needs no scraping. If you want
+  the value pulled **live from the source** (so it stays faithful and updates if the
+  site reworries it), use the generic **`page_fields`** yaml section — it is scraped
+  **once** from the listing page and merged into every record's `list.*`. Both are
+  fine; the wrong move is a **list-specific** branch in the spider — keep any spider
+  change generic and yaml-driven (`CLAUDE.md` §1).
 - **Per-record values the spider "can't reach"** (listing vs detail page, an
   attribute, a repeating field) are almost always a **selector / yaml** problem,
   not a code problem — see §2.
