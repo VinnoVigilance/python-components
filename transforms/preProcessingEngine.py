@@ -604,19 +604,16 @@ class PreProcessingEngine:
 
         raw_id = "|".join(values)
 
-        if config.get("hash", True):
-            result = hashlib.sha256(
-                raw_id.encode("utf-8")
-            ).hexdigest()
-        else:
-            result = raw_id
+        digest = hashlib.sha256(
+            raw_id.encode("utf-8")
+        ).hexdigest()
 
         if prefix:
             record[output_field] = (
-                f"{prefix}-{result}"
+                f"{prefix}-{digest}"
             )
         else:
-            record[output_field] = result
+            record[output_field] = digest
 
         return record
 

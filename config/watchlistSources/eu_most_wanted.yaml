@@ -189,9 +189,8 @@ attachments:
     attribute: "href"
 
 record_id:
-  strategy: url_regex
-  source: detail_url
-  pattern: "/([^/?#]+)$"
+  strategy: field
+  source: nid
 
 storage:
   save_listing_page: true

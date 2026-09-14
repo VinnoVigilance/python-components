@@ -491,17 +491,6 @@ WATCHLIST_CONFIGS = {
                 "source_url_field": "detail_url",
             },
         ],
-        "preprocessing": [
-            {
-                "handler": "generate_composite_id",
-                "level": "record",
-                "config": {
-                    "fields": ["list.nid"],
-                    "output_field": "source_record_id",
-                    "hash": False,
-                },
-            },
-        ],
     },
     "GPPB-BLACKLISTED-ENTITIES": {
         "source_name": "GPPB",
