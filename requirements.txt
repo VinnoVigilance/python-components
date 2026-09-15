@@ -17,6 +17,7 @@ lxml==6.1.1
 pdfplumber==0.11.10
 Scrapy==2.17.0
 nameparser==1.4.0
+inscriptis==2.7.3
 
 # --- Ingestion / infrastructure ---
 requests==2.34.2         # source file downloads

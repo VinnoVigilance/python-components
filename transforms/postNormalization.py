@@ -4,6 +4,9 @@ import html
 from copy import deepcopy
 from datetime import date, datetime
 import re
+import unicodedata
+
+from inscriptis import get_text
 
 from transforms.dateResolver import parse_date_string, resolve_dates
 from transforms.searchEnrichment import (
@@ -112,6 +115,61 @@ def date_normalization_handler(entity, rule, config=None):
 
     entity[source_path] = resolve_dates(values, date_order)
 
+def normalize_body_text_handler(entity, rule, config=None):
+    """Create normalized plain text from Content.BodyOriginalValue."""
+
+    content = entity.get("Content")
+
+    if not isinstance(content, dict):
+        return
+
+    if "BodyOriginalValue" not in content:
+        return
+
+    original_value = content.get("BodyOriginalValue")
+
+    if original_value is None:
+        content["BodyText"] = None
+        return
+
+    if not isinstance(original_value, str):
+        raise TypeError(
+            "Content.BodyOriginalValue must be a string or None."
+        )
+
+    # Decode encoded HTML such as &lt;p&gt; before parsing.
+    decoded_value = html.unescape(original_value)
+
+    # Convert HTML to plain text while preserving paragraph/list boundaries.
+    normalized_text = get_text(decoded_value)
+
+    # Normalize Unicode characters.
+    normalized_text = unicodedata.normalize("NFC", normalized_text)
+
+    # Normalize special spaces and line endings.
+    normalized_text = (
+        normalized_text
+        .replace("\xa0", " ")
+        .replace("\u200b", "")
+        .replace("\ufeff", "")
+        .replace("\u2028", "\n")
+        .replace("\u2029", "\n")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
+
+    # Remove additional horizontal whitespace without removing paragraphs.
+    lines = [
+        re.sub(r"[ \t]+", " ", line).strip()
+        for line in normalized_text.split("\n")
+    ]
+
+    normalized_text = "\n".join(lines)
+
+    # Keep at most one empty line between paragraphs.
+    normalized_text = re.sub(r"\n{3,}", "\n\n", normalized_text)
+
+    content["BodyText"] = normalized_text.strip()
 
 def deduplicate_all_arrays_handler(entity, rule, config=None):
 
@@ -455,6 +513,7 @@ HANDLERS = {
     "ENUM_NORMALIZE": enum_normalize_handler,
     "DATE_WINDOW_STATUS": date_window_status_handler,
     "SANITIZE_HTML": sanitize_html_handler,
+    "NORMALIZE_BODY_TEXT": normalize_body_text_handler,
     "SEARCH_ENRICH": search_enrich_handler,
     "DEDUPLICATE_ALL_ARRAYS": deduplicate_all_arrays_handler,
 }
