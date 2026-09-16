@@ -1,0 +1,58 @@
+fetch_strategy: saved_html
+
+record_mode: listing_only
+
+discovery:
+  selector_type: xpath
+  row_selector: "//table[1]//tr[position() > 1]"
+
+list_fields:
+  name_raw:
+    selector: "normalize-space(string(./td[1]/p[1]))"
+    selector_type: xpath
+    value: text
+
+  address_raw:
+    selector: "./td[1]/p[position() > 1]//text()"
+    selector_type: xpath
+    value: text
+    join: " "
+
+  date_of_sanction:
+    selector: "normalize-space(string(./td[2]))"
+    selector_type: xpath
+    value: text
+
+  sanction_imposed:
+    selector: "normalize-space(string(./td[3]))"
+    selector_type: xpath
+    value: text
+
+  sanction_pdf:
+    selector: "./td[3]//a[1]/@href"
+    selector_type: xpath
+    value: text
+
+  grounds:
+    selector: "normalize-space(string(./td[4]))"
+    selector_type: xpath
+    value: text
+
+  footnotes:
+    selector: "//p[starts-with(normalize-space(.), '*')]"
+    selector_type: xpath
+    fields:
+      text:
+        selector: "normalize-space(string(.))"
+        selector_type: xpath
+        value: text
+
+      pdf_urls:
+        selector: "./a/@href"
+        selector_type: xpath
+        value: text
+        multiple: true
+
+storage:
+  save_listing_page: false
+  save_detail_pages: false

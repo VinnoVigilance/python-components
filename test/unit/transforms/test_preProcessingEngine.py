@@ -98,6 +98,59 @@ class TestGenerateCompositeId:
         assert len(out["id"]) == 64
 
 
+class TestSplitFieldRegex:
+    PATTERN = r"(?P<from>.+?)\s*[-–—]\s*(?P<to>.+)$"
+
+    def test_reads_nested_dotted_field(self, engine):
+        record = {"list": {"date_of_sanction": "June 17, 2025 – December 16, 2026"}}
+        out = engine.split_field_regex(
+            dict(record),
+            {
+                "input_field": "list.date_of_sanction",
+                "pattern": self.PATTERN,
+                "outputs": {"from": "wb_sanction_from", "to": "wb_sanction_to"},
+            },
+        )
+        assert out["wb_sanction_from"] == "June 17, 2025"
+        assert out["wb_sanction_to"] == "December 16, 2026"
+
+    def test_flat_field_still_works(self, engine):
+        out = engine.split_field_regex(
+            {"name": "66. VILLAR, CAMILLE"},
+            {
+                "input_field": "name",
+                "pattern": r"^(?P<ballot>\d+)\.\s*(?P<rest>.+)$",
+                "outputs": {"ballot": "ballot_number", "rest": "clean_name"},
+            },
+        )
+        assert out["ballot_number"] == "66"
+        assert out["clean_name"] == "VILLAR, CAMILLE"
+
+    def test_no_match_yields_empty_outputs(self, engine):
+        out = engine.split_field_regex(
+            {"list": {"date_of_sanction": "Ongoing"}},
+            {
+                "input_field": "list.date_of_sanction",
+                "pattern": self.PATTERN,
+                "outputs": {"from": "wb_sanction_from", "to": "wb_sanction_to"},
+            },
+        )
+        assert out["wb_sanction_from"] == ""
+        assert out["wb_sanction_to"] == ""
+
+    def test_missing_nested_field_is_empty(self, engine):
+        out = engine.split_field_regex(
+            {"list": {}},
+            {
+                "input_field": "list.date_of_sanction",
+                "pattern": self.PATTERN,
+                "outputs": {"from": "a", "to": "b"},
+            },
+        )
+        assert out["a"] == ""
+        assert out["b"] == ""
+
+
 class TestExtractNameFromUrl:
     def test_extracts_slug(self, engine):
         record = engine.extract_name_from_url(

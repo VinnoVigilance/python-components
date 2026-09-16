@@ -1050,4 +1050,144 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "WORLD-BANK-DEBARRED": {
+        "source_name": "WORLD-BANK",
+        "date_order": "YMD",
+        "list_name": "WORLD-BANK-DEBARRED",
+        "download_method": "API",
+        "url": (
+            "https://apigwext.worldbank.org/dvsvc/v1.0/json/"
+            "APPLICATION/ADOBE_EXPRNCE_MGR/FIRM/SANCTIONED_FIRM"
+        ),
+        "file_type": "jsonl",
+        "external_id_path": "SUPP_ID",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "none",
+            },
+            "items_path": "response.ZPROCSUPP",
+            "headers": {
+                "apikey": "z9duUaFUiEUYSHs97CU38fcZO7ipOPvm",
+            },
+            "write_mode": "single_jsonl",
+        },
+        "preprocessing": [
+        {
+            "handler": "detect_entity_type",
+            "level": "record",
+            "config": {"input_field": "SUPP_NAME", "output_field": "entity_type"},
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r".*Reg\.?\s*No[.:\s]+(?P<reg>[A-Za-z0-9./-]+)",
+                "outputs": {"reg": "wb_reg_no"},
+            },
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r".*(?:f/?k/?a|formerly known as|FKA)[\s:]*(?P<fka>[^)*]+)",
+                "outputs": {"fka": "wb_fka"},
+            },
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r".*(?:a/?k/?a|also known as|d/?b/?a|doing business as|now known as)[\s:]*(?P<aka>[^)*]+)",
+                "outputs": {"aka": "wb_aka"},
+            },
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r".*?(?P<script>[\u4e00-\u9fff\u0400-\u04ff][\u4e00-\u9fff\u0400-\u04ff\s,\u3000()（）]*[\u4e00-\u9fff\u0400-\u04ff])",
+                "outputs": {"script": "wb_orig_script"},
+            },
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r"(?P<note>.*?)\s*(?:\*\d+)?\s*$",
+                "outputs": {"note": "wb_add_note"},
+            },
+        },
+    ],
+    },
+
+    "WORLD-BANK-OTHER-SANCTIONS": {
+        "source_name": "WORLD-BANK",
+        "date_order": "MDY",
+        "list_name": "WORLD-BANK-OTHER-SANCTIONS",
+        "download_method": "HTTPS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.worldbank.org/en/projects-operations/"
+            "procurement/debarred-firms"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/world_bank_other_sanctions.yaml"
+        ),
+        "preprocessing": [
+            {
+                "handler": "resolve_reference",
+                "level": "record",
+                "config": {
+                    "key_field": "list.name_raw",
+                    "key_pattern": r"\*(\d+)",
+                    "list_field": "list.footnotes",
+                    "item_key": "text",
+                    "item_pattern": r"\*(\d+)",
+                    "outputs": {
+                        "text": "wb_footnote_text",
+                        "pdf_urls": "wb_footnote_pdfs",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "list.date_of_sanction",
+                    "pattern": r"(?P<from>.+?)\s*[-–—]\s*(?P<to>.+)$",
+                    "outputs": {"from": "wb_sanction_from", "to": "wb_sanction_to"},
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["list.name_raw"],
+                    "output_field": "source_record_id",
+                    "prefix": "WORLD-BANK-OTHER-SANCTIONS",
+                },
+
+            },
+        ],
+    },
+
 }

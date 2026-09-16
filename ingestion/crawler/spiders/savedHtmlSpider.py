@@ -163,7 +163,7 @@ class SavedHtmlSpider(GenericSpider):
 
             if record_mode == "listing_only":
                 record_id = (
-                    self._extract_record_id(detail_url)
+                    self._extract_record_id(detail_url, list_data)
                     if detail_url
                     else None
                 )
@@ -194,7 +194,7 @@ class SavedHtmlSpider(GenericSpider):
                 continue
 
             record_id = self._extract_record_id(
-                detail_url
+                detail_url, list_data
             )
 
             if not record_id:

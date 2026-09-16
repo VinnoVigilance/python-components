@@ -351,6 +351,7 @@ class PreProcessingEngine:
             "BOOKKEEPING",
             "AUDITING",
             "CONSULTANCY",
+            "CONSTRUCTION",
             "BUSINESS",
             "GROUP",
             "TRADING",
@@ -779,11 +780,70 @@ class PreProcessingEngine:
                           match (optional group, or no overall match) writes ""
                           so the output field always exists.
         """
-        value = str(record.get(config["input_field"], "")).strip()
+        resolved = record
+        for part in config["input_field"].split("."):
+            resolved = resolved.get(part) if isinstance(resolved, dict) else None
+        value = str(resolved or "").strip()
         match = re.match(config["pattern"], value)
 
         for group_name, output_field in config["outputs"].items():
             captured = match.group(group_name) if match else None
             record[output_field] = captured.strip() if captured else ""
+
+        return record
+
+    def resolve_reference(self, record, config):
+        """
+        Resolve a per-record key against a co-located list and project fields.
+
+        Generic keyed lookup: derive a key from the record, find the one item in
+        `list_field` whose own key equals it, then copy chosen sub-fields of that
+        item onto the record. Any "row references one entry in an attached/shared
+        list" shape reuses it by config, not code. Keys can be read verbatim or
+        pulled out of free text with a regex, so an id embedded in a label
+        ("... *12", "code: 14") works the same as a plain id field. No match
+        leaves the outputs at `default` and keeps the record.
+
+        config:
+            key_field     dot-path to the value holding the record's key.
+            key_pattern   optional regex; group(1) (else whole match) is the key.
+            list_field    dot-path to the list of candidate items.
+            item_key      sub-field of each item holding its key.
+            item_pattern  optional regex applied to item_key before comparing.
+            outputs       {item_subfield: output_field} copied from the match.
+            default       written to every output when nothing matches ("").
+        """
+
+        def dig(obj, path):
+            for part in path.split("."):
+                obj = obj.get(part) if isinstance(obj, dict) else None
+            return obj
+
+        def key_of(text, pattern):
+            text = "" if text is None else str(text)
+            if not pattern:
+                return text.strip()
+            found = re.search(pattern, text)
+            if not found:
+                return ""
+            return (found.group(1) if found.groups() else found.group(0)).strip()
+
+        record_key = key_of(dig(record, config["key_field"]), config.get("key_pattern"))
+        items = dig(record, config["list_field"]) or []
+
+        chosen = None
+
+        if record_key:
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                if key_of(item.get(config["item_key"]), config.get("item_pattern")) == record_key:
+                    chosen = item
+                    break
+
+        default = config.get("default", "")
+
+        for item_subfield, output_field in config["outputs"].items():
+            record[output_field] = (chosen or {}).get(item_subfield, default)
 
         return record
