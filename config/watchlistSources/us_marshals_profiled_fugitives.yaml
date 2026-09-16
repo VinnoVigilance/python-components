@@ -37,7 +37,7 @@ list_fields:
 
   thumbnail:
     selector: ".usa-card__img img"
-    as_attachment: "THUMBNAIL"
+    as_attachment: Thumbnail
     selector_type: css
     value: attribute
     attribute: src
@@ -241,14 +241,15 @@ detail_fields:
 
 
 attachments:
-  - type: DETAIL_PAGE
+  - type: Profile
+    role: detail_page
 
-  - type: IMAGE
+  - type: Photograph
     selector: ".block-field-blocknodefugitivefield-fugitive-image-asset-file img"
     attribute: "src"
     multiple: true
 
-  - type: DOCUMENT
+  - type: Poster
     selector: ".block-field-blocknodefugitivefield-fugitive-poster a"
     attribute: "href"
 
