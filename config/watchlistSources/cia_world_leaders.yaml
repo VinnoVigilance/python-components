@@ -1,0 +1,57 @@
+fetch_strategy: saved_html
+
+record_mode: list_detail
+
+detail_fetch_strategy: direct
+
+discovery:
+  row_selector: "a.inline-link[href*='/foreign-governments/']"
+  detail_link_selector_type: xpath
+  detail_link_selector: "self::a"
+  detail_link_attribute: href
+
+detail_fields:
+  country:
+    selector: "h1"
+    selector_type: css
+    value: text
+
+  last_updated:
+    selector: ".last-updated span"
+    selector_type: css
+    value: text
+
+  note:
+    selector: ".caveat"
+    selector_type: css
+    value: text
+
+  leaders:
+    selector: ".leader-info"
+    selector_type: css
+    fields:
+      position:
+        selector: "h4"
+        selector_type: css
+        value: text
+
+      name:
+        selector: "p"
+        selector_type: css
+        value: text
+
+attachments:
+  - type: Reference
+    role: detail_page
+
+record_id:
+  strategy: url_regex
+  source: detail_url
+  pattern: "/foreign-governments/([a-z-]+)"
+
+pagination:
+  type: none
+
+storage:
+  save_listing_page: false
+  save_detail_pages: false

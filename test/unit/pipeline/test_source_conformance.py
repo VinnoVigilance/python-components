@@ -64,6 +64,7 @@ SAMPLES = {
     "EU-MOST-WANTED": "EU-MOST-WANTED_raw_sample.jsonl",
     "WORLD-BANK-OTHER-SANCTIONS": "WORLD-BANK-OTHER-SANCTIONS_raw_sample.jsonl",
     "PH-HOUSE-MEMBERS": "PH-HOUSE-MEMBERS_raw_sample.jsonl",
+    "CIA-WORLD-LEADERS-HISTORICAL": "CIA-WORLD-LEADERS-HISTORICAL_raw_sample.jsonl",
 }
 
 VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel"}

@@ -44,7 +44,7 @@ class CompatibleSeleniumBaseDriver(SeleniumBaseDriver):
             proxy=proxy,
             test=False,
             rtf=False,
-            driver_version=self.driver_version,
+            driver_version=self._resolve_driver_version(),
         )
 
         if self.binary_location:
@@ -58,3 +58,31 @@ class CompatibleSeleniumBaseDriver(SeleniumBaseDriver):
         self.sb = self._sb_context.__enter__()
 
         return self.sb
+
+    def _resolve_driver_version(self) -> str:
+        """Turn "mlatest" into the installed Chrome major (e.g. "153").
+
+        SeleniumBase calls int() on the version, which fails on Chrome's
+        4-part string (153.0.8010.52); the major is int-safe and still
+        auto-matches the device's Chrome. Any explicit version is left as-is.
+        """
+        if self.driver_version != "mlatest":
+            return self.driver_version
+
+        try:
+            from seleniumbase.core import detect_b_ver
+
+            full_version = detect_b_ver.get_browser_version_from_os(
+                "google-chrome"
+            )
+            major = str(full_version).split(".")[0]
+
+            if major.isdigit():
+                return major
+
+        except Exception:
+            logger.warning(
+                "Could not detect Chrome major version; using 'mlatest'."
+            )
+
+        return self.driver_version

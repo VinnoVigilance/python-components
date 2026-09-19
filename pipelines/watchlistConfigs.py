@@ -494,6 +494,82 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+    "CIA-WORLD-LEADERS-HISTORICAL": {
+        "source_name": "CIA",
+        "list_name": "CIA-WORLD-LEADERS-HISTORICAL",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": "https://www.cia.gov/resources/world-leaders/foreign-governments/",
+        "file_type": "html",
+        "external_id_path": "external_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/cia_world_leaders.yaml",
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "headless": True,
+            "timeout_seconds": 120,
+            "success_criteria": ["Foreign Governments"],
+            "actions": [
+                {
+                    "action": "execute_js",
+                    "await": True,
+                    "script": """(async () => {
+  const sel = [...document.querySelectorAll('select')]
+    .find(s => [...s.options].some(o => /^all$/i.test(o.textContent.trim())));
+  if (sel) {
+    const opt = [...sel.options].find(o => /^all$/i.test(o.textContent.trim()));
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLSelectElement.prototype, 'value').set;
+    setter.call(sel, opt.value);
+    sel.dispatchEvent(new Event('input', {bubbles: true}));
+    sel.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  const count = () => document.querySelectorAll(
+    'a[href*="/foreign-governments/"]').length;
+  for (let i = 0; i < 60; i++) {
+    if (count() >= 190) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return count();
+})()""",
+                },
+                {"action": "wait", "type": "time", "seconds": 2},
+                {
+                    "action": "save_html",
+                    "filename_pattern": "{source}_{list}_{timestamp}.html",
+                },
+            ],
+            "validation": {
+                "required_content": ["/foreign-governments/"],
+                "min_size_bytes": 10000,
+            },
+        },
+        "preprocessing": [
+            {
+                "handler": "explode_nested_records",
+                "level": "dataset",
+                "config": {
+                    "list_path": "detail.leaders",
+                    "carry_fields": {
+                        "detail.country": "country",
+                        "detail.last_updated": "last_updated",
+                        "detail.note": "note",
+                    },
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["country", "position"],
+                    "output_field": "external_id",
+                    "prefix": "CIA-WORLD-LEADERS-HISTORICAL",
+                },
+            },
+        ],
+    },
     "GPPB-BLACKLISTED-ENTITIES": {
         "source_name": "GPPB",
         "date_order": "YMD",
