@@ -12,6 +12,7 @@ from ingestion.bypassCollector.actions.saveAction import (
     SaveJsonAction,
     SavePaginatedHtmlAction,
 )
+from ingestion.bypassCollector.actions.executeJsAction import ExecuteJsAction
 logger = logging.getLogger(__name__)
 
 
@@ -32,12 +33,7 @@ class ActionExecutor:
             "save_html": SaveHtmlAction(),
             "save_json": SaveJsonAction(),
             "save_paginated_html": SavePaginatedHtmlAction(),
-            # Future actions:
-            # "click": ClickAction(),
-            # "scroll": ScrollAction(),
-            # "extract_links": ExtractLinksAction(),
-            # "for_each": ForEachAction(),
-            # etc.
+            "execute_js": ExecuteJsAction(),
         }
     
     def executeActions(
