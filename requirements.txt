@@ -26,6 +26,7 @@ seleniumbase==4.51.11    # SeleniumBase driver, pinned to a device-matched chrom
 psycopg2-binary==2.9.12  # PostgreSQL access
 boto3                    # SeaweedFS/S3 storage client (not pinned: install if using infrastructure/storage)
 python-dotenv==1.0.1     # load config/secrets from a local .env file
+tzdata; sys_platform == "win32"  # IANA zones for watchlist schedules on Windows
 PyYAML==6.0.3           # YAML source configs; >=6.0.3 required by seleniumbase
 elasticsearch==9.5.0
 

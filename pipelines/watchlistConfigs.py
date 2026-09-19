@@ -332,6 +332,7 @@ WATCHLIST_CONFIGS = {
         "filename_aliases": ["UN"],
         "download_method": "HTTPS",
         "versioning_strategy": "continuous",
+        "schedule": "daily",
 
     },
     "EU-FINANCIAL-SANCTIONS": {
@@ -345,6 +346,7 @@ WATCHLIST_CONFIGS = {
         "filename_aliases": ["EU"],
         "download_method": "HTTPS",
         "versioning_strategy": "continuous",
+        "schedule": "daily",
     },
 
     "SECO-SANCTIONS": {
