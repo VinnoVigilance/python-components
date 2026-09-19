@@ -59,6 +59,7 @@ SAMPLES = {
     "US-STATE-TERRORIST-EXCLUSION": "US-STATE-TERRORIST-EXCLUSION_raw_sample.jsonl",
     "EU-MOST-WANTED": "EU-MOST-WANTED_raw_sample.jsonl",
     "WORLD-BANK-OTHER-SANCTIONS": "WORLD-BANK-OTHER-SANCTIONS_raw_sample.jsonl",
+    "PH-HOUSE-MEMBERS": "PH-HOUSE-MEMBERS_raw_sample.jsonl",
 }
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
@@ -163,6 +164,10 @@ GOLDEN = {
     "WORLD-BANK-OTHER-SANCTIONS": {
         "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "WORLD-BANK-OTHER-SANCTIONS", "SourceName": "WORLD-BANK",
+    },
+    "PH-HOUSE-MEMBERS": {
+        "SourceType": "Official", "DatasetCategory": "PEP (Politically Exposed Person)",
+        "ListName": "PH-HOUSE-MEMBERS", "SourceName": "CONGRESS-PH",
     },
 }
 

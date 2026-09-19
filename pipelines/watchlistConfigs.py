@@ -873,6 +873,30 @@ WATCHLIST_CONFIGS = {
                     "value": "20th Congress",
                 },
             },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "output_field": "source_url",
+                    "template": (
+                        "https://www.congress.gov.ph/"
+                        "house-members/view/"
+                        "{source_record_id}"
+                    ),
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "detail.profile_name",
+                    "pattern": r'^(?P<last_name>[^,]+),(?P<_pre>[^"]*)("(?P<nickname>[^"]+)")?.*$',
+                    "outputs": {
+                        "last_name": "last_name",
+                        "nickname": "nickname",
+                    },
+                },
+            },
         ],
     },
 
