@@ -683,9 +683,10 @@ detail_fields:
 
 
 attachments:
-  - type: DETAIL_PAGE
+  - role: detail_page
+    type: Profile
 
-  - type: IMAGE
+  - type: Photograph
     selector: "div.hm-show-avatar img.profile-img"
     attribute: src
 
