@@ -66,6 +66,25 @@ class TestBuildQuery:
 
         assert query == {"category": "BLACKLISTED_ENTITIES"}
 
+    def test_offset_paging_multiplies_counter_by_page_size(self):
+        # ADB's api_config: the zero-based loop counter becomes a record offset
+        # (offset = counter * page_size), and the size param rides along.
+        pagination = {
+            "type": "offset",
+            "offset_param": "offset",
+            "size_param": "size",
+            "page_size": 100,
+            "start_page": 0,
+        }
+
+        first = build_query(
+            pagination=pagination, params={"sortField": "Name"}, page=0
+        )
+        third = build_query(pagination=pagination, params={}, page=3)
+
+        assert first == {"sortField": "Name", "offset": 0, "size": 100}
+        assert third == {"offset": 300, "size": 100}
+
 
 # --- extract_items ---------------------------------------------------------
 
@@ -160,6 +179,36 @@ class TestIterPages:
                 )
 
         assert calls["count"] == 1
+
+    def test_offset_source_pages_past_short_pages_until_empty(self):
+        # ADB returns ~85 records for a size=100 window (the server filters
+        # after slicing), so a short page is NOT the last page. An offset source
+        # must keep paging until a truly empty page -- unlike page-number
+        # sources, it must not stop on the first short page.
+        task = _task(
+            {
+                "type": "offset",
+                "offset_param": "offset",
+                "size_param": "size",
+                "page_size": 100,
+                "start_page": 0,
+            },
+            items_path="data",
+        )
+
+        pages = {
+            0: {"data": [{"id": i} for i in range(83)]},
+            100: {"data": [{"id": i} for i in range(87)]},
+            200: {"data": []},
+        }
+
+        def fake_get_page(_task, query, _transport=None):
+            return pages[query["offset"]]
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            result = list(collector._iter_pages(task, None))
+
+        assert [len(page) for page in result] == [83, 87]
 
     def test_single_request_source_fetches_once(self):
         # The GPPB case: the endpoint ignores paging and always returns the

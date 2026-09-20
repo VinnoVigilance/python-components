@@ -533,7 +533,9 @@ def _iter_variant_pages(
         if pagination_type == "none":
             return
 
-        if no_more_pages(fetched, page_count, cap, page_size):
+        if pagination_type != "offset" and no_more_pages(
+            fetched, page_count, cap, page_size
+        ):
             return
 
         page += 1
