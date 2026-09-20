@@ -92,44 +92,122 @@ def exists_by_record_key(
 # =========================================================
 
 
-def exists_core_record(
+def find_current_media_record(
     cursor,
-    source_id: int,
     dataset_id: int,
     record_key: str,
-    content_hash: str,
-) -> bool:
+) -> dict[str, Any] | None:
     """
-    Check whether this exact version already exists.
+    Find and lock the current version of one Media record.
     """
 
     cursor.execute(
         """
-        SELECT 1
-        FROM core.media_record
-        WHERE source_id = %s
-          AND dataset_id = %s
-          AND record_key = %s
-          AND content_hash = %s
-        LIMIT 1
-        """,
-        (
+        SELECT
+            id,
+            media_file_id,
+            vv_media_id,
             source_id,
             dataset_id,
+            external_id,
             record_key,
+            record_type,
             content_hash,
+            version_no,
+            pipeline_version,
+            change_type
+        FROM core.media_record
+        WHERE dataset_id = %s
+          AND record_key = %s
+          AND is_current = TRUE
+        LIMIT 1
+        FOR UPDATE
+        """,
+        (
+            dataset_id,
+            record_key,
         ),
     )
 
-    return cursor.fetchone() is not None
+    row = cursor.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "id": row[0],
+        "media_file_id": row[1],
+        "vv_media_id": row[2],
+        "source_id": row[3],
+        "dataset_id": row[4],
+        "external_id": row[5],
+        "record_key": row[6],
+        "record_type": row[7],
+        "content_hash": row[8],
+        "version_no": row[9],
+        "pipeline_version": row[10],
+        "change_type": row[11],
+    }
+
+
+def get_next_vv_media_id(
+    cursor,
+) -> int:
+    """
+    Allocate a new permanent Media identifier.
+    """
+
+    cursor.execute(
+        """
+        SELECT nextval(
+            'core.vv_media_id_seq'
+        )
+        """
+    )
+
+    row = cursor.fetchone()
+
+    if row is None:
+        raise RuntimeError(
+            "Could not generate vv_media_id."
+        )
+
+    return row[0]
+
+
+def close_current_media_record(
+    cursor,
+    core_record_id: int,
+) -> None:
+    """
+    Close the previous current version.
+    """
+
+    cursor.execute(
+        """
+        UPDATE core.media_record
+        SET
+            is_current = FALSE,
+            valid_to = NOW()
+        WHERE id = %s
+          AND is_current = TRUE
+        """,
+        (core_record_id,),
+    )
+
+    if cursor.rowcount != 1:
+        raise RuntimeError(
+            "Current Media record could not be closed. "
+            f"Core record ID: {core_record_id}"
+        )
 
 
 def insert_media_record(
     cursor,
     record_data: dict[str, Any],
-) -> int:
+) -> dict[str, Any]:
     """
-    Insert one standardized Media record into Core.
+    Insert one version of a Media record.
     """
 
     query_data = {
@@ -143,6 +221,7 @@ def insert_media_record(
         """
         INSERT INTO core.media_record (
             media_file_id,
+            vv_media_id,
             source_id,
             dataset_id,
             external_id,
@@ -150,12 +229,16 @@ def insert_media_record(
             record_type,
             media_payload,
             content_hash,
-            parser_version,
-            parsed_at,
-            status
+            version_no,
+            is_current,
+            valid_from,
+            valid_to,
+            change_type,
+            pipeline_version
         )
         VALUES (
             %(media_file_id)s,
+            %(vv_media_id)s,
             %(source_id)s,
             %(dataset_id)s,
             %(external_id)s,
@@ -163,11 +246,17 @@ def insert_media_record(
             %(record_type)s,
             %(media_payload)s,
             %(content_hash)s,
-            %(parser_version)s,
+            %(version_no)s,
+            TRUE,
             NOW(),
-            %(status)s
+            NULL,
+            %(change_type)s,
+            %(pipeline_version)s
         )
-        RETURNING id
+        RETURNING
+            id,
+            vv_media_id,
+            version_no
         """,
         query_data,
     )
@@ -179,8 +268,11 @@ def insert_media_record(
             "Failed to insert core.media_record."
         )
 
-    return row[0]
-
+    return {
+        "id": row[0],
+        "vv_media_id": row[1],
+        "version_no": row[2],
+    }
 
 # =========================================================
 # Raw Media File
@@ -189,10 +281,15 @@ def insert_media_record(
 
 def find_media_file_by_hash(
     cursor,
+    source_id: int,
+    dataset_id: int,
     file_hash: str,
 ) -> dict[str, Any] | None:
     """
-    Find an already acquired physical file.
+    Find an already acquired physical Media file.
+
+    A file is considered duplicate only inside the same
+    source and dataset.
     """
 
     cursor.execute(
@@ -206,10 +303,16 @@ def find_media_file_by_hash(
             status,
             parsed_at
         FROM raw.media_file
-        WHERE file_hash = %s
+        WHERE source_id = %s
+          AND dataset_id = %s
+          AND file_hash = %s
         LIMIT 1
         """,
-        (file_hash,),
+        (
+            source_id,
+            dataset_id,
+            file_hash,
+        ),
     )
 
     row = cursor.fetchone()
@@ -227,13 +330,15 @@ def find_media_file_by_hash(
         "parsed_at": row[6],
     }
 
-
 def insert_media_file(
     cursor,
     file_data: dict[str, Any],
 ) -> int | None:
     """
     Insert one newly acquired Raw Media file.
+
+    Duplicate detection is scoped to:
+        source_id + dataset_id + file_hash
     """
 
     cursor.execute(
@@ -270,7 +375,11 @@ def insert_media_file(
             'DOWNLOADED',
             %(download_method)s
         )
-        ON CONFLICT (file_hash)
+        ON CONFLICT (
+            source_id,
+            dataset_id,
+            file_hash
+        )
         DO NOTHING
         RETURNING id
         """,
@@ -280,7 +389,6 @@ def insert_media_file(
     row = cursor.fetchone()
 
     return row[0] if row else None
-
 
 def mark_media_file_parsed(
     cursor,
