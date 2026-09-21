@@ -32,7 +32,7 @@ from services.watchlistPipeline import watchlistNormalizationService as norm
 
 pytestmark = pytest.mark.unit
 
-FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "sources"
+FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "sources"
 
 # list_name -> committed sample file (mirrors test_source_conformance.SAMPLES).
 SAMPLES = {

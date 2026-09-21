@@ -34,9 +34,9 @@ from transforms.fieldMapper import load_rules
 
 pytestmark = pytest.mark.unit
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 MAPPING_FILE = PROJECT_ROOT / "data" / "rules" / "mapping.xlsx"
-FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "sources"
+FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "sources"
 
 # list_name -> committed sample file (one per source list).
 SAMPLES = {

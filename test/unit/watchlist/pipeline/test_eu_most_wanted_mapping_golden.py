@@ -35,7 +35,7 @@ from services.watchlistPipeline import watchlistNormalizationService as norm
 pytestmark = pytest.mark.unit
 
 FIXTURE = (
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[3]
     / "fixtures" / "sources" / "EU-MOST-WANTED_raw_sample.jsonl"
 )
 
