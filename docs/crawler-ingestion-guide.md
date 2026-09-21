@@ -146,16 +146,16 @@ There are **two** separate attachment mechanisms — don't confuse them:
 - The spider sets it from `record_id` (`url_regex` on the detail URL → the URL
   slug, e.g. `kanys-renaldas`). That slug is also used to **name the saved detail
   HTML file**, so it earns its keep even when overwritten.
-- **preprocess** can overwrite it. If the site gives a stable unique id (a Drupal
-  `nid`, an API id), use it directly — do **not** hash an id that is already
-  unique. Use `generate_composite_id` with `hash: false`:
-  ```python
-  {"handler": "generate_composite_id", "level": "record",
-   "config": {"fields": ["list.nid"], "output_field": "source_record_id",
-              "hash": false}}     # -> "964"; add "prefix": "X" for "X-964"
-  ```
-  The `_extracted.jsonl` still shows the raw slug (that's the pre-preprocess
-  stage); the nid appears from `_preprocessed.jsonl` onward.
+- **If the site gives a stable unique id** (a Drupal `nid`, an API id), use it
+  directly — do **not** hash an id that is already unique. Point
+  `external_id_path` at that raw top-level field, the way OFAC does
+  (`"external_id_path": "id"`). No preprocessing needed.
+- **`generate_composite_id` always SHA-256-hashes** its joined `fields` (there is
+  **no** `hash: false` option — the handler ignores it). Use it only when you must
+  build one id out of several fields that have no single stable key; it accepts a
+  `prefix`. For a single already-unique field, prefer `external_id_path` above.
+- The `_extracted.jsonl` shows the raw record (pre-preprocess); an id written by
+  preprocess appears from `_preprocessed.jsonl` onward.
 
 ---
 
@@ -174,8 +174,8 @@ an `enum` rule (see `CLAUDE.md` §1).
   `<LIST>_<YYYYMMDD_HHMMSS>.html` (matches the downloader convention). Avoid
   `source_name == list_name` in the config — it makes a doubled
   `X/X/…` directory.
-- **Dev stages** (`scripts/stage_*.py`, `scripts/run_all_no_db.py`) run the
-  pipeline DB-free. The real output of `extract` is
+- **Dev stages** (`scripts/watchlist/stage_*.py`, `scripts/watchlist/run_all_no_db.py`)
+  run the pipeline DB-free. The real output of `extract` is
   `data/raw/<LIST>_extracted.jsonl`. `meta.json` is a sidecar for chaining
   file-based stages and is **not** written for crawler sources.
 - **Validate the extract before building mapping.** Onboarding order:
@@ -192,6 +192,6 @@ an `enum` rule (see `CLAUDE.md` §1).
 2. Write the yaml recipe; test selectors against the **saved** HTML.
 3. Confirm each field reads from the page that shows the **filled** value (§2a).
 4. Attachment types = picklist values; profile page = `role: detail_page` (§3).
-5. Decide `source_record_id` (raw site id via `hash: false`) (§4).
+5. Decide the external id: point `external_id_path` at the raw stable id field (§4).
 6. Stamp `entity_type` if the list isn't all-Individual (§5).
 7. Crawl, validate `_extracted.jsonl`, **then** build mapping + picklist rows.

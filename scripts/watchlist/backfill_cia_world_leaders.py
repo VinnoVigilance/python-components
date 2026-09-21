@@ -14,9 +14,9 @@ Two era formats are handled and chosen by year:
                               with a per-country ``Last Updated:`` line.
 
 Usage:
-  python -m scripts.backfill_cia_world_leaders --dry-run          # parse only
-  python -m scripts.backfill_cia_world_leaders                    # parse + DB load
-  python -m scripts.backfill_cia_world_leaders --start 2013-01 --end 2013-03
+  python -m scripts.watchlist.backfill_cia_world_leaders --dry-run          # parse only
+  python -m scripts.watchlist.backfill_cia_world_leaders                    # parse + DB load
+  python -m scripts.watchlist.backfill_cia_world_leaders --start 2013-01 --end 2013-03
 """
 
 import argparse
@@ -34,7 +34,7 @@ import pdfplumber
 import requests
 
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from pipelines.watchlistConfigs import WATCHLIST_CONFIGS

@@ -19,7 +19,7 @@ from collections import Counter
 from copy import deepcopy
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 try:
@@ -32,32 +32,20 @@ from ingestion.crawler.models import CrawlerTask
 from ingestion.downloader import interface as downloader
 from parsing.parserFactory import create_parser
 from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+from scripts._shared import (
+    DOWNLOADS,
+    RAW_DIR,
+    emit,
+    finish,
+    load_stage_input,
+)
 from services.watchlistPipeline import watchlistFileService
 from services.watchlistPipeline.watchlistNormalizationService import (
     create_normalization_engines,
 )
 from transforms.preProcessingEngine import PreProcessingEngine
 
-DOWNLOADS = ROOT / "data" / "downloads"
-RAW_DIR = ROOT / "data" / "raw"
-FINAL_DIR = ROOT / "data" / "final"
-
 STAGES = ["ingest", "extract", "preprocess", "prenorm", "map", "postnorm"]
-
-ARTIFACTS = {
-    "extract": RAW_DIR / "{list}_extracted.jsonl",
-    "preprocess": FINAL_DIR / "{list}_preprocessed.jsonl",
-    "prenorm": RAW_DIR / "{list}_prenorm.jsonl",
-    "map": RAW_DIR / "{list}_mapped.jsonl",
-    "postnorm": FINAL_DIR / "{list}_final.jsonl",
-}
-
-PREVIOUS_STAGE = {
-    "preprocess": "extract",
-    "prenorm": "preprocess",
-    "map": "prenorm",
-    "postnorm": "map",
-}
 
 EXT = {
     "xml": ".xml",
@@ -86,23 +74,6 @@ def is_crawler(config: dict) -> bool:
     return str(config.get("download_method", "")).upper() == "CRAWLER"
 
 
-def artifact_path(list_name: str, stage: str) -> Path:
-    return Path(str(ARTIFACTS[stage]).format(list=list_name))
-
-
-def read_jsonl(path: Path) -> list[dict]:
-    with open(path, encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
-
-
-def write_jsonl(path: Path, records: list[dict]) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        for record in records:
-            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
-    return path
-
-
 def _meta_path(list_name: str) -> Path:
     return RAW_DIR / f"{list_name}_meta.json"
 
@@ -120,19 +91,6 @@ def write_meta(list_name: str, **values) -> None:
     path = _meta_path(list_name)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-
-
-def load_stage_input(list_name: str, stage: str, override: str | None = None) -> list[dict]:
-    """Records feeding `stage`: an explicit --in file, else the previous stage's artifact."""
-    if override:
-        return read_jsonl(Path(override))
-    previous = PREVIOUS_STAGE.get(stage)
-    if previous is None:
-        raise SystemExit(f"Stage '{stage}' has no default input; pass --in.")
-    path = artifact_path(list_name, previous)
-    if not path.is_file():
-        raise SystemExit(f"Missing input {path}. Run the earlier stage first.")
-    return read_jsonl(path)
 
 
 def find_latest_source_file(list_name: str, config: dict) -> Path | None:
@@ -226,7 +184,7 @@ def stage_extract(config: dict, source_file=None) -> tuple[list[dict], Path | No
     if src is None:
         raise SystemExit(
             f"No downloaded source file for {config['list_name']}; "
-            f"run: python -m scripts.stage_ingest {config['list_name']}"
+            f"run: python -m scripts.watchlist.stage_ingest {config['list_name']}"
         )
     parser = create_parser(file_type=config["file_type"])
     return list(parser.parse(file_path=str(src), config=config)), Path(src)
@@ -259,18 +217,6 @@ def stage_postnorm(config: dict, records: list[dict], engines=None) -> list[dict
     return canonical
 
 
-def finish(list_name, stage, records, *, out=None, preview=False, limit=3) -> Path:
-    """Write a stage's output artifact, report the count, optionally preview records."""
-    out_path = Path(out) if out else artifact_path(list_name, stage)
-    write_jsonl(out_path, records)
-    print(f"{stage:10} : {len(records):>6} records -> {out_path}")
-    if preview:
-        for index, record in enumerate(records[:limit], 1):
-            print(f"\n===== {stage} record {index} =====")
-            print(json.dumps(record, ensure_ascii=False, indent=2))
-    return out_path
-
-
 def stage_parser(description: str) -> argparse.ArgumentParser:
     """Shared argument parser for the record-transforming stage CLIs."""
     parser = argparse.ArgumentParser(description=description)
@@ -280,13 +226,6 @@ def stage_parser(description: str) -> argparse.ArgumentParser:
     parser.add_argument("--preview", action="store_true", help="print the first --limit records")
     parser.add_argument("--limit", type=int, default=3)
     return parser
-
-
-def _emit(list_name, stage, records, quiet, preview, limit) -> None:
-    if quiet:
-        write_jsonl(artifact_path(list_name, stage), records)
-    else:
-        finish(list_name, stage, records, preview=preview, limit=limit)
 
 
 def run_chain(
@@ -304,13 +243,13 @@ def run_chain(
     records, src = stage_extract(config, source_file=source_file)
     if not is_crawler(config):
         write_meta(list_name, source_file=src)
-    _emit(list_name, "extract", records, quiet, preview, limit)
+    emit(list_name, "extract", records, quiet, preview, limit)
     summary["extract"] = len(records)
     if stop == "extract":
         return summary
 
     records = stage_preprocess(config, records, source_file=src)
-    _emit(list_name, "preprocess", records, quiet, preview, limit)
+    emit(list_name, "preprocess", records, quiet, preview, limit)
     summary["preprocess"] = len(records)
     if stop == "preprocess":
         return summary
@@ -323,7 +262,7 @@ def run_chain(
         ("postnorm", stage_postnorm),
     ):
         records = transform(config, records, engines=engines)
-        _emit(list_name, stage, records, quiet, preview, limit)
+        emit(list_name, stage, records, quiet, preview, limit)
         summary[stage] = len(records)
         if stop == stage and stage != "postnorm":
             return summary

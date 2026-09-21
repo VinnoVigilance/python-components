@@ -4,7 +4,7 @@ Crawler sources have no separate ingest step: the spider fetches AND extracts, s
 run stage_extract for those instead.
 
 Usage:
-    python -m scripts.stage_ingest US-STATE-TERRORIST-EXCLUSION
+    python -m scripts.watchlist.stage_ingest US-STATE-TERRORIST-EXCLUSION
 """
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts._harness import get_config, is_crawler, stage_ingest, write_meta
+from scripts.watchlist._harness import get_config, is_crawler, stage_ingest, write_meta
 
 
 def main(argv=None) -> None:
@@ -28,7 +28,7 @@ def main(argv=None) -> None:
         print(
             f"{args.list_name} is a CRAWLER source: ingestion is fused with extraction "
             f"(the spider fetches AND extracts).\n"
-            f"Run: python -m scripts.stage_extract {args.list_name}"
+            f"Run: python -m scripts.watchlist.stage_extract {args.list_name}"
         )
         return
 
