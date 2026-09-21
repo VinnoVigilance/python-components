@@ -7,3 +7,5 @@
 
 pytest==8.3.4          # test runner
 pytest-cov==5.0.0      # coverage report ("which lines were never tested")
+pytest-xdist==3.8.0    # parallel test execution across CPU cores (-n auto)
+pytest-split==0.11.0   # shard tests across parallel CI jobs (--splits/--group)
