@@ -63,7 +63,6 @@ WATCHLIST_CONFIGS = {
         "filename_aliases": ["UK-Sanctions-List"],
     },
 
-
     "DNFBP": {
         "source_name": "AMLC",
         "date_order": "MDY",
@@ -113,7 +112,6 @@ WATCHLIST_CONFIGS = {
             "headless": False,
             "timeout_seconds": 90,
             "success_criteria": ["Designated Terrorist Individuals"],
-
             "actions": [
                 {
                     "action": "navigate",
@@ -130,7 +128,6 @@ WATCHLIST_CONFIGS = {
                     "filename_pattern": "{source}_{list}_{timestamp}.html"
                 }
             ],
-            
             "validation": {
                 "required_content": [
                     "Designated Terrorist",
@@ -234,7 +231,6 @@ WATCHLIST_CONFIGS = {
             "headless": False,
             "timeout_seconds": 90,
             "success_criteria": ["Designated Terrorist Groups"],
-
             "actions": [
                 {
                     "action": "navigate",
@@ -251,7 +247,6 @@ WATCHLIST_CONFIGS = {
                     "filename_pattern": "{source}_{list}_{timestamp}.html"
                 }
             ],
-
             "validation": {
                 "required_content": [
                     "Designated Terrorist",
@@ -321,6 +316,7 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
     "UN-SANCTIONS": {
         "source_name": "UN",
         "list_name": "UN-SANCTIONS",
@@ -333,8 +329,8 @@ WATCHLIST_CONFIGS = {
         "download_method": "HTTPS",
         "versioning_strategy": "continuous",
         "schedule": "daily",
-
     },
+
     "EU-FINANCIAL-SANCTIONS": {
         "source_name": "EU",
         "list_name": "EU-FINANCIAL-SANCTIONS",
@@ -392,13 +388,10 @@ WATCHLIST_CONFIGS = {
         "source_name": "DILG",
         "date_order": "DMY",
         "list_name": "DILG-LOCAL-OFFICIALS",
-
         "download_method": "HTTPS",
-
         "url": (
             r"https://region5.dilg.gov.ph/wp-content/uploads/2026/05/Masterlist-of-Local-Officials-2025-2028.pdf"
         ),
-
         "url_resolver": {
             "type": "link_text",
             "source_page_url": (
@@ -406,15 +399,10 @@ WATCHLIST_CONFIGS = {
             ),
             "value": "Masterlist of Local Officials",
         },
-
         "file_type": "pdf",
-
         "external_id_path": "unique_id",
-
         "schedule": "daily",
-
         "versioning_strategy": "continuous",
-
         "parser_config": {
             "expected_headers": [
                 "REGION",
@@ -424,7 +412,6 @@ WATCHLIST_CONFIGS = {
                 "NAME",
             ],
         },
-
         "preprocessing": [
             {
                 "handler": "generate_composite_id",
@@ -444,7 +431,7 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
-        "CFTC-RED-LIST": {
+    "CFTC-RED-LIST": {
         "source_name": "CFTC",
         "date_order": "MDY",
         "list_name": "CFTC-RED-LIST",
@@ -474,6 +461,7 @@ WATCHLIST_CONFIGS = {
             }
         ],
     },
+
     "EU-MOST-WANTED": {
         "source_name": "EU",
         "date_order": "MDY",
@@ -494,6 +482,7 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
     "CIA-WORLD-LEADERS-HISTORICAL": {
         "source_name": "CIA",
         "list_name": "CIA-WORLD-LEADERS-HISTORICAL",
@@ -570,6 +559,7 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
     "GPPB-BLACKLISTED-ENTITIES": {
         "source_name": "GPPB",
         "date_order": "YMD",
@@ -851,41 +841,33 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
     "PH-HOUSE-MEMBERS": {
         "source_name": "CONGRESS-PH",
         "date_order": "MDY",
         "list_name": "PH-HOUSE-MEMBERS",
-
         "download_method": "BYPASS",
         "extraction_method": "SAVED_HTML_SPIDER",
-
         "url": (
             "https://www.congress.gov.ph/"
             "house-members"
         ),
-
         "file_type": "html",
         "external_id_path": "source_record_id",
-
         "schedule": "daily",
         "versioning_strategy": "continuous",
-
         "source_config": (
             "config/watchlistSources/"
             "ph_house_members.yaml"
         ),
-
         "minimum_record_count": 250,
-
         "bypass_config": {
             "challenge": "cloudflare",
             "headless": False,
             "timeout_seconds": 120,
-
             "success_criteria": [
                 "House Members",
             ],
-
             "actions": [
                 {
                     "action": "wait",
@@ -903,7 +885,6 @@ WATCHLIST_CONFIGS = {
                     ),
                 },
             ],
-
             "validation": {
                 "required_content": [
                     "Full Name",
@@ -913,7 +894,6 @@ WATCHLIST_CONFIGS = {
                 "min_size_bytes": 10000,
             },
         },
-
         "preprocessing": [
             {
                 "handler": "set_constant_field",
@@ -1296,9 +1276,35 @@ WATCHLIST_CONFIGS = {
                     "output_field": "source_record_id",
                     "prefix": "WORLD-BANK-OTHER-SANCTIONS",
                 },
-
             },
         ],
     },
 
+    "ADB-DEBARMENT-SUSPENSION": {
+        "source_name": "ADB",
+        "date_order": "YMD",
+        "list_name": "ADB-DEBARMENT-SUSPENSION",
+        "download_method": "API",
+        "url": "https://apim.adb.org/sanctions/lists/v1/published-list",
+        "file_type": "jsonl",
+        "external_id_path": "id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "offset",
+                "offset_param": "offset",
+                "size_param": "size",
+                "page_size": 100,
+                "start_page": 0,
+            },
+            "items_path": "data",
+            "params": {
+                "sortField": "Name",
+                "isAscending": True,
+            },
+            "dedup_path": "id",
+            "write_mode": "single_jsonl",
+        },
+    },
 }

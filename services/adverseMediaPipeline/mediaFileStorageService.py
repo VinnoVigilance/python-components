@@ -50,7 +50,9 @@ class MediaRawService:
 
         existing_file = (
             MediaRawService._find_existing_file(
-                file_hash=file_hash
+                source_id=source_id,
+                dataset_id=dataset_id,
+                file_hash=file_hash,
             )
         )
 
@@ -135,6 +137,8 @@ class MediaRawService:
 
     @staticmethod
     def _find_existing_file(
+        source_id: int,
+        dataset_id: int,
         file_hash: str,
     ) -> dict[str, Any] | None:
 
@@ -148,6 +152,8 @@ class MediaRawService:
                         mediaRepository
                         .find_media_file_by_hash(
                             cursor=cursor,
+                            source_id=source_id,
+                            dataset_id=dataset_id,
                             file_hash=file_hash,
                         )
                     )
@@ -156,7 +162,7 @@ class MediaRawService:
             connection_pool.putconn(
                 connection
             )
-
+            
     @staticmethod
     def _store_file(
         source_name: str,

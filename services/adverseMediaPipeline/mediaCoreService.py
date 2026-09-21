@@ -25,8 +25,11 @@ class MediaCoreService:
         source_id: int,
         dataset_id: int,
         record_type: str,
-        parser_version: str | None = None,
+        pipeline_version: str,
     ) -> dict[str, Any]:
+        """
+        Prepare the common fields of one Media version.
+        """
 
         payload = deepcopy(
             media_payload
@@ -47,8 +50,7 @@ class MediaCoreService:
             "record_type": record_type,
             "media_payload": payload,
             "content_hash": content_hash,
-            "parser_version": parser_version,
-            "status": "ACTIVE",
+            "pipeline_version": pipeline_version,
         }
 
     def process(
@@ -60,19 +62,23 @@ class MediaCoreService:
         source_id: int,
         dataset_id: int,
         record_type: str,
-        parser_version: str | None = None,
+        pipeline_version: str,
     ) -> dict[str, Any]:
         """
         Process one Media record in one transaction.
 
-        Same record_key + same content_hash:
-            skip
+        New logical record:
+            Create version 1 with change_type NEW.
 
-        Same record_key + different content_hash:
-            insert new version
+        Same content and same pipeline:
+            Skip.
 
-        New record_key:
-            insert
+        Same content but different pipeline:
+            Create a REPROCESSED version.
+
+        Different content:
+            Close the previous version and create
+            an UPDATED version.
         """
 
         core_record = (
@@ -84,7 +90,7 @@ class MediaCoreService:
                 source_id=source_id,
                 dataset_id=dataset_id,
                 record_type=record_type,
-                parser_version=parser_version,
+                pipeline_version=pipeline_version,
             )
         )
 
@@ -96,22 +102,32 @@ class MediaCoreService:
             with connection:
                 with connection.cursor() as cursor:
 
-                    exists = (
+                    current_record = (
                         mediaRepository
-                        .exists_core_record(
+                        .find_current_media_record(
                             cursor=cursor,
-                            source_id=source_id,
                             dataset_id=dataset_id,
                             record_key=record_key,
-                            content_hash=(
-                                core_record[
-                                    "content_hash"
-                                ]
-                            ),
                         )
                     )
 
-                    if exists:
+                    # -----------------------------------------
+                    # No change
+                    # -----------------------------------------
+
+                    if (
+                        current_record is not None
+                        and current_record[
+                            "content_hash"
+                        ]
+                        == core_record[
+                            "content_hash"
+                        ]
+                        and current_record[
+                            "pipeline_version"
+                        ]
+                        == pipeline_version
+                    ):
                         (
                             mediaRepository
                             .mark_media_file_parsed(
@@ -123,24 +139,124 @@ class MediaCoreService:
                         )
 
                         return {
+                            "action": "SKIPPED",
                             "inserted": False,
                             "duplicate": True,
-                            "core_record_id": None,
+                            "core_record_id": (
+                                current_record["id"]
+                            ),
+                            "vv_media_id": (
+                                current_record[
+                                    "vv_media_id"
+                                ]
+                            ),
+                            "version_no": (
+                                current_record[
+                                    "version_no"
+                                ]
+                            ),
                             "record_key": record_key,
                             "content_hash": (
                                 core_record[
                                     "content_hash"
                                 ]
                             ),
+                            "pipeline_version": (
+                                pipeline_version
+                            ),
                         }
 
-                    core_record_id = (
+                    # -----------------------------------------
+                    # New logical Media record
+                    # -----------------------------------------
+
+                    if current_record is None:
+
+                        vv_media_id = (
+                            mediaRepository
+                            .get_next_vv_media_id(
+                                cursor=cursor
+                            )
+                        )
+
+                        version_no = 1
+                        change_type = "NEW"
+
+                    # -----------------------------------------
+                    # New version of an existing Media record
+                    # -----------------------------------------
+
+                    else:
+                        (
+                            mediaRepository
+                            .close_current_media_record(
+                                cursor=cursor,
+                                core_record_id=(
+                                    current_record["id"]
+                                ),
+                            )
+                        )
+
+                        vv_media_id = (
+                            current_record[
+                                "vv_media_id"
+                            ]
+                        )
+
+                        version_no = (
+                            current_record[
+                                "version_no"
+                            ]
+                            + 1
+                        )
+
+                        if (
+                            current_record[
+                                "content_hash"
+                            ]
+                            == core_record[
+                                "content_hash"
+                            ]
+                        ):
+                            change_type = (
+                                "REPROCESSED"
+                            )
+
+                        else:
+                            change_type = (
+                                "UPDATED"
+                            )
+
+                    # -----------------------------------------
+                    # Insert new current version
+                    # -----------------------------------------
+
+                    record_to_insert = {
+                        **core_record,
+                        "vv_media_id": (
+                            vv_media_id
+                        ),
+                        "version_no": (
+                            version_no
+                        ),
+                        "change_type": (
+                            change_type
+                        ),
+                    }
+
+                    inserted_record = (
                         mediaRepository
                         .insert_media_record(
                             cursor=cursor,
-                            record_data=core_record,
+                            record_data=(
+                                record_to_insert
+                            ),
                         )
                     )
+
+                    # -----------------------------------------
+                    # Mark Raw file as successfully parsed
+                    # -----------------------------------------
 
                     (
                         mediaRepository
@@ -153,16 +269,30 @@ class MediaCoreService:
                     )
 
                     return {
+                        "action": change_type,
                         "inserted": True,
                         "duplicate": False,
                         "core_record_id": (
-                            core_record_id
+                            inserted_record["id"]
+                        ),
+                        "vv_media_id": (
+                            inserted_record[
+                                "vv_media_id"
+                            ]
+                        ),
+                        "version_no": (
+                            inserted_record[
+                                "version_no"
+                            ]
                         ),
                         "record_key": record_key,
                         "content_hash": (
                             core_record[
                                 "content_hash"
                             ]
+                        ),
+                        "pipeline_version": (
+                            pipeline_version
                         ),
                     }
 
@@ -177,6 +307,9 @@ class MediaCoreService:
     ) -> None:
         """
         Mark one Raw Media file as FAILED.
+
+        This runs in a separate transaction after
+        Core processing has been rolled back.
         """
 
         connection = (

@@ -29,6 +29,9 @@ from services.adverseMediaPipeline.mediaCoreService import (
 from services.adverseMediaPipeline.mediaIdentityService import (
     MediaIdentityService,
 )
+from services.common.pipelineVersionService import (
+    PipelineVersionService,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -86,6 +89,17 @@ def run_media_pipeline(
     # =====================================================
 
     media_config = load_media_config()
+
+    pipeline_version = (
+    PipelineVersionService.resolve(
+        repository_root=ROOT_DIR
+    )
+)
+
+    logger.info(
+        "Media Pipeline version: %s",
+        pipeline_version,
+    )
 
     global_config = media_config.get(
         "global",
@@ -366,6 +380,7 @@ def run_media_pipeline(
                     record_type=(
                         record_type
                     ),
+                    pipeline_version=pipeline_version,
                 )
             )
 
