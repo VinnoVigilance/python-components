@@ -174,8 +174,8 @@ an `enum` rule (see `CLAUDE.md` §1).
   `<LIST>_<YYYYMMDD_HHMMSS>.html` (matches the downloader convention). Avoid
   `source_name == list_name` in the config — it makes a doubled
   `X/X/…` directory.
-- **Dev stages** (`scripts/stage_*.py`, `scripts/run_all_no_db.py`) run the
-  pipeline DB-free. The real output of `extract` is
+- **Dev stages** (`scripts/watchlist/stage_*.py`, `scripts/watchlist/run_all_no_db.py`)
+  run the pipeline DB-free. The real output of `extract` is
   `data/raw/<LIST>_extracted.jsonl`. `meta.json` is a sidecar for chaining
   file-based stages and is **not** written for crawler sources.
 - **Validate the extract before building mapping.** Onboarding order:

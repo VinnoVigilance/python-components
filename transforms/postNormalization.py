@@ -53,6 +53,19 @@ def empty_dependency_handler(entity, rule, config=None):
     entity[tgt_list_name] = tgt_list
 
 
+def _iso_or_blank(text, date_order):
+    """Full date -> ISO 'YYYY-MM-DD'; non-date -> ''; partial -> None (keep as written)."""
+    parsed = parse_date_string(text, date_order)
+
+    if parsed and parsed[0] and parsed[1] and parsed[2]:
+        return f"{parsed[0]}-{parsed[1]}-{parsed[2]}"
+
+    if not parsed:
+        return ""
+
+    return None
+
+
 def date_normalization_handler(entity, rule, config=None):
     # If a DATE_NORMALIZATION rule is running then date_order genuinely
     # decides how ambiguous dates read (03/04 as 3 Apr under DMY vs 4 Mar
@@ -90,19 +103,16 @@ def date_normalization_handler(entity, rule, config=None):
                 if leaf not in item:
                     continue
 
-                parsed = parse_date_string(item.get(leaf), date_order)
                 # Only a whole date earns an ISO value (the resolver's own rule);
                 # a non-date (empty, junk, PERMANENT) is blanked so a permanent
                 # measure reads as "no end", partial dates are left as written.
-                if parsed and parsed[0] and parsed[1] and parsed[2]:
-                    item[leaf] = f"{parsed[0]}-{parsed[1]}-{parsed[2]}"
-                elif not parsed:
-                    item[leaf] = ""
+                iso = _iso_or_blank(item.get(leaf), date_order)
+
+                if iso is not None:
+                    item[leaf] = iso
 
         return
 
-    # Row-array mode (the original behaviour): resolve a whole Dates[]-style
-    # array of date rows into normalised rows.
     source_path = rule["condition_path"]
 
     if source_path not in entity:
@@ -110,10 +120,19 @@ def date_normalization_handler(entity, rule, config=None):
 
     values = entity.get(source_path)
 
-    if not isinstance(values, list):
+    # Row-array mode (the original behaviour): resolve a whole Dates[]-style
+    # array of date rows into normalised rows.
+    if isinstance(values, list):
+        entity[source_path] = resolve_dates(values, date_order)
         return
 
-    entity[source_path] = resolve_dates(values, date_order)
+    # Top-level scalar mode: a flat date string field (e.g. DateAdded,
+    # DateUpdated) reformatted to one ISO shape by the same resolver rules.
+    if isinstance(values, str) and values.strip():
+        iso = _iso_or_blank(values, date_order)
+
+        if iso is not None:
+            entity[source_path] = iso
 
 def normalize_body_text_handler(entity, rule, config=None):
     """Create normalized plain text from Content.BodyOriginalValue."""

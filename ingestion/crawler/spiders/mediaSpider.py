@@ -366,6 +366,9 @@ class MediaSpider(scrapy.Spider):
 
         Optional:
 
+        multiple: true         -> return a de-duped list of every match
+        prefix: "https://..."  -> prepend to the value (or each list item)
+
         extraction:
             strategy: regex
             pattern: "..."
@@ -400,19 +403,37 @@ class MediaSpider(scrapy.Spider):
             if not selected_nodes:
                 return None
 
+            multiple = bool(
+                field_config.get("multiple", False)
+            )
+
             if output == "text":
 
-                texts = selected_nodes.xpath(
-                    ".//text()"
-                ).getall()
+                if multiple:
+                    value = [
+                        self._clean_text(
+                            " ".join(
+                                node.xpath(".//text()").getall()
+                            )
+                        )
+                        for node in selected_nodes
+                    ]
+                    value = [item for item in value if item]
 
-                value = self._clean_text(
-                    " ".join(texts)
-                )
+                else:
+                    value = self._clean_text(
+                        " ".join(
+                            selected_nodes.xpath(".//text()").getall()
+                        )
+                    )
 
             elif output == "html":
 
-                value = selected_nodes.get()
+                value = (
+                    selected_nodes.getall()
+                    if multiple
+                    else selected_nodes.get()
+                )
 
             elif output == "attribute":
 
@@ -426,18 +447,31 @@ class MediaSpider(scrapy.Spider):
                         "when output=attribute"
                     )
 
-                value = selected_nodes.attrib.get(
-                    attribute
+                nodes = (
+                    selected_nodes
+                    if multiple
+                    else selected_nodes[:1]
                 )
 
-                if (
-                    value
-                    and attribute
-                    in {"href", "src"}
-                ):
-                    value = response.urljoin(
-                        value
-                    )
+                collected = []
+
+                for node in nodes:
+
+                    raw = node.attrib.get(attribute)
+
+                    if not raw:
+                        continue
+
+                    if attribute in {"href", "src"}:
+                        raw = response.urljoin(raw)
+
+                    if raw not in collected:
+                        collected.append(raw)
+
+                if multiple:
+                    value = collected
+                else:
+                    value = collected[0] if collected else None
 
             else:
                 raise ValueError(
@@ -449,11 +483,19 @@ class MediaSpider(scrapy.Spider):
             "extraction"
         )
 
-        if extraction:
+        if extraction and not isinstance(value, list):
             value = self._apply_extraction(
                 value=value,
                 extraction=extraction,
             )
+
+        prefix = field_config.get("prefix")
+
+        if prefix and value:
+            if isinstance(value, list):
+                value = [f"{prefix}{item}" for item in value]
+            else:
+                value = f"{prefix}{value}"
 
         return value
 
@@ -639,9 +681,11 @@ class MediaSpider(scrapy.Spider):
         """
 
         if source_record_id:
-            return str(
-                source_record_id
-            ).strip()
+            return re.sub(
+                r"[\\/]+",
+                "-",
+                str(source_record_id).strip(),
+            )
 
         return hashlib.sha256(
             record_key.encode(

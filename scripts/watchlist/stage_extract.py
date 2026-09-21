@@ -2,9 +2,9 @@
 (crawler / saved_html sources), DB-free. Writes data/raw/<LIST>_extracted.jsonl.
 
 Usage:
-    python -m scripts.stage_extract EU-MOST-WANTED
-    python -m scripts.stage_extract DFAT --source-file data/downloads/DFAT_2026....xlsx
-    python -m scripts.stage_extract EU-MOST-WANTED --preview
+    python -m scripts.watchlist.stage_extract EU-MOST-WANTED
+    python -m scripts.watchlist.stage_extract DFAT --source-file data/downloads/DFAT_2026....xlsx
+    python -m scripts.watchlist.stage_extract EU-MOST-WANTED --preview
 """
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts._harness import finish, get_config, is_crawler, stage_extract, write_meta
+from scripts.watchlist._harness import finish, get_config, is_crawler, stage_extract, write_meta
 
 
 def main(argv=None) -> None:

@@ -1252,6 +1252,15 @@ WATCHLIST_CONFIGS = {
                 },
             },
             {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "list.date_of_sanction",
+                    "pattern": r"(?i)^(?P<period>ongoing)$",
+                    "outputs": {"period": "wb_sanction_period"},
+                },
+            },
+            {
                 "handler": "set_constant_field",
                 "level": "record",
                 "config": {

@@ -5,8 +5,8 @@ writes data/raw/ + data/final/, and prints extracted/written counts. A list that
 0 records is flagged. Errors are caught so one bad list doesn't stop the rest.
 
 Usage:
-    python -m scripts.run_all_no_db                 # all lists
-    python -m scripts.run_all_no_db UN-SANCTIONS DFAT   # only these
+    python -m scripts.watchlist.run_all_no_db                 # all lists
+    python -m scripts.watchlist.run_all_no_db UN-SANCTIONS DFAT   # only these
 """
 from __future__ import annotations
 
@@ -15,10 +15,10 @@ import sys
 import traceback
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
-from scripts._harness import run_chain
+from scripts.watchlist._harness import run_chain
 
 
 def main(argv=None) -> None:

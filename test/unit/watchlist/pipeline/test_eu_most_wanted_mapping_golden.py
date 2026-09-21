@@ -35,7 +35,7 @@ from services.watchlistPipeline import watchlistNormalizationService as norm
 pytestmark = pytest.mark.unit
 
 FIXTURE = (
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[3]
     / "fixtures" / "sources" / "EU-MOST-WANTED_raw_sample.jsonl"
 )
 
@@ -98,8 +98,10 @@ class TestEuMostWantedMappingGolden:
         }
 
     def test_published_split_into_added_and_updated(self, primary):
-        assert primary["DateAdded"] == "September 7, 2020"
-        assert primary["DateUpdated"] == "October 13, 2021"
+        # Split out of the one ``published`` string, then ISO-normalized by the
+        # DateAdded/DateUpdated date rules.
+        assert primary["DateAdded"] == "2020-09-07"
+        assert primary["DateUpdated"] == "2021-10-13"
 
     def test_attachment_types(self, primary):
         assert [a["Type"] for a in primary["Attachments"]] == [

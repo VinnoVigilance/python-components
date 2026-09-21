@@ -19,6 +19,15 @@ jobs:
     name: Tests (unit + mocked, no real DB)
     runs-on: ubuntu-latest
 
+    # Split the unit suite across parallel jobs (pytest-split) so the slow
+    # golden/conformance tests don't serialize into one long run. Each job runs
+    # its own even slice; -n auto then spreads that slice across the runner's
+    # cores. fail-fast off so one shard's failure still lets the others report.
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
+
     # Dummy values so that modules which read config at import time (via
     # config/settings.py) can be imported. No real secret is ever used or
     # needed here: the tests that run below never open a real connection.
@@ -46,8 +55,8 @@ jobs:
       # Run everything EXCEPT tests that need a real database, live internet,
       # or a full end-to-end pipeline. Those tiers require infrastructure that
       # is not wired into CI yet (see test/README.md).
-      - name: Run tests
-        run: pytest -m "not db and not network and not e2e" --cov --cov-report=term-missing
+      - name: Run tests (shard ${{ matrix.group }} of 4)
+        run: pytest -n auto -m "not db and not network and not e2e" --splits 4 --group ${{ matrix.group }}
 
   # ---------------------------------------------------------------------------
   # Real-database integration tests. Spins up a disposable PostgreSQL, loads the

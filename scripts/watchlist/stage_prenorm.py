@@ -3,16 +3,16 @@ preprocess artifact (per-source raw cleanup before mapping). DB-free.
 Reads data/final/<LIST>_preprocessed.jsonl, writes data/raw/<LIST>_prenorm.jsonl.
 
 Usage:
-    python -m scripts.stage_prenorm EU-MOST-WANTED --preview
+    python -m scripts.watchlist.stage_prenorm EU-MOST-WANTED --preview
 """
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts._harness import (
+from scripts.watchlist._harness import (
     finish,
     get_config,
     load_stage_input,

@@ -7,9 +7,9 @@ early (e.g. before mapping rules exist). For crawler sources the spider does ext
 everything else parses the latest download.
 
 Usage:
-    python -m scripts.run_pipeline_no_db EU-MOST-WANTED
-    python -m scripts.run_pipeline_no_db EU-MOST-WANTED --to preprocess
-    python -m scripts.run_pipeline_no_db DFAT --source-file <path> --preview
+    python -m scripts.watchlist.run_pipeline_no_db EU-MOST-WANTED
+    python -m scripts.watchlist.run_pipeline_no_db EU-MOST-WANTED --to preprocess
+    python -m scripts.watchlist.run_pipeline_no_db DFAT --source-file <path> --preview
 """
 from __future__ import annotations
 
@@ -17,9 +17,9 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts._harness import STAGES, run_chain
+from scripts.watchlist._harness import STAGES, run_chain
 
 
 def main(argv=None) -> None:
