@@ -413,3 +413,72 @@ sources:
           - source_name
           - dataset_name
           - SourceRecordId
+
+  UK_GOV_NEWS_COMMUNICATIONS:
+    enabled: true
+    active: true
+
+    source_name: UK_GOV
+    dataset_name: UK_GOV_NEWS_COMMUNICATIONS
+    dataset_category: News Article
+
+    schedule: daily
+    date_order: YMD
+
+    source_page_url: https://www.gov.uk/search/news-and-communications
+
+    url: https://www.gov.uk/api/search.json
+
+    acquisition:
+      type: api
+      download_method: API
+
+    api_config:
+      params:
+        filter_content_purpose_supergroup: news_and_communications
+        reject_content_purpose_subgroup: decisions
+        order: "-public_timestamp"
+        fields: "title,link,description,public_timestamp,updated_at,content_store_document_type,format,organisations,primary_publishing_organisation,people,roles,world_locations,topical_events,content_id,content_purpose_subgroup,indexable_content"
+
+      pagination:
+        type: offset
+        offset_param: start
+        size_param: count
+        page_size: 1000
+        start_page: 0
+
+      items_path: results
+
+      write_mode: record_files
+      record_id_path: link
+
+      transport: requests
+      timeout: 30
+      retry: 3
+      throttle_delay: 0.5
+
+    parser:
+      type: json
+
+    identity:
+      external_id:
+        field: content_id
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - content_id
+
+    preprocessing:
+      - handler: build_url_from_template
+        level: record
+        config:
+          output_field: SourceURL
+          template: "https://www.gov.uk{link}"
+
+      - handler: build_url_from_template
+        level: record
+        config:
+          output_field: ContentApiUrl
+          template: "https://www.gov.uk/api/content{link}"
