@@ -290,3 +290,126 @@ sources:
           - source_name
           - dataset_name
           - SourceRecordId
+
+  DOJ_PH_NEWS:
+    enabled: true
+    active: true
+
+    source_name: DOJ_PH
+    dataset_name: DOJ_PH_NEWS
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+
+    url: https://www.doj.gov.ph/news.html
+
+    date_order: DMY
+
+    acquisition:
+      type: crawler
+      spider: media
+      fetch_strategy: saved_html
+      download_method: BYPASS
+
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 2
+        randomize_download_delay: true
+        retry_times: 3
+
+    bypass_config:
+      challenge: cloudflare
+      headless: false
+      timeout_seconds: 120
+
+      success_criteria:
+        - "News Articles"
+
+      actions:
+        - action: wait
+          type: selector
+          selector: "#blog-full-width"
+          timeout: 120
+
+        - action: save_html
+          filename_pattern: "{source}_{list}_{timestamp}.html"
+
+      validation:
+        required_content:
+          - "news_article.html?newsid="
+
+        min_size_bytes: 10000
+
+    detail_fetch_strategy: browser
+
+    detail_browser:
+      headless: false
+      timeout_seconds: 120
+
+      wait_selector: ".single-post .post-content"
+
+      success_criteria:
+        - "More News Articles"
+
+    storage:
+      save_detail_pages: true
+      reuse_saved_detail_pages: false
+      minimum_detail_size_bytes: 5000
+
+    discovery:
+      strategy: list_detail
+
+      start_url: https://www.doj.gov.ph/news.html
+      start_page: 1
+
+      pagination:
+        type: none
+
+      article:
+        link_selector: "#blog-full-width h3.blogpost-title a, #blog-full-width table td[align='justify'] > a"
+
+      known_record:
+        field: SourceRecordId
+
+      stop_condition:
+        type: consecutive_known_records
+        threshold: 10
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: "[?&]newsid=([^&]+)"
+
+      Title:
+        selector: ".global-page-header h2"
+        output: text
+
+      Summary:
+        selector: "meta[name='description']"
+        output: attribute
+        attribute: content
+
+      date.originalValue:
+        selector: ".global-page-header .portfolio-meta span"
+        output: text
+
+      BodyOriginalValue:
+        selector: ".single-post .post-content"
+        output: html
+
+    parser:
+      type: html
+
+    identity:
+      external_id:
+        field: SourceRecordId
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId

@@ -9,6 +9,9 @@ from ingestion.bypassCollector.engines.stealthBrowserEngine import (
     StealthBrowserEngine,
 )
 from ingestion.crawler.spiders.genericSpider import GenericSpider
+from ingestion.crawler.browserDetailFetcher import (
+    BrowserDetailFetcher,
+)
 
 
 _ITERATION_FINISHED = object()
@@ -263,6 +266,14 @@ class SavedHtmlSpider(GenericSpider):
         self,
         pending_details,
     ):
+        """
+        Fetch Watchlist detail pages through the
+        shared browser fetcher.
+
+        Watchlist record extraction and output format
+        remain unchanged.
+        """
+
         if self.storage is None:
             raise ValueError(
                 "Crawler storage is required "
@@ -279,147 +290,48 @@ class SavedHtmlSpider(GenericSpider):
             {},
         )
 
-        wait_selector = browser_config.get(
-            "wait_selector"
-        )
+        fetcher = BrowserDetailFetcher(
+            browser_config=browser_config,
+            storage_config=storage_config,
 
-        timeout_seconds = int(
-            browser_config.get(
-                "timeout_seconds",
-                90,
-            )
-        )
-
-        reuse_saved_pages = bool(
-            storage_config.get(
-                "reuse_saved_detail_pages",
-                True,
-            )
-        )
-
-        minimum_saved_size = int(
-            storage_config.get(
-                "minimum_detail_size_bytes",
-                1000,
-            )
-        )
-
-        engine = None
-
-        try:
-            for index, item in enumerate(
-                pending_details,
-                start=1,
-            ):
-                detail_url = item["detail_url"]
-                record_id = item["record_id"]
-
-                detail_file_path = (
+            # Preserve the existing Watchlist
+            # attachments/members/{record_id}.html
+            # cache location.
+            cache_path_builder=(
+                lambda item: (
                     self.storage.detail_path
-                    / f"{record_id}.html"
+                    / f"{item['record_id']}.html"
                 )
+            ),
 
-                self.logger.info(
-                    "Processing unique detail page "
-                    "%s/%s: %s",
-                    index,
-                    len(pending_details),
-                    detail_url,
-                )
+            # Keep this injected so the existing
+            # Watchlist regression tests continue
+            # patching the same engine.
+            engine_factory=(
+                StealthBrowserEngine
+            ),
 
-                if (
-                    reuse_saved_pages
-                    and detail_file_path.is_file()
-                    and detail_file_path.stat().st_size
-                    >= minimum_saved_size
-                ):
-                    self.logger.info(
-                        "Reusing saved detail page: %s",
-                        detail_file_path,
-                    )
+            component_logger=self.logger,
+        )
 
-                    detail_response = HtmlResponse(
-                        url=detail_url,
-                        body=(
-                            detail_file_path.read_bytes()
-                        ),
-                        encoding="utf-8",
-                    )
+        for (
+            item,
+            detail_response,
+        ) in fetcher.fetch(
+            pending_details
+        ):
+            # GenericSpider.parse_detail keeps the exact
+            # existing Watchlist output contract:
+            #
+            # source_record_id
+            # list
+            # detail
+            # attachments
+            yield from super().parse_detail(
+                response=detail_response,
+                **item,
+            )
 
-                    yield from super().parse_detail(
-                        response=detail_response,
-                        **item,
-                    )
-
-                    continue
-
-                if engine is None:
-                    self.logger.info(
-                        "Starting detail browser."
-                    )
-
-                    engine = StealthBrowserEngine(
-                        headless=browser_config.get(
-                            "headless",
-                            False,
-                        ),
-                        successCriteria=(
-                            browser_config.get(
-                                "success_criteria",
-                                [],
-                            )
-                        ),
-                        timeoutSeconds=timeout_seconds,
-                    )
-
-                    engine.__enter__()
-
-                if not engine.navigate(detail_url):
-                    raise RuntimeError(
-                        "Could not open detail page: "
-                        f"{detail_url}"
-                    )
-
-                if (
-                    wait_selector
-                    and not engine.waitForElement(
-                        wait_selector,
-                        timeout_seconds,
-                    )
-                ):
-                    raise RuntimeError(
-                        "Detail page did not "
-                        "become ready: "
-                        f"{detail_url}"
-                    )
-
-                html = engine.getHtml()
-
-                if not html:
-                    raise RuntimeError(
-                        "Detail page returned "
-                        "empty HTML: "
-                        f"{detail_url}"
-                    )
-
-                detail_response = HtmlResponse(
-                    url=detail_url,
-                    body=html.encode("utf-8"),
-                    encoding="utf-8",
-                )
-
-                yield from super().parse_detail(
-                    response=detail_response,
-                    **item,
-                )
-
-        finally:
-            if engine is not None:
-                engine.__exit__(
-                    None,
-                    None,
-                    None,
-                )
 
     def _extract_saved_detail_url(
         self,

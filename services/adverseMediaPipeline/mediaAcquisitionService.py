@@ -1,5 +1,7 @@
 import logging
+
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from infrastructure.database.connection import (
@@ -9,6 +11,10 @@ from infrastructure.database.connection import (
 from ingestion.apiCollector.interface import (
     ApiCollectorTask,
     collect_artifacts,
+)
+
+from ingestion.bypassCollector import (
+    BypassCollector,
 )
 
 from ingestion.crawler.interface import (
@@ -37,6 +43,11 @@ from services.adverseMediaPipeline.mediaFileStorageService import (
 
 
 logger = logging.getLogger(__name__)
+
+
+ROOT_DIR = Path(
+    __file__
+).resolve().parents[2]
 
 
 @dataclass
@@ -69,7 +80,7 @@ class MediaAcquisitionService:
         -> SeaweedFS
         -> raw.media_file
 
-    Processing / normalization is NOT part
+    Processing and normalization are not part
     of this service.
     """
 
@@ -181,7 +192,7 @@ class MediaAcquisitionService:
         )
 
         # =================================================
-        # 5. Persist every acquired file
+        # 5. Persist every acquired detail file
         # =================================================
 
         processed_results: list[
@@ -297,7 +308,7 @@ class MediaAcquisitionService:
 
                     if source_id is None:
                         raise ValueError(
-                            f"Media source not found: "
+                            "Media source not found: "
                             f"{source_name}"
                         )
 
@@ -312,9 +323,9 @@ class MediaAcquisitionService:
 
                     if dataset_id is None:
                         raise ValueError(
-                            f"Media dataset not found: "
+                            "Media dataset not found: "
                             f"{dataset_name} "
-                            f"for source "
+                            "for source "
                             f"{source_name}"
                         )
 
@@ -342,6 +353,7 @@ class MediaAcquisitionService:
     ) -> list[dict[str, Any]]:
 
         if acquisition_type == "crawler":
+
             crawl_result = (
                 MediaAcquisitionService
                 ._crawl_source(
@@ -366,6 +378,7 @@ class MediaAcquisitionService:
             return crawl_result.records
 
         if acquisition_type == "api":
+
             return (
                 MediaAcquisitionService
                 ._collect_api_source(
@@ -374,7 +387,7 @@ class MediaAcquisitionService:
             )
 
         raise ValueError(
-            f"Unsupported Media acquisition type: "
+            "Unsupported Media acquisition type: "
             f"{acquisition_type}"
         )
 
@@ -388,7 +401,55 @@ class MediaAcquisitionService:
         dataset_name: str,
         source_url: str,
     ):
+        """
+        Acquire a crawler-based Media source.
 
+        direct:
+            MediaSpider opens listing and detail pages.
+
+        saved_html:
+            BypassCollector saves the protected listing.
+            SavedHtmlMediaSpider reads that listing and
+            opens each detail page through the browser.
+        """
+
+        acquisition_config = (
+            source_config.get(
+                "acquisition",
+                {},
+            )
+        )
+
+        fetch_strategy = str(
+            acquisition_config.get(
+                "fetch_strategy",
+                "direct",
+            )
+        ).strip().lower()
+
+        source_file_path = None
+
+        if fetch_strategy == "saved_html":
+
+            source_file_path = (
+                MediaAcquisitionService
+                ._collect_bypass_listing(
+                    source_config=source_config,
+                    dataset_name=dataset_name,
+                )
+            )
+
+        elif fetch_strategy != "direct":
+
+            raise ValueError(
+                "Unsupported Media "
+                "fetch_strategy: "
+                f"{fetch_strategy}"
+            )
+
+        # Bypass collection does not need a DB connection.
+        # Obtain the connection only after the listing
+        # has been saved.
         connection = (
             connection_pool.getconn()
         )
@@ -401,7 +462,9 @@ class MediaAcquisitionService:
                         cursor=cursor,
                         source_id=source_id,
                         dataset_id=dataset_id,
-                        source_config=source_config,
+                        source_config=(
+                            source_config
+                        ),
                         known_threshold=(
                             known_threshold
                         ),
@@ -417,7 +480,19 @@ class MediaAcquisitionService:
                         source_config
                     ),
 
-                    fetch_strategy="direct",
+                    fetch_strategy=(
+                        fetch_strategy
+                    ),
+
+                    source_file_path=(
+                        source_file_path
+                    ),
+
+                    download_dir=str(
+                        ROOT_DIR
+                        / "data"
+                        / "downloads"
+                    ),
                 )
 
                 return crawl(
@@ -431,6 +506,60 @@ class MediaAcquisitionService:
             connection_pool.putconn(
                 connection
             )
+
+    @staticmethod
+    def _collect_bypass_listing(
+        source_config: dict[str, Any],
+        dataset_name: str,
+    ) -> str:
+        """
+        Save a protected Media listing page through
+        BypassCollector.
+
+        The listing is an intermediate discovery
+        artifact. It is not registered as an
+        individual Media file in raw.media_file.
+        """
+
+        # BypassCollector uses list_name for its
+        # output path. Media uses dataset_name.
+        bypass_source_config = {
+            **source_config,
+            "list_name": dataset_name,
+        }
+
+        collector = BypassCollector(
+            outputDir=(
+                ROOT_DIR
+                / "data"
+                / "downloads"
+            )
+        )
+
+        collected_path = collector.collect(
+            bypass_source_config
+        )
+
+        if collected_path is None:
+            raise RuntimeError(
+                "Bypass collection failed for "
+                f"{source_config.get('source_name')}/"
+                f"{dataset_name}."
+            )
+
+        listing_path = Path(
+            collected_path
+        ).resolve()
+
+        if not listing_path.is_file():
+            raise FileNotFoundError(
+                "Bypass listing artifact was not "
+                f"found: {listing_path}"
+            )
+
+        return str(
+            listing_path
+        )
 
     @staticmethod
     def _collect_api_source(
@@ -617,8 +746,8 @@ class MediaAcquisitionService:
                 or str(value).strip() == ""
             ):
                 raise ValueError(
-                    f"Missing required Media "
-                    f"configuration: "
+                    "Missing required Media "
+                    "configuration: "
                     f"{field_name}"
                 )
 
@@ -686,3 +815,49 @@ class MediaAcquisitionService:
                 "must use "
                 "acquisition.spider=media."
             )
+
+        fetch_strategy = str(
+            acquisition_config.get(
+                "fetch_strategy",
+                "direct",
+            )
+        ).strip().lower()
+
+        if fetch_strategy not in {
+            "direct",
+            "saved_html",
+        }:
+            raise ValueError(
+                "Crawler-based Media source "
+                "supports acquisition."
+                "fetch_strategy direct or "
+                "saved_html."
+            )
+
+        if fetch_strategy == "saved_html":
+
+            bypass_config = (
+                source_config.get(
+                    "bypass_config",
+                    {},
+                )
+            )
+
+            if not bypass_config:
+                raise ValueError(
+                    "bypass_config is required for "
+                    "Media "
+                    "fetch_strategy=saved_html."
+                )
+
+            actions = bypass_config.get(
+                "actions",
+                [],
+            )
+
+            if not actions:
+                raise ValueError(
+                    "bypass_config.actions is required "
+                    "for Media "
+                    "fetch_strategy=saved_html."
+                )

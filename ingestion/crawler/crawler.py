@@ -1,16 +1,30 @@
 from scrapy.crawler import CrawlerProcess
-from scrapy.utils.project import get_project_settings
+from scrapy.utils.project import (
+    get_project_settings,
+)
 
-from ingestion.crawler.configLoader import load_crawler_config
+from ingestion.crawler.configLoader import (
+    load_crawler_config,
+)
 from ingestion.crawler.models import (
     CrawlerTask,
     CrawlResult,
 )
-from ingestion.crawler.storage import CrawlerStorage
-
-from ingestion.crawler.spiders.genericSpider import GenericSpider
-from ingestion.crawler.spiders.savedHtmlSpider import SavedHtmlSpider
-from ingestion.crawler.spiders.mediaSpider import MediaSpider
+from ingestion.crawler.storage import (
+    CrawlerStorage,
+)
+from ingestion.crawler.spiders.genericSpider import (
+    GenericSpider,
+)
+from ingestion.crawler.spiders.mediaSpider import (
+    MediaSpider,
+)
+from ingestion.crawler.spiders.savedHtmlMediaSpider import (
+    SavedHtmlMediaSpider,
+)
+from ingestion.crawler.spiders.savedHtmlSpider import (
+    SavedHtmlSpider,
+)
 
 
 def crawl_source(
@@ -21,15 +35,24 @@ def crawl_source(
     Run crawler acquisition.
 
     Watchlist behaviour:
-        - saved_html -> SavedHtmlSpider
-        - direct     -> GenericSpider
+
+        direct
+            -> GenericSpider
+
+        saved_html
+            -> SavedHtmlSpider
 
     Adverse Media behaviour:
-        - acquisition.spider=media -> MediaSpider
 
-    Media-specific crawler settings are applied only
-    to MediaSpider, so existing Watchlist behaviour
-    remains unchanged.
+        direct
+            -> MediaSpider
+
+        saved_html
+            -> SavedHtmlMediaSpider
+
+    Media-specific crawler settings are applied
+    only to Media spiders. Existing Watchlist
+    behaviour remains unchanged.
     """
 
     # =====================================================
@@ -83,15 +106,14 @@ def crawl_source(
     )
 
     if is_media:
-        # Media HTML files are stored directly
-        # inside the date folder.
+        # Media stores each detail HTML directly
+        # inside the date directory.
         detail_directory = storage_config.get(
             "detail_directory",
             "",
         )
 
     else:
-        # IMPORTANT:
         # Preserve existing Watchlist behaviour.
         detail_directory = storage_config.get(
             "detail_directory",
@@ -114,13 +136,55 @@ def crawl_source(
 
     if is_media:
 
-        spider_class = MediaSpider
+        # ---------------------------------------------
+        # Adverse Media strategy
+        # ---------------------------------------------
+
+        media_fetch_strategy = str(
+            acquisition_config.get(
+                "fetch_strategy",
+
+                # Backward compatibility:
+                # allow the strategy at the top level
+                # or through CrawlerTask.
+                crawler_config.get(
+                    "fetch_strategy",
+                    task.fetch_strategy,
+                ),
+            )
+        ).strip().lower()
+
+        if media_fetch_strategy == "direct":
+
+            # Existing direct Media behaviour,
+            # including NBI.
+            spider_class = MediaSpider
+
+        elif media_fetch_strategy == "saved_html":
+
+            if not task.source_file_path:
+                raise ValueError(
+                    "Media saved_html strategy "
+                    "requires task.source_file_path."
+                )
+
+            spider_class = (
+                SavedHtmlMediaSpider
+            )
+
+        else:
+
+            raise ValueError(
+                "Unsupported Media "
+                "fetch_strategy: "
+                f"{media_fetch_strategy}"
+            )
 
     else:
 
-        # -------------------------------------------------
-        # Existing Watchlist behaviour
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # Existing Watchlist strategy
+        # ---------------------------------------------
 
         fetch_strategy = str(
             crawler_config.get(
@@ -146,7 +210,7 @@ def crawl_source(
         else:
 
             raise ValueError(
-                f"Unsupported fetch_strategy: "
+                "Unsupported fetch_strategy: "
                 f"{fetch_strategy}"
             )
 
@@ -169,20 +233,21 @@ def crawl_source(
 
     settings.set(
         "USER_AGENT",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/126.0.0.0 Safari/537.36",
+        "Mozilla/5.0 "
+        "(Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/126.0.0.0 "
+        "Safari/537.36",
     )
 
     # =====================================================
     # 7. MEDIA-SPECIFIC HTTP SETTINGS
     # =====================================================
     #
-    # IMPORTANT:
-    # These settings are applied ONLY to Media.
-    #
-    # Watchlist continues using its existing
-    # Scrapy settings exactly as before.
+    # These settings are applied only to Media.
+    # Existing Watchlist Scrapy settings remain
+    # unchanged.
     # =====================================================
 
     if is_media:
@@ -316,15 +381,8 @@ def crawl_source(
 
     if is_media:
 
-        # IMPORTANT:
-        # MediaSpider expects:
-        #
-        #     source_config
-        #
-        # not:
-        #
-        #     crawler_config
-        #
+        # Both MediaSpider and SavedHtmlMediaSpider
+        # expect source_config and discovery_service.
         process.crawl(
             spider_class,
             task=task,
@@ -336,14 +394,7 @@ def crawl_source(
 
     else:
 
-        # -------------------------------------------------
-        # Existing Watchlist call.
-        #
-        # DO NOT change parameter names here.
-        # GenericSpider / SavedHtmlSpider already use
-        # crawler_config.
-        # -------------------------------------------------
-
+        # Preserve existing Watchlist parameter names.
         process.crawl(
             spider_class,
             task=task,
@@ -365,7 +416,8 @@ def crawl_source(
     if is_media:
 
         # Media works with one HTML file per article.
-        # Therefore there is no single source file.
+        # Therefore there is no single source file
+        # returned as a Media acquisition artifact.
         result_source_file_path = None
 
     else:
@@ -398,7 +450,9 @@ def crawl_source(
     # =====================================================
 
     return CrawlResult(
-        source_file_path=result_source_file_path,
+        source_file_path=(
+            result_source_file_path
+        ),
         records=records,
         record_count=len(records),
     )
