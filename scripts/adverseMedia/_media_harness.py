@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import sys
 from contextlib import redirect_stdout
 from copy import deepcopy
@@ -29,6 +30,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from ingestion.apiCollector.interface import ApiCollectorTask, collect_artifacts
 from ingestion.crawler.interface import crawl
 from ingestion.crawler.models import CrawlerTask
 from scripts._shared import DOWNLOADS, emit
@@ -94,14 +96,21 @@ def _load_engines(global_config: dict, source_config: dict) -> MediaNormalizatio
 
 
 def stage_extract(source_config: dict, max_records: int) -> list[dict]:
-    """Crawl the source DB-free (capped at max_records) -> the extracted source records."""
+    """Acquire the source DB-free (capped at max_records) -> the extracted source records.
+    Dispatches by acquisition.type so every ingestion method runs through one entry point."""
     a_type = acquisition_type(source_config)
-    if a_type != "crawler":
-        raise SystemExit(
-            f"The media harness extract stage supports crawler sources only; "
-            f"'{source_config.get('dataset_name')}' is type={a_type or 'unknown'}."
-        )
+    if a_type == "crawler":
+        return _extract_crawler(source_config, max_records)
+    if a_type == "api":
+        return _extract_api(source_config, max_records)
+    raise SystemExit(
+        f"The media harness extract stage does not support acquisition type "
+        f"'{a_type or 'unknown'}' for '{source_config.get('dataset_name')}'."
+    )
 
+
+def _extract_crawler(source_config: dict, max_records: int) -> list[dict]:
+    """Crawl a spider-based source DB-free -> the extracted source records."""
     discovery = _NoDbDiscoveryService(source_config, max_records=max_records)
     task = CrawlerTask(
         url=source_config["url"],
@@ -117,6 +126,29 @@ def stage_extract(source_config: dict, max_records: int) -> list[dict]:
         for record in (result.records or [])
         if record.get("extracted")
     ]
+
+
+def _extract_api(source_config: dict, max_records: int) -> list[dict]:
+    """Collect an API source DB-free -> its raw records. When max_records is set, fetch a
+    single capped page; otherwise page the whole source as the real pipeline would."""
+    config = deepcopy(source_config)
+    api_config = config.setdefault("api_config", {})
+
+    if max_records is not None:
+        pagination = api_config.get("pagination", {})
+        size_param = pagination.get("size_param")
+        params = dict(api_config.get("params", {}))
+        if size_param:
+            params[size_param] = max_records
+        api_config["params"] = params
+        api_config["pagination"] = {"type": "none"}
+
+    task = ApiCollectorTask.from_config(config)
+    task.download_dir = str(DOWNLOADS)
+
+    result = collect_artifacts(task)
+    file_paths = result.file_paths[:max_records] if max_records else result.file_paths
+    return [json.loads(Path(path).read_text(encoding="utf-8")) for path in file_paths]
 
 
 def stage_preprocess(source_config: dict, records: list[dict]) -> list[dict]:
