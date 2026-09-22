@@ -5,9 +5,10 @@ source it runs the real transform chain over a committed extracted sample --
 preprocess (MediaRawRecordService) -> normalize (MediaNormalizationService:
 entity_type stamp -> pre-normalization -> mapping -> post-normalization) -- and
 pins the Sources[] fields that are CONSTANT for a whole dataset (SourceType,
-DatasetCategory, DatasetName, SourceName) plus Publisher.Name. Those come from
-`constant` handlers in mediaMapping.xlsx, so they change only on a deliberate
-re-map.
+DatasetCategory, DatasetName, SourceName) plus Publisher.Name where it too is a
+constant. Those come from `constant` handlers in mediaMapping.xlsx, so they
+change only on a deliberate re-map. (UK_GOV's Publisher.Name is a per-record
+path, so it is not pinned -- omit PublisherName from GOLDEN in that case.)
 
 PCIJ additionally proves the four `multiple` embed fields (Table/Chart/Dashboard/
 Document) flow through mapping into Attachments[] with the right Type.
@@ -43,6 +44,7 @@ SAMPLES = {
     "NBI_PRESS_RELEASES": "NBI_PRESS_RELEASES_extracted_sample.jsonl",
     "AMLC_NEWS_AND_ANNOUNCEMENTS": "AMLC_NEWS_AND_ANNOUNCEMENTS_extracted_sample.jsonl",
     "PCIJ_CORRUPTION_WATCH": "PCIJ_CORRUPTION_WATCH_extracted_sample.jsonl",
+    "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
 }
 
 # dataset_name -> the constant Sources[]/Publisher fields every record must carry.
@@ -63,6 +65,12 @@ GOLDEN = {
         "SourceType": "Official", "DatasetCategory": "News Article",
         "DatasetName": "PCIJ_CORRUPTION_WATCH", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
+    },
+    # UK_GOV's Publisher.Name is a per-record `path` (the publishing org), not a
+    # dataset constant, so it is not pinned here.
+    "UK_GOV_NEWS_COMMUNICATIONS": {
+        "SourceType": "Official", "DatasetCategory": "News Article",
+        "DatasetName": "UK_GOV_NEWS_COMMUNICATIONS", "SourceName": "UK_GOV",
     },
 }
 
@@ -112,7 +120,7 @@ class TestMediaSourceGolden:
 
     def test_sources_constants_match_expected(self, dataset_name):
         expected = GOLDEN[dataset_name]
-        publisher_expected = expected["PublisherName"]
+        publisher_expected = expected.get("PublisherName")
         source_fields = {k: v for k, v in expected.items() if k != "PublisherName"}
 
         records = _canonical_records(dataset_name)
@@ -120,12 +128,13 @@ class TestMediaSourceGolden:
 
         saw_sources = False
         for rec in records:
-            assert (rec.get("Publisher") or {}).get("Name") == publisher_expected, (
-                f"{dataset_name}: Publisher.Name = "
-                f"{(rec.get('Publisher') or {}).get('Name')!r}, expected "
-                f"{publisher_expected!r} -- check the Publisher.Name row under the "
-                f"'{dataset_name}' column in mediaMapping.xlsx"
-            )
+            if publisher_expected is not None:
+                assert (rec.get("Publisher") or {}).get("Name") == publisher_expected, (
+                    f"{dataset_name}: Publisher.Name = "
+                    f"{(rec.get('Publisher') or {}).get('Name')!r}, expected "
+                    f"{publisher_expected!r} -- check the Publisher.Name row under the "
+                    f"'{dataset_name}' column in mediaMapping.xlsx"
+                )
             for src in rec.get("Sources") or []:
                 saw_sources = True
                 for field, want in source_fields.items():
