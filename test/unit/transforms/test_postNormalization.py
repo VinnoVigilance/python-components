@@ -42,27 +42,36 @@ class TestDateWindowStatusHandler:
     PAST = f"{YEAR - 5}-01-01"
     FUTURE = f"{YEAR + 5}-01-01"
 
-    def _status(self, start, end):
-        entity = {"Measures": [{"EffectiveDate": start, "EndDate": end}]}
+    def _status(self, start, end, duration=None):
+        measure = {"EffectiveDate": start, "EndDate": end}
+        if duration is not None:
+            measure["Duration"] = duration
+        entity = {"Measures": [measure]}
         date_window_status_handler(entity, self.RULE, self.CONFIG)
         return entity["Measures"][0]["Status"]
 
     def test_today_inside_window_is_active(self):
         assert self._status(self.PAST, self.FUTURE) == "Active"
 
-    def test_past_end_is_inactive(self):
-        assert self._status(self.PAST, f"{self.YEAR - 1}-12-31") == "Inactive"
+    def test_past_end_is_unknown(self):
+        # A lapsed end does not prove the measure ended -> Unknown, never Inactive.
+        assert self._status(self.PAST, f"{self.YEAR - 1}-12-31") == "Unknown"
 
-    def test_before_start_is_inactive(self):
-        # A measure whose start is in the future has not begun -> Inactive.
-        assert self._status(f"{self.YEAR + 1}-01-01", self.FUTURE) == "Inactive"
+    def test_before_start_is_unknown(self):
+        # A measure whose start is in the future has not begun -> Unknown.
+        assert self._status(f"{self.YEAR + 1}-01-01", self.FUTURE) == "Unknown"
 
-    def test_permanent_end_is_open_ended_active(self):
-        # "PERMANENT" is not a date -> no upper bound -> Active, no crash.
-        assert self._status(self.PAST, "PERMANENT") == "Active"
+    def test_start_with_no_end_and_no_marker_is_unknown(self):
+        # A missing end without an open-ended marker is not provably active.
+        assert self._status(self.PAST, "") == "Unknown"
 
-    def test_missing_end_is_open_ended_active(self):
-        assert self._status(self.PAST, "") == "Active"
+    def test_open_ended_marker_is_active_without_dates(self):
+        # An open-ended Duration marker means in force, no dates needed.
+        assert self._status("", "", duration="Ongoing") == "Active"
+
+    def test_marker_overrides_date_window(self):
+        # The marker wins even when the dates alone would not read active.
+        assert self._status(f"{self.YEAR + 1}-01-01", "", duration="Permanent") == "Active"
 
     def test_leaves_non_list_measures_untouched(self):
         entity = {"Measures": None}
