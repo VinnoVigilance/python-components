@@ -558,7 +558,7 @@ HANDLERS = {
 class PostNormalizationEngine:
 
     def __init__(self, rules_df: pd.DataFrame, config: dict):
-        self.rules_df = rules_df.sort_values("priority")
+        self.rules_df = rules_df
 
         # Carries per source settings such as date_order, so a handler
         # can read a date the way the list that published it writes them.

@@ -299,7 +299,6 @@ class TestSanitizeHtmlHandler:
 class TestEngineEndToEnd:
     def test_runs_rules_and_does_not_mutate_input(self):
         rules_df = pd.DataFrame([{
-            "priority": 1,
             "rule_type": "SEARCH_ENRICH",
             "condition_path": "Names[].Name",
             "target_path": "Names[].Normalized_Name",
