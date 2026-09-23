@@ -53,12 +53,12 @@ SAMPLES = {
 # data/rules/mediaMapping.xlsx.
 GOLDEN = {
     "NBI_PRESS_RELEASES": {
-        "SourceType": "Official", "DatasetCategory": "PRESS_RELEASE",
+        "SourceType": "Official", "DatasetCategory": "Press Release",
         "DatasetName": "NBI_PRESS_RELEASES", "SourceName": "NBI",
         "PublisherName": "NBI",
     },
     "AMLC_NEWS_AND_ANNOUNCEMENTS": {
-        "SourceType": "Official", "DatasetCategory": "PRESS_RELEASE",
+        "SourceType": "Official", "DatasetCategory": "Press Release",
         "DatasetName": "AMLC_NEWS_AND_ANNOUNCEMENTS", "SourceName": "AMLC",
         "PublisherName": "AMLC",
     },
