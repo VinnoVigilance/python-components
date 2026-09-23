@@ -214,7 +214,7 @@ sources:
         url_pattern: "https://pcij.org/category/corruption-watch/page/{page}/"
 
       article:
-        link_selector: "h2.entry-title a"
+        link_selector: "#main h2.entry-title a"
 
       known_record:
         field: SourceRecordId
@@ -354,7 +354,7 @@ sources:
         url_pattern: "https://pcij.org/tag/investigative-reports/page/{page}/"
 
       article:
-        link_selector: "h2.entry-title a"
+        link_selector: "#main h2.entry-title a"
 
       known_record:
         field: SourceRecordId
