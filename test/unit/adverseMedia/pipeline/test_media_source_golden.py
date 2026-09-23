@@ -44,6 +44,7 @@ SAMPLES = {
     "NBI_PRESS_RELEASES": "NBI_PRESS_RELEASES_extracted_sample.jsonl",
     "AMLC_NEWS_AND_ANNOUNCEMENTS": "AMLC_NEWS_AND_ANNOUNCEMENTS_extracted_sample.jsonl",
     "PCIJ_CORRUPTION_WATCH": "PCIJ_CORRUPTION_WATCH_extracted_sample.jsonl",
+    "PCIJ_INVESTIGATIVE_REPORTS": "PCIJ_INVESTIGATIVE_REPORTS_extracted_sample.jsonl",
     "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
 }
 
@@ -52,18 +53,23 @@ SAMPLES = {
 # data/rules/mediaMapping.xlsx.
 GOLDEN = {
     "NBI_PRESS_RELEASES": {
-        "SourceType": "Official", "DatasetCategory": "PRESS_RELEASE",
+        "SourceType": "Official", "DatasetCategory": "Press Release",
         "DatasetName": "NBI_PRESS_RELEASES", "SourceName": "NBI",
         "PublisherName": "NBI",
     },
     "AMLC_NEWS_AND_ANNOUNCEMENTS": {
-        "SourceType": "Official", "DatasetCategory": "PRESS_RELEASE",
+        "SourceType": "Official", "DatasetCategory": "Press Release",
         "DatasetName": "AMLC_NEWS_AND_ANNOUNCEMENTS", "SourceName": "AMLC",
         "PublisherName": "AMLC",
     },
     "PCIJ_CORRUPTION_WATCH": {
         "SourceType": "Official", "DatasetCategory": "News Article",
         "DatasetName": "PCIJ_CORRUPTION_WATCH", "SourceName": "PCIJ",
+        "PublisherName": "PCIJ",
+    },
+    "PCIJ_INVESTIGATIVE_REPORTS": {
+        "SourceType": "Official", "DatasetCategory": "News Article",
+        "DatasetName": "PCIJ_INVESTIGATIVE_REPORTS", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
     # UK_GOV's Publisher.Name is a per-record `path` (the publishing org), not a
@@ -187,3 +193,39 @@ class TestPcijEmbedsBecomeAttachments:
             f"expected several Table attachments from the multi-embed record, "
             f"got {len(tables)}"
         )
+
+
+class TestPcijFeaturedImageAndTags:
+    """FeaturedImageUrl (og:image) -> Attachments[Photograph], TagNames -> Taxonomy.Tags[]."""
+
+    def _by_title(self, needle):
+        for rec in _canonical_records("PCIJ_INVESTIGATIVE_REPORTS"):
+            if needle.lower() in (rec.get("Content") or {}).get("Title", "").lower():
+                return rec
+        raise AssertionError(f"no PCIJ_INVESTIGATIVE_REPORTS sample record matching {needle!r}")
+
+    def test_featured_image_becomes_photograph_attachment(self):
+        rec = self._by_title("Have you come across pro-China propaganda")
+        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Photograph"]
+        assert photos, "expected a Photograph attachment from FeaturedImageUrl"
+        assert photos[0].get("URL"), "Photograph attachment has no URL"
+
+    def test_missing_featured_image_produces_no_photograph_attachment(self):
+        """Some older articles genuinely have no og:image -- must not fabricate one."""
+        rec = self._by_title("SALN files of wannabe presidents")
+        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Photograph"]
+        assert not photos, f"expected no Photograph attachment, got {photos}"
+
+    def test_tag_names_become_taxonomy_tags(self):
+        rec = self._by_title("Have you come across pro-China propaganda")
+        tags = (rec.get("Taxonomy") or {}).get("Tags") or []
+        assert "China" in tags, f"expected 'China' tag, got {tags}"
+        assert all(isinstance(t, str) for t in tags), "Taxonomy.Tags[] must be flat strings"
+
+    def test_embedded_pdf_becomes_document_attachment(self):
+        """Older SALN articles embed the PDF via a raw <iframe src=*.pdf>, not the
+        newer wp-block-file__embed markup -- EmbeddedPdfUrls covers that case."""
+        rec = self._by_title("Duterte")
+        docs = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Document"]
+        assert docs, "expected a Document attachment from EmbeddedPdfUrls"
+        assert ".pdf" in (docs[0].get("URL") or ""), docs[0].get("URL")

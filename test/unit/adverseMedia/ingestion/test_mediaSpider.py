@@ -1,12 +1,20 @@
 """Unit tests for MediaSpider field extraction (multiple / prefix), the
 full-path SourceRecordId regex, and filename-safe record ids."""
 
+from pathlib import Path
+from unittest.mock import MagicMock
+
 import pytest
+import yaml
 from scrapy.http import HtmlResponse
 
 from ingestion.crawler.spiders.mediaSpider import MediaSpider
 
 pytestmark = pytest.mark.unit
+
+MEDIA_CONFIG_PATH = (
+    Path(__file__).resolve().parents[4] / "config" / "mediaSources.yaml"
+)
 
 
 HTML = """
@@ -107,6 +115,76 @@ class TestExtractField:
             },
         )
         assert value is None
+
+
+# PCIJ's listing pages carry a hidden "recommended article" popup block that
+# reuses the exact same `entry-title` markup as real listed articles, but
+# lives outside the page's #main content area. link_selector must be scoped
+# so the popup is never picked up as a discovered article.
+LISTING_HTML_WITH_DECOY = """
+<html><body>
+  <main id="main" class="site-main">
+    <article>
+      <h2 class="entry-title"><a href="/2026/09/06/real-article/">Real</a></h2>
+    </article>
+  </main>
+  <div class="newspack-popup-container newspack-lightbox hidden">
+    <article>
+      <h2 class="entry-title"><a href="/2025/10/29/decoy-popup-ad/">Decoy</a></h2>
+    </article>
+  </div>
+</body></html>
+"""
+
+
+def _pcij_source_config(dataset_name):
+    with MEDIA_CONFIG_PATH.open(encoding="utf-8") as handle:
+        media_config = yaml.safe_load(handle)
+    return media_config["sources"][dataset_name]
+
+
+class TestPcijListingSelectorExcludesPopup:
+    """Regression guard for the #main scoping fix: locks in the real
+    config's link_selector against a page shaped like PCIJ's, so a future
+    change back to a bare `h2.entry-title a` fails this test."""
+
+    @pytest.mark.parametrize(
+        "dataset_name",
+        ["PCIJ_CORRUPTION_WATCH", "PCIJ_INVESTIGATIVE_REPORTS"],
+    )
+    def test_only_the_main_content_article_is_discovered(self, dataset_name):
+        source_config = _pcij_source_config(dataset_name)
+
+        discovery_service = MagicMock()
+        discovery_service.build_record_key.side_effect = (
+            lambda record: record["SourceURL"]
+        )
+        discovery_service.check_record_key.return_value = (False, False)
+
+        spider = MediaSpider(
+            task=None,
+            source_config=source_config,
+            storage=None,
+            records=[],
+            discovery_service=discovery_service,
+        )
+
+        response = HtmlResponse(
+            url="https://pcij.org/category/corruption-watch/",
+            body=LISTING_HTML_WITH_DECOY.encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        requests = [
+            item
+            for item in spider.parse_listing(response, page_number=1)
+            if hasattr(item, "url")
+        ]
+
+        urls = [request.url for request in requests]
+
+        assert any("real-article" in url for url in urls)
+        assert not any("decoy-popup-ad" in url for url in urls)
 
 
 class TestSourceRecordIdRegex:

@@ -6,7 +6,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, Iterator, List
+from typing import Any, Callable, Iterable, Iterator, List, Optional
 
 import requests
 
@@ -64,8 +64,15 @@ def collect_source(task: ApiCollectorTask) -> str:
     return str(output_path)
 
 
-def collect_artifacts(task: ApiCollectorTask) -> ApiCollectionResult:
-    """Collect a multi-file API source and return its raw file paths."""
+def collect_artifacts(
+    task: ApiCollectorTask,
+    stop_check: Optional[Callable[[List[Any]], bool]] = None,
+) -> ApiCollectionResult:
+    """Collect a multi-file API source and return its raw file paths.
+
+    ``stop_check(items)``, if given, runs after each page; once it returns
+    True, no further pages are requested (records already written stay).
+    """
 
     if task.write_mode != "record_files":
         raise ValueError(
@@ -76,7 +83,7 @@ def collect_artifacts(task: ApiCollectorTask) -> ApiCollectionResult:
     transport = _build_transport(task)
 
     with transport:
-        return _collect_record_files(task, transport, collected_at)
+        return _collect_record_files(task, transport, collected_at, stop_check)
 
 
 def _collect_list_detail(
@@ -126,6 +133,7 @@ def _collect_record_files(
     task: ApiCollectorTask,
     transport: Any,
     collected_at: datetime,
+    stop_check: Optional[Callable[[List[Any]], bool]] = None,
 ) -> ApiCollectionResult:
     """Write each collected API record to its own JSON file."""
 
@@ -138,7 +146,7 @@ def _collect_record_files(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     total_hint = _startup_probe(task, transport)
-    pages = _iter_pages(task, transport)
+    pages = _iter_pages(task, transport, stop_check)
 
     if task.dedup_path:
         pages = _dedup_pages(pages, task.dedup_path)
@@ -293,6 +301,7 @@ def _dedup_pages(
 def _iter_pages(
     task: ApiCollectorTask,
     transport: Any,
+    stop_check: Optional[Callable[[List[Any]], bool]] = None,
 ) -> Iterator[List[Any]]:
     """Yield every page: fan-out slices when faceting is on, else param_variants,
     else a single fetch with ``params``."""
@@ -305,7 +314,7 @@ def _iter_pages(
     for index, variant in enumerate(variants):
         params = {**task.params, **variant}
 
-        yield from _iter_variant_pages(task, params, transport)
+        yield from _iter_variant_pages(task, params, transport, stop_check)
 
         if task.throttle_delay and index < len(variants) - 1:
             time.sleep(task.throttle_delay)
@@ -501,9 +510,11 @@ def _iter_variant_pages(
     task: ApiCollectorTask,
     params: dict,
     transport: Any,
+    stop_check: Optional[Callable[[List[Any]], bool]] = None,
 ) -> Iterator[List[Any]]:
     """Page one param-set until an empty (or, for a capped API, a short/over-cap)
-    page. A ``type: "none"`` source yields one request and stops."""
+    page, or until ``stop_check`` says we've reached already-known records.
+    A ``type: "none"`` source yields one request and stops."""
 
     pagination_type = task.pagination.get("type", "page")
     page = task.pagination.get("start_page", 1)
@@ -529,6 +540,9 @@ def _iter_variant_pages(
         yield items
 
         fetched += page_count
+
+        if stop_check is not None and stop_check(items):
+            return
 
         if pagination_type == "none":
             return

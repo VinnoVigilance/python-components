@@ -8,7 +8,13 @@ import unicodedata
 
 from inscriptis import get_text
 
-from transforms.dateResolver import parse_date_string, resolve_dates
+from transforms.dateResolver import (
+    parse_date_string,
+    resolve_dates,
+    read_day,
+    read_month,
+    read_year,
+)
 from transforms.searchEnrichment import (
     normalize_text,
     tokenize,
@@ -133,6 +139,37 @@ def date_normalization_handler(entity, rule, config=None):
 
         if iso is not None:
             entity[source_path] = iso
+
+
+def date_component_handler(entity, rule, config=None):
+    """Normalize standalone day/month/year leaves on an array (e.g. Occupations[]
+    Since/To parts) via the resolver's read_day/read_month/read_year."""
+    array_name = str(rule["condition_path"]).split("[]")[0].strip(". ")
+    items = entity.get(array_name)
+
+    if not isinstance(items, list):
+        return
+
+    readers = {"day": read_day, "month": read_month, "year": read_year}
+    spec = _parse_kv(rule.get("value"))
+
+    for mode, reader in readers.items():
+        leaves = [
+            leaf.strip()
+            for leaf in spec.get(mode, "").split(",")
+            if leaf.strip()
+        ]
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            for leaf in leaves:
+                if leaf not in item:
+                    continue
+
+                item[leaf] = reader(item.get(leaf))
+
 
 def normalize_body_text_handler(entity, rule, config=None):
     """Create normalized plain text from Content.BodyOriginalValue."""
@@ -552,6 +589,7 @@ HANDLERS = {
     "NORMALIZE_BODY_TEXT": normalize_body_text_handler,
     "SEARCH_ENRICH": search_enrich_handler,
     "DEDUPLICATE_ALL_ARRAYS": deduplicate_all_arrays_handler,
+    "DATE_COMPONENT_NORMALIZE": date_component_handler,
 }
 
 
