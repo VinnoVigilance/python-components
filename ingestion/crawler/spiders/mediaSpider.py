@@ -423,7 +423,7 @@ class MediaSpider(scrapy.Spider):
                 else:
                     value = self._clean_text(
                         " ".join(
-                            selected_nodes.xpath(".//text()").getall()
+                            selected_nodes[0].xpath(".//text()").getall()
                         )
                     )
 
