@@ -648,3 +648,59 @@ sources:
         config:
           output_field: ContentApiUrl
           template: "https://www.gov.uk/api/content{link}"
+
+  DTI_FAIR_TRADE_PRESS_RELEASES:
+    enabled: true
+    active: true
+
+    source_name: DTI
+    dataset_name: DTI_FAIR_TRADE_PRESS_RELEASES
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+    date_order: DMY
+
+    source_page_url: https://fairtrade.dti.gov.ph/resources/media/press-release/
+
+    url: https://fairtrade.dti.gov.ph/wp-json/wp/v2/posts
+
+    acquisition:
+      type: api
+      download_method: API
+
+    api_config:
+      params:
+        categories: 23
+        _embed: 1
+        orderby: date
+        order: desc
+
+      pagination:
+        type: page
+        page_param: page
+        size_param: per_page
+        page_size: 100
+        start_page: 1
+
+      items_path: ""
+
+      write_mode: record_files
+      record_id_path: id
+
+      transport: requests
+      timeout: 30
+      retry: 3
+      throttle_delay: 0.5
+
+    parser:
+      type: json
+
+    identity:
+      external_id:
+        field: id
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - id
