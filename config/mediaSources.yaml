@@ -278,6 +278,162 @@ sources:
         attribute: data
         multiple: true
 
+      EmbeddedPdfUrls:
+        selector: ".entry-content iframe[src*='.pdf']"
+        output: attribute
+        attribute: src
+        multiple: true
+
+      FeaturedImageUrl:
+        selector: "meta[property='og:image']"
+        output: attribute
+        attribute: content
+
+      TagNames:
+        selector: ".entry-footer .tags-links a[rel='tag']"
+        output: text
+        multiple: true
+
+    parser:
+      type: html
+
+    identity:
+      external_id:
+        field: SourceRecordId
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId
+
+  PCIJ_INVESTIGATIVE_REPORTS:
+    enabled: true
+    active: true
+
+    source_name: PCIJ
+    dataset_name: PCIJ_INVESTIGATIVE_REPORTS
+    dataset_category: News Article
+
+    schedule: daily
+
+    url: https://pcij.org/tag/investigative-reports/
+
+    date_order: MDY
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 2
+        randomize_download_delay: true
+        retry_times: 3
+
+        retry_http_codes:
+          - 408
+          - 429
+          - 500
+          - 502
+          - 503
+          - 504
+          - 521
+          - 522
+          - 524
+
+    discovery:
+      strategy: list_detail
+
+      start_url: https://pcij.org/tag/investigative-reports/
+      start_page: 1
+
+      pagination:
+        type: page_number
+        url_pattern: "https://pcij.org/tag/investigative-reports/page/{page}/"
+
+      article:
+        link_selector: "h2.entry-title a"
+
+      known_record:
+        field: SourceRecordId
+
+      stop_condition:
+        type: consecutive_known_records
+        threshold: 10
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: "//[^/]+/(.+?)/*$"
+
+      Title:
+        selector: "h1.entry-title"
+        output: text
+
+      date.originalValue:
+        selector: ".entry-header time.entry-date"
+        output: attribute
+        attribute: datetime
+
+      AuthorName:
+        selector: ".entry-header .byline"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: "[Bb]y\\s+(.+)"
+
+      BodyText:
+        selector: ".entry-content"
+        output: text
+
+      TableEmbedUrls:
+        selector: ".entry-content .flourish-table"
+        output: attribute
+        attribute: data-src
+        multiple: true
+        prefix: "https://public.flourish.studio/"
+
+      ChartEmbedUrls:
+        selector: ".entry-content .flourish-chart"
+        output: attribute
+        attribute: data-src
+        multiple: true
+        prefix: "https://public.flourish.studio/"
+
+      DashboardEmbedUrls:
+        selector: ".entry-content iframe[src*='datawrapper']"
+        output: attribute
+        attribute: src
+        multiple: true
+
+      DocumentUrls:
+        selector: ".entry-content .wp-block-file__embed"
+        output: attribute
+        attribute: data
+        multiple: true
+
+      EmbeddedPdfUrls:
+        selector: ".entry-content iframe[src*='.pdf']"
+        output: attribute
+        attribute: src
+        multiple: true
+
+      FeaturedImageUrl:
+        selector: "meta[property='og:image']"
+        output: attribute
+        attribute: content
+
+      TagNames:
+        selector: ".entry-footer .tags-links a[rel='tag']"
+        output: text
+        multiple: true
+
     parser:
       type: html
 
