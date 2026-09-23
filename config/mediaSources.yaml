@@ -613,6 +613,11 @@ sources:
       retry: 3
       throttle_delay: 0.5
 
+    discovery:
+      stop_condition:
+        type: consecutive_known_records
+        threshold: 10
+
     parser:
       type: json
 

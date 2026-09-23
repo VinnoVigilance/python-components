@@ -33,6 +33,10 @@ from services.adverseMediaPipeline.mediaDiscoveryService import (
     MediaDiscoveryService,
 )
 
+from services.adverseMediaPipeline.mediaIdentityService import (
+    MediaIdentityService,
+)
+
 from services.adverseMediaPipeline.mediaFileService import (
     MediaFileService,
 )
@@ -382,7 +386,10 @@ class MediaAcquisitionService:
             return (
                 MediaAcquisitionService
                 ._collect_api_source(
-                    source_config=source_config
+                    source_config=source_config,
+                    source_id=source_id,
+                    dataset_id=dataset_id,
+                    known_threshold=known_threshold,
                 )
             )
 
@@ -564,23 +571,171 @@ class MediaAcquisitionService:
     @staticmethod
     def _collect_api_source(
         source_config: dict[str, Any],
+        source_id: int,
+        dataset_id: int,
+        known_threshold: int,
     ) -> list[dict[str, Any]]:
+        """
+        Acquire an API-based Media source.
 
-        collection_result = (
-            collect_artifacts(
-                ApiCollectorTask.from_config(
-                    source_config
-                )
-            )
+        A source with discovery.stop_condition configured (currently
+        UK_GOV_NEWS_COMMUNICATIONS) stops requesting further pages once
+        known_threshold already-saved records appear in a row in the
+        API's own (already newest-first) order -- the same rule the
+        crawler sources use. A source without that config (e.g. AMLC
+        today) is unaffected: every page is fetched, exactly as before.
+        """
+
+        discovery_config = source_config.get(
+            "discovery",
+            {},
         )
 
-        return [
-            {
-                "detail_file_path": file_path,
-            }
-            for file_path
-            in collection_result.file_paths
-        ]
+        stop_condition = discovery_config.get(
+            "stop_condition",
+            {},
+        )
+
+        if not stop_condition:
+
+            collection_result = (
+                collect_artifacts(
+                    ApiCollectorTask.from_config(
+                        source_config
+                    )
+                )
+            )
+
+            return [
+                {
+                    "detail_file_path": file_path,
+                }
+                for file_path
+                in collection_result.file_paths
+            ]
+
+        connection = (
+            connection_pool.getconn()
+        )
+
+        try:
+            with connection.cursor() as cursor:
+
+                discovery_service = (
+                    MediaDiscoveryService(
+                        cursor=cursor,
+                        source_id=source_id,
+                        dataset_id=dataset_id,
+                        source_config=(
+                            source_config
+                        ),
+                        known_threshold=(
+                            known_threshold
+                        ),
+                    )
+                )
+
+                collection_result = (
+                    collect_artifacts(
+                        ApiCollectorTask.from_config(
+                            source_config
+                        ),
+                        stop_check=(
+                            MediaAcquisitionService
+                            ._build_api_stop_check(
+                                discovery_service=(
+                                    discovery_service
+                                ),
+                                source_config=(
+                                    source_config
+                                ),
+                            )
+                        ),
+                    )
+                )
+
+                return [
+                    {
+                        "detail_file_path": file_path,
+                    }
+                    for file_path
+                    in collection_result.file_paths
+                ]
+
+        finally:
+            connection_pool.putconn(
+                connection
+            )
+
+    @staticmethod
+    def _build_api_stop_check(
+        discovery_service: MediaDiscoveryService,
+        source_config: dict[str, Any],
+    ):
+        """
+        Build the callback apiCollector runs after each page.
+
+        Walks the page's records in order (the API's own order, not
+        re-sorted by us) and returns True as soon as known_threshold
+        already-saved records have appeared in a row -- the signal
+        that every remaining record, on this page and any later page,
+        is older than what we already have.
+        """
+
+        def stop_check(
+            items: list[dict[str, Any]],
+        ) -> bool:
+
+            for item in items:
+
+                try:
+                    record_key = (
+                        MediaIdentityService
+                        .generate_record_key(
+                            source_config=(
+                                source_config
+                            ),
+                            record=item,
+                        )
+                    )
+
+                except ValueError as exc:
+
+                    logger.warning(
+                        "Could not build media identity "
+                        "for API record: %s",
+                        exc,
+                    )
+
+                    continue
+
+                try:
+                    (
+                        _,
+                        should_stop,
+                    ) = (
+                        discovery_service
+                        .check_record_key(
+                            record_key
+                        )
+                    )
+
+                except Exception:
+
+                    logger.exception(
+                        "Could not check media record "
+                        "key=%s",
+                        record_key,
+                    )
+
+                    continue
+
+                if should_stop:
+                    return True
+
+            return False
+
+        return stop_check
 
     # =====================================================
     # Persist one acquired record

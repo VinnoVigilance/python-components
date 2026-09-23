@@ -281,3 +281,112 @@ class TestIterPages:
 
         assert result == [[{"id": 1}]]
         assert calls["count"] == 1
+
+
+# --- _iter_pages with stop_check (Media API early-stop, e.g. UK_GOV) --------
+
+class TestIterPagesStopCheck:
+    def test_stop_check_true_halts_further_pages(self):
+        # UK_GOV-style offset paging with 3 non-empty pages available. Once
+        # stop_check reports True after page 1, page 2 and 3 must never be
+        # requested -- this is the whole point of the early-stop.
+        task = _task(
+            {
+                "type": "offset",
+                "offset_param": "start",
+                "size_param": "count",
+                "page_size": 10,
+                "start_page": 0,
+            },
+            items_path="results",
+        )
+
+        pages = {
+            0: {"results": [{"id": i} for i in range(10)]},
+            10: {"results": [{"id": i} for i in range(10, 20)]},
+            20: {"results": [{"id": i} for i in range(20, 30)]},
+        }
+
+        def fake_get_page(_task, query, _transport=None):
+            return pages[query["start"]]
+
+        stop_after_first_page = iter([True])
+
+        def stop_check(_items):
+            return next(stop_after_first_page, False)
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            result = list(
+                collector._iter_pages(task, None, stop_check=stop_check)
+            )
+
+        # Page 1 is still yielded in full (records already fetched are kept);
+        # only the *next* request is skipped.
+        assert len(result) == 1
+        assert len(result[0]) == 10
+
+    def test_stop_check_false_does_not_affect_normal_pagination(self):
+        # A stop_check that never fires must behave exactly like passing none
+        # at all -- this is the AMLC case (no discovery.stop_condition
+        # configured, so mediaAcquisitionService never builds a stop_check,
+        # but this locks in that a harmless stop_check would be a no-op too).
+        task = _task(
+            {
+                "type": "offset",
+                "offset_param": "start",
+                "size_param": "count",
+                "page_size": 10,
+                "start_page": 0,
+            },
+            items_path="results",
+        )
+
+        pages = {
+            0: {"results": [{"id": i} for i in range(10)]},
+            10: {"results": [{"id": i} for i in range(10, 20)]},
+            20: {"results": []},
+        }
+
+        def fake_get_page(_task, query, _transport=None):
+            return pages[query["start"]]
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            result = list(
+                collector._iter_pages(task, None, stop_check=lambda items: False)
+            )
+
+        assert [len(page) for page in result] == [10, 10]
+
+    def test_stop_check_receives_the_items_just_fetched(self):
+        # The callback must see the actual page contents (so a caller can
+        # walk them in order and count consecutive known records), not just a
+        # bare "continue?" signal.
+        task = _task(
+            {
+                "type": "offset",
+                "offset_param": "start",
+                "size_param": "count",
+                "page_size": 10,
+                "start_page": 0,
+            },
+            items_path="results",
+        )
+
+        pages = {
+            0: {"results": [{"id": 1}, {"id": 2}]},
+            10: {"results": []},
+        }
+
+        def fake_get_page(_task, query, _transport=None):
+            return pages[query["start"]]
+
+        seen_pages = []
+
+        def stop_check(items):
+            seen_pages.append(items)
+            return False
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            list(collector._iter_pages(task, None, stop_check=stop_check))
+
+        assert seen_pages == [[{"id": 1}, {"id": 2}]]
