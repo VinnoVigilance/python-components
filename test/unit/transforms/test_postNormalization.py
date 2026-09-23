@@ -17,6 +17,7 @@ from transforms.postNormalization import (
     PostNormalizationEngine,
     _split_array_path,
     _strip_html,
+    date_component_handler,
     date_normalization_handler,
     date_window_status_handler,
     deduplicate_all_arrays_handler,
@@ -199,6 +200,55 @@ class TestDateNormalizationHandler:
         entity = {"Dates": [{"Year": "1980"}]}
         with pytest.raises(ValueError, match="date_order"):
             date_normalization_handler(entity, {"condition_path": "Dates"}, {})
+
+
+class TestDateComponentHandler:
+    RULE = {
+        "condition_path": "Occupations[]",
+        "value": "day=SinceDay,ToDay|month=SinceMonth,ToMonth|year=SinceYear,ToYear",
+    }
+
+    def test_normalizes_month_day_year_forms(self):
+        entity = {"Occupations": [{
+            "SinceMonth": "February", "ToMonth": "2",
+            "SinceDay": "5", "SinceYear": "2025", "ToYear": "2028",
+        }]}
+        date_component_handler(entity, self.RULE)
+
+        occ = entity["Occupations"][0]
+        assert occ["SinceMonth"] == "02"
+        assert occ["ToMonth"] == "02"
+        assert occ["SinceDay"] == "05"
+        assert occ["SinceYear"] == "2025"
+        assert occ["ToYear"] == "2028"
+
+    def test_invalid_components_are_blanked(self):
+        entity = {"Occupations": [{
+            "SinceMonth": "13", "SinceDay": "garbage", "SinceYear": "99",
+        }]}
+        date_component_handler(entity, self.RULE)
+
+        occ = entity["Occupations"][0]
+        assert occ["SinceMonth"] == ""
+        assert occ["SinceDay"] == ""
+        assert occ["SinceYear"] == ""
+
+    def test_only_a_single_mode_is_applied(self):
+        rule = {"condition_path": "VesselDetails[]", "value": "year=YearBuilt"}
+        entity = {"VesselDetails": [{"YearBuilt": "1999"}, {"YearBuilt": "N/A"}]}
+        date_component_handler(entity, rule)
+
+        assert entity["VesselDetails"][0]["YearBuilt"] == "1999"
+        assert entity["VesselDetails"][1]["YearBuilt"] == ""
+
+    def test_missing_array_and_absent_leaf_are_no_ops(self):
+        entity = {"Names": [{"Name": "x"}], "Occupations": [{"OccupationTitle": "Mayor"}]}
+        date_component_handler(entity, self.RULE)
+
+        assert entity == {
+            "Names": [{"Name": "x"}],
+            "Occupations": [{"OccupationTitle": "Mayor"}],
+        }
 
 
 class TestEnumNormalizeHandler:
