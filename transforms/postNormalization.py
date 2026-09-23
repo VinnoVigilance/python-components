@@ -382,14 +382,16 @@ def date_window_status_handler(entity, rule, config=None):
     the status leaf (``target_path``):
 
       * a Status already set (by mapping or the source) is left alone;
-      * no usable start *and* no usable end          -> left blank;
-      * now before the start                         -> Inactive (not begun);
-      * now after a real end                         -> Inactive (expired);
-      * otherwise -- inside the window, or a start
-        with no end (a permanent measure)            -> Active.
+      * an open-ended Duration marker (Ongoing, Permanent, Indefinitely,
+        Until Further Notice) -- in force regardless of dates    -> Active;
+      * a start that has passed AND an end still ahead           -> Active;
+      * any other date signal (past end, not-yet-begun, or a
+        start with no end and no marker)                         -> Unknown;
+      * no usable dates and no marker                            -> left blank.
 
-    A permanent measure has no end (``PERMANENT`` is not a date, so it reads as
-    "no end"), which is just "started, no end" -> Active; no special-casing here.
+    We never infer Inactive from dates: a missing or lapsed end does not prove
+    the measure ended, and screening must not silently deactivate a record. Only
+    a positive signal -- a live window or an open-ended marker -- yields Active.
 
     **Category override (config-driven, general).** A record the source has
     suspended/removed is inside its window (dates alone would say Active) but must
@@ -400,7 +402,8 @@ def date_window_status_handler(entity, rule, config=None):
 
     ``value`` config (``|`` separated, all optional):
 
-        active=Active | inactive=Inactive
+        active=Active | unknown=Unknown
+        | active_markers=Ongoing,Permanent,Indefinitely,Until Further Notice
         | hold_type=Category | hold_values=TEMPORARY_REMOVED_BLACKLISTED_ENTITIES
         | hold_status=Inactive
     """
@@ -410,8 +413,17 @@ def date_window_status_handler(entity, rule, config=None):
     _, status_leaf = _split_array_path(rule["target_path"])
 
     end_leaf = "EndDate"
+    duration_leaf = "Duration"
     active_label = cfg.get("active", "Active").strip()
-    inactive_label = cfg.get("inactive", "Inactive").strip()
+    unknown_label = cfg.get("unknown", "Unknown").strip()
+    active_markers = {
+        marker.strip().lower()
+        for marker in cfg.get(
+            "active_markers",
+            "Ongoing,Permanent,Indefinitely,Until Further Notice",
+        ).split(",")
+        if marker.strip()
+    }
 
     date_order = (config or {}).get("date_order", "DMY")
     today = datetime.now().date()
@@ -435,7 +447,12 @@ def date_window_status_handler(entity, rule, config=None):
             item[status_leaf] = hold_status
             continue
 
-        # 3. Otherwise derive it from the measure's own date window.
+        # 3. An open-ended duration marker means in force, whatever the dates.
+        if str(item.get(duration_leaf) or "").strip().lower() in active_markers:
+            item[status_leaf] = active_label
+            continue
+
+        # 4. Otherwise derive it from the measure's own date window.
         start = _as_date(item.get(start_leaf), date_order)
         end = _as_date(item.get(end_leaf), date_order)
 
@@ -443,11 +460,11 @@ def date_window_status_handler(entity, rule, config=None):
         if start is None and end is None:
             continue
 
-        begun = start is None or today >= start
-        ended = end is not None and today > end
+        begun = start is not None and today >= start
+        within_window = end is not None and today <= end
 
         item[status_leaf] = (
-            active_label if (begun and not ended) else inactive_label
+            active_label if (begun and within_window) else unknown_label
         )
 
 
@@ -541,7 +558,7 @@ HANDLERS = {
 class PostNormalizationEngine:
 
     def __init__(self, rules_df: pd.DataFrame, config: dict):
-        self.rules_df = rules_df.sort_values("priority")
+        self.rules_df = rules_df
 
         # Carries per source settings such as date_order, so a handler
         # can read a date the way the list that published it writes them.
