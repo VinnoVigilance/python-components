@@ -20,6 +20,7 @@ from transforms.preNormalization import (
     FlattenDictHandler,
     LanguageNameHandler,
     PreNormalizationEngine,
+    RegexExtractAllHandler,
     RegexExtractHandler,
     RemoveListMarkersHandler,
     SplitPatternHandler,
@@ -172,6 +173,49 @@ class TestHandlers:
         assert handler.normalize("Manuel Perez", rule) == "Manuel Perez"
         # a quote *inside* the name is preserved
         assert handler.normalize('Ali "Bob" Smith', rule) == 'Ali "Bob" Smith'
+
+
+class TestRegexExtractAllHandler:
+    """regex_extract_all keeps EVERY match (regex_extract keeps only the first),
+    returning a list -- DTI-FTEB pulls all <img>/PDF URLs out of an HTML body."""
+
+    def test_returns_every_capture_group_match(self):
+        handler = RegexExtractAllHandler()
+        html = '<p><img src="a.jpg"></p><p><img src="b.png"></p>'
+        assert handler.normalize(html, r'<img[^>]+src="([^"]+)"') == ["a.jpg", "b.png"]
+
+    def test_no_match_returns_empty_list(self):
+        handler = RegexExtractAllHandler()
+        assert handler.normalize("no images here", r'<img[^>]+src="([^"]+)"') == []
+
+    def test_none_returns_empty_list(self):
+        handler = RegexExtractAllHandler()
+        assert handler.normalize(None, r'<img[^>]+src="([^"]+)"') == []
+
+
+class TestTargetFieldRoutingEndToEnd:
+    """target_field lands a rule's result on a NEW field instead of overwriting
+    the field it read from -- so an HTML body reaches mapping intact while its
+    extracted image URLs are collected onto ImageUrls (the DTI-FTEB setup)."""
+
+    def _engine(self):
+        source_config_df = pd.DataFrame(columns=["source", "entity_field"])
+        prenorm_df = pd.DataFrame([{
+            "source": "DTI", "field": "content.rendered", "entity_type": "*",
+            "normalization_type": "regex_extract_all",
+            "normalization_rule": r'<img[^>]+src="([^"]+)"',
+            "target_field": "ImageUrls",
+        }])
+        return PreNormalizationEngine(prenorm_df, source_config_df)
+
+    def test_extracts_to_new_field_without_touching_source(self):
+        engine = self._engine()
+        body = '<p><img src="x.jpg"></p><p><img src="y.png"></p>'
+        result = engine.pre_normalize_record("DTI", {"content": {"rendered": body}})
+
+        assert result["ImageUrls"] == ["x.jpg", "y.png"]
+        # the HTML body is left untouched for the mapper
+        assert result["content"]["rendered"] == body
 
 
 class TestPathUtilities:
