@@ -51,6 +51,13 @@ class MediaSpider(scrapy.Spider):
             {},
         )
 
+        self.discovery_policy = str(
+            self.discovery_config.get(
+                "policy",
+                "full_scan",
+            )
+        ).strip().lower()
+
         self.extraction_config = source_config.get(
             "extraction",
             {},
@@ -119,10 +126,37 @@ class MediaSpider(scrapy.Spider):
         )
 
         if not link_nodes:
-            self.logger.info(
-                "No media links found on page %s",
-                page_number,
+            start_page = int(
+                self.discovery_config.get(
+                    "start_page",
+                    1,
+                )
             )
+
+            if (
+                page_number == start_page
+                and not self.discovery_config.get(
+                    "allow_empty_listing",
+                    False,
+                )
+            ):
+                self.logger.error(
+                    "No media links found on the first "
+                    "listing page; treating the run as "
+                    "incomplete. page=%s",
+                    page_number,
+                )
+                self.discovery_service.mark_discovery_failure(
+                    "EMPTY_FIRST_LISTING_PAGE"
+                )
+
+            else:
+                self.logger.info(
+                    "No media links found on page %s; "
+                    "source end reached.",
+                    page_number,
+                )
+                self.discovery_service.mark_source_end()
             return
 
         should_stop_discovery = False
@@ -140,18 +174,25 @@ class MediaSpider(scrapy.Spider):
                 href
             )
 
-            source_record_id = (
-                self._extract_source_record_id(
-                    detail_url
-                )
-            )
-
-            candidate_record = {
-                "SourceURL": detail_url,
-                "SourceRecordId": source_record_id,
-            }
-
             try:
+                source_record_id = (
+                    self._extract_source_record_id(
+                        detail_url
+                    )
+                )
+
+                identity_fields = (
+                    self._extract_identity_fields(
+                        link_node
+                    )
+                )
+
+                candidate_record = {
+                    "SourceURL": detail_url,
+                    "SourceRecordId": source_record_id,
+                    **identity_fields,
+                }
+
                 record_key = (
                     self.discovery_service
                     .build_record_key(
@@ -160,6 +201,7 @@ class MediaSpider(scrapy.Spider):
                 )
 
             except ValueError as exc:
+                self.discovery_service.record_identity_failure()
                 self.logger.warning(
                     "Could not build media identity "
                     "for URL %s: %s",
@@ -193,6 +235,7 @@ class MediaSpider(scrapy.Spider):
                 )
 
             except Exception as exc:
+                self.discovery_service.record_identity_failure()
                 self.logger.warning(
                     "Could not check media record "
                     "key=%s: %s",
@@ -207,22 +250,37 @@ class MediaSpider(scrapy.Spider):
                 is_known,
             )
 
-            # IMPORTANT:
-            #
-            # Even KNOWN records are opened until the
-            # discovery stop threshold is reached.
-            #
-            # Later stages use content_hash to determine
-            # whether the same logical record changed.
-            yield scrapy.Request(
-                url=detail_url,
-                callback=self.parse_detail,
-                cb_kwargs={
-                    "record_key": record_key,
-                    "is_known": is_known,
-                    "source_record_id": source_record_id,
-                },
+            # A full scan fetches known records again so
+            # content_hash can detect an updated article.
+            # stop_after_known sources skip known detail
+            # downloads and use them only as the safe
+            # incremental stopping signal.
+            should_fetch_detail = (
+                not is_known
+                or self.discovery_policy
+                == "full_scan"
             )
+
+            if should_fetch_detail:
+                self.discovery_service.record_detail_selected()
+
+                yield scrapy.Request(
+                    url=detail_url,
+                    callback=self.parse_detail,
+                    cb_kwargs={
+                        "record_key": record_key,
+                        "is_known": is_known,
+                        "source_record_id": source_record_id,
+                        "identity_fields": identity_fields,
+                    },
+                )
+
+            else:
+                self.logger.info(
+                    "Known Media detail download skipped "
+                    "| key=%s",
+                    record_key,
+                )
 
             if should_stop:
                 should_stop_discovery = True
@@ -243,6 +301,7 @@ class MediaSpider(scrapy.Spider):
         )
 
         if not next_url:
+            self.discovery_service.mark_source_end()
             return
 
         yield scrapy.Request(
@@ -259,6 +318,7 @@ class MediaSpider(scrapy.Spider):
         record_key: str,
         is_known: bool,
         source_record_id: str | None,
+        identity_fields: dict[str, Any] | None = None,
     ):
         """
         Save original HTML first, then extract fields.
@@ -269,7 +329,6 @@ class MediaSpider(scrapy.Spider):
 
         file_name_id = self._build_file_name_id(
             record_key=record_key,
-            source_record_id=source_record_id,
         )
 
         # Save the original HTML before any parsing/extraction.
@@ -296,6 +355,11 @@ class MediaSpider(scrapy.Spider):
             extracted_record[
                 "SourceRecordId"
             ] = source_record_id
+
+        if identity_fields:
+            extracted_record.update(
+                identity_fields
+            )
 
         result = {
             "record_key": record_key,
@@ -559,6 +623,93 @@ class MediaSpider(scrapy.Spider):
             extraction=extraction,
         )
 
+    def _extract_identity_fields(
+        self,
+        link_node,
+    ) -> dict[str, str]:
+        """Extract configured candidate fields from one listing link."""
+
+        article_config = self.discovery_config.get(
+            "article",
+            {},
+        )
+
+        identity_fields_config = article_config.get(
+            "identity_fields",
+            {},
+        )
+
+        extracted_fields: dict[str, str] = {}
+
+        for field_name, field_config in (
+            identity_fields_config.items()
+        ):
+            source = str(
+                field_config.get(
+                    "source",
+                    "xpath",
+                )
+            ).strip().lower()
+
+            raw_value = None
+
+            if source == "link_text":
+                raw_value = " ".join(
+                    link_node.xpath(
+                        ".//text()"
+                    ).getall()
+                )
+
+            elif source == "xpath":
+                selectors = field_config.get(
+                    "selectors",
+                    [],
+                )
+
+                if isinstance(selectors, str):
+                    selectors = [selectors]
+
+                for selector in selectors:
+                    selected = link_node.xpath(
+                        selector
+                    ).getall()
+
+                    candidate = self._clean_text(
+                        " ".join(selected)
+                    )
+
+                    if candidate:
+                        raw_value = candidate
+                        break
+
+            else:
+                raise ValueError(
+                    "Unsupported identity field "
+                    f"source: {source}"
+                )
+
+            cleaned_value = self._clean_text(
+                raw_value
+            )
+
+            if (
+                not cleaned_value
+                and field_config.get(
+                    "required",
+                    True,
+                )
+            ):
+                raise ValueError(
+                    "Missing listing field required for identity: "
+                    f"field: {field_name}"
+                )
+
+            extracted_fields[field_name] = (
+                cleaned_value or ""
+            )
+
+        return extracted_fields
+
     @staticmethod
     def _apply_extraction(
         value: str | None,
@@ -666,27 +817,8 @@ class MediaSpider(scrapy.Spider):
     @staticmethod
     def _build_file_name_id(
         record_key: str,
-        source_record_id: str | None,
     ) -> str:
-        """
-        Build a safe local HTML filename.
-
-        If source provides an ID:
-            10914.html
-
-        If not:
-            use a short hash only for filename generation.
-
-        record_key itself remains human-readable.
-        """
-
-        if source_record_id:
-            return re.sub(
-                r"[\\/]+",
-                "-",
-                str(source_record_id).strip(),
-            )
-
+        """Build one safe and stable filename from record_key."""
         return hashlib.sha256(
             record_key.encode(
                 "utf-8"

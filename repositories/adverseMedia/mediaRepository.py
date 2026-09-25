@@ -279,6 +279,59 @@ def insert_media_record(
 # =========================================================
 
 
+def find_current_media_files_for_reprocessing(
+    cursor,
+    source_id: int,
+    dataset_id: int,
+) -> list[dict[str, Any]]:
+    """Return the Raw file behind each current Core Media record."""
+
+    cursor.execute(
+        """
+        SELECT
+            file.id,
+            file.source_id,
+            file.dataset_id,
+            file.file_url,
+            file.file_name,
+            file.file_type,
+            file.storage_path,
+            file.file_hash,
+            file.status,
+            record.record_key
+        FROM core.media_record AS record
+        JOIN raw.media_file AS file
+          ON file.id = record.media_file_id
+        WHERE record.source_id = %s
+          AND record.dataset_id = %s
+          AND record.is_current = TRUE
+        ORDER BY record.id
+        """,
+        (
+            source_id,
+            dataset_id,
+        ),
+    )
+
+    rows = cursor.fetchall()
+
+    return [
+        {
+            "id": row[0],
+            "source_id": row[1],
+            "dataset_id": row[2],
+            "file_url": row[3],
+            "file_name": row[4],
+            "file_type": row[5],
+            "storage_path": row[6],
+            "file_hash": row[7],
+            "status": row[8],
+            "record_key": row[9],
+        }
+        for row in rows
+    ]
+
+
 def find_media_file_by_hash(
     cursor,
     source_id: int,

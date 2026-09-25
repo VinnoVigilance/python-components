@@ -48,6 +48,8 @@ sources:
 
     discovery:
       strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
 
       start_url: https://nbi.gov.ph/press_releases/
       start_page: 1
@@ -58,13 +60,6 @@ sources:
 
       article:
         link_selector: "h2 a"
-
-      known_record:
-        field: SourceRecordId
-
-      stop_condition:
-        type: consecutive_known_records
-        threshold: 10
 
     extraction:
       SourceURL:
@@ -129,6 +124,9 @@ sources:
       type: api
       download_method: API
 
+    discovery:
+      policy: full_scan
+
     api_config:
       pagination:
         type: page
@@ -145,6 +143,9 @@ sources:
       transport: requests
       timeout: 30
       retry: 3
+      retry_delay_seconds: 1
+      retry_backoff_multiplier: 2
+      retry_max_delay_seconds: 8
       throttle_delay: 0.2
 
     parser:
@@ -165,7 +166,7 @@ sources:
         level: record
         config:
           output_field: SourceURL
-          template: "https://www.amlc.gov.ph/news-and-announcements/{id}?type={type}"
+          template: "https://www.amlc.gov.ph/news-and-announcements/{slug}"
 
   PCIJ_CORRUPTION_WATCH:
     enabled: true
@@ -205,6 +206,8 @@ sources:
 
     discovery:
       strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
 
       start_url: https://pcij.org/category/corruption-watch/
       start_page: 1
@@ -215,13 +218,6 @@ sources:
 
       article:
         link_selector: "#main h2.entry-title a"
-
-      known_record:
-        field: SourceRecordId
-
-      stop_condition:
-        type: consecutive_known_records
-        threshold: 10
 
     extraction:
       SourceURL:
@@ -514,6 +510,8 @@ sources:
 
     discovery:
       strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
 
       start_url: https://www.doj.gov.ph/news.html
       start_page: 1
@@ -524,21 +522,22 @@ sources:
       article:
         link_selector: "#blog-full-width h3.blogpost-title a, #blog-full-width table td[align='justify'] > a"
 
-      known_record:
-        field: SourceRecordId
+        # DOJ regenerates the newsid query token on every listing request.
+        # Published date + normalized title stays stable for the same article.
+        identity_fields:
+          ListingPublishedDate:
+            source: xpath
+            selectors:
+              - "ancestor::article[1]//*[contains(concat(' ', normalize-space(@class), ' '), ' blog-meta ')]/span[1]//text()"
+              - "ancestor::tr[1]/td[1]//text()"
 
-      stop_condition:
-        type: consecutive_known_records
-        threshold: 10
+          ListingTitle:
+            source: link_text
+            required: false
 
     extraction:
       SourceURL:
         source: response_url
-
-      SourceRecordId:
-        source: response_url
-        strategy: regex
-        pattern: "[?&]newsid=([^&]+)"
 
       Title:
         selector: ".global-page-header h2"
@@ -561,14 +560,14 @@ sources:
       type: html
 
     identity:
-      external_id:
-        field: SourceRecordId
-
       record_key:
         fields:
           - source_name
           - dataset_name
-          - SourceRecordId
+          - ListingPublishedDate
+          - ListingTitle
+
+        hash: true
 
   UK_GOV_NEWS_COMMUNICATIONS:
     enabled: true
@@ -588,6 +587,9 @@ sources:
     acquisition:
       type: api
       download_method: API
+
+    discovery:
+      policy: full_scan
 
     api_config:
       params:
@@ -611,6 +613,9 @@ sources:
       transport: requests
       timeout: 30
       retry: 3
+      retry_delay_seconds: 1
+      retry_backoff_multiplier: 2
+      retry_max_delay_seconds: 8
       throttle_delay: 0.5
 
     discovery:

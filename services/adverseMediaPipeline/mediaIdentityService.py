@@ -1,3 +1,6 @@
+import hashlib
+import unicodedata
+
 from typing import Any
 
 
@@ -25,6 +28,10 @@ class MediaIdentityService:
             )
 
         values: list[str] = []
+        record_values: list[str] = []
+        hash_record_key = bool(
+            record_key_config.get("hash", False)
+        )
 
         for field in fields:
             # First try source-level config values
@@ -33,12 +40,39 @@ class MediaIdentityService:
             else:
                 value = record.get(field)
 
-            if value is None or str(value).strip() == "":
+            if not hash_record_key and (
+                value is None
+                or str(value).strip() == ""
+            ):
                 raise ValueError(
                     f"Missing value for record_key field: {field}"
                 )
 
-            values.append(str(value).strip())
+            normalized = unicodedata.normalize(
+                "NFKC",
+                "" if value is None else str(value),
+            )
+            normalized = " ".join(
+                normalized.split()
+            ).strip()
+
+            if hash_record_key:
+                normalized = normalized.casefold()
+
+            values.append(normalized)
+
+            if field not in source_config:
+                record_values.append(normalized)
+
+        if hash_record_key:
+            if not any(record_values):
+                raise ValueError(
+                    "Record identity fields are empty."
+                )
+
+            return hashlib.sha256(
+                "\x1f".join(values).encode("utf-8")
+            ).hexdigest()
 
         return "|".join(values)
 

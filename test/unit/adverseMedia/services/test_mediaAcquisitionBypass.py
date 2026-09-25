@@ -171,6 +171,7 @@ def test_saved_html_media_collects_listing_before_crawl(
             source_config=source_config,
             source_id=10,
             dataset_id=20,
+            stop_after_known=True,
             known_threshold=10,
             source_name="DOJ-PH",
             dataset_name="DOJ-PH-NEWS",
@@ -296,6 +297,7 @@ def test_direct_media_does_not_run_bypass_collector(
             source_config=source_config,
             source_id=1,
             dataset_id=2,
+            stop_after_known=True,
             known_threshold=10,
             source_name="NBI",
             dataset_name=(

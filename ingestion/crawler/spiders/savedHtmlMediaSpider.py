@@ -1,8 +1,4 @@
 import asyncio
-
-from concurrent.futures import (
-    ThreadPoolExecutor,
-)
 from pathlib import Path
 
 import scrapy
@@ -18,24 +14,6 @@ from ingestion.crawler.browserDetailFetcher import (
 from ingestion.crawler.spiders.mediaSpider import (
     MediaSpider,
 )
-
-
-_ITERATION_FINISHED = object()
-
-
-def _get_next_result(iterator):
-    """
-    Read one result from a synchronous generator.
-
-    StopIteration cannot safely enter an asyncio
-    Future, so a sentinel is returned instead.
-    """
-
-    try:
-        return next(iterator)
-
-    except StopIteration:
-        return _ITERATION_FINISHED
 
 
 class SavedHtmlMediaSpider(MediaSpider):
@@ -101,10 +79,11 @@ class SavedHtmlMediaSpider(MediaSpider):
         )
 
         if not pending_details:
-            raise ValueError(
-                "No Media detail pages were "
-                "discovered from the saved listing."
+            self.logger.info(
+                "No Media detail pages require download "
+                "from the saved listing."
             )
+            return
 
         self.logger.info(
             "Saved Media listing produced %s "
@@ -112,35 +91,20 @@ class SavedHtmlMediaSpider(MediaSpider):
             len(pending_details),
         )
 
-        # BrowserDetailFetcher is synchronous because
-        # Selenium is blocking. Run it in one worker
-        # thread while keeping one browser session.
-        iterator = (
-            self._fetch_and_parse_details(
-                pending_details
+        # SeleniumBase manages its own event loop. Running it directly in
+        # Scrapy's asyncio loop causes an event-loop conflict. Move the whole
+        # blocking batch to one worker thread. Details are still fetched
+        # sequentially with one browser session (there is no per-item thread).
+        detail_results = await asyncio.to_thread(
+            lambda: list(
+                self._fetch_and_parse_details(
+                    pending_details
+                )
             )
         )
 
-        loop = asyncio.get_running_loop()
-
-        with ThreadPoolExecutor(
-            max_workers=1,
-            thread_name_prefix=(
-                "saved-html-media-browser"
-            ),
-        ) as executor:
-
-            while True:
-                result = await loop.run_in_executor(
-                    executor,
-                    _get_next_result,
-                    iterator,
-                )
-
-                if result is _ITERATION_FINISHED:
-                    break
-
-                yield result
+        for result in detail_results:
+            yield result
 
     def _discover_from_saved_listing(
         self,
@@ -221,6 +185,13 @@ class SavedHtmlMediaSpider(MediaSpider):
                             "source_record_id"
                         )
                     ),
+
+                    "identity_fields": (
+                        callback_arguments.get(
+                            "identity_fields"
+                        )
+                        or {}
+                    ),
                 }
             )
 
@@ -295,6 +266,35 @@ class SavedHtmlMediaSpider(MediaSpider):
         ) in fetcher.fetch(
             pending_details
         ):
+            if detail_response is None:
+                failed_record = {
+                    "record_key": item.get(
+                        "record_key"
+                    ),
+                    "is_known": item.get(
+                        "is_known"
+                    ),
+                    "detail_file_path": None,
+                    "extracted": None,
+                    "failed": True,
+                    "error": item.get(
+                        "fetch_error",
+                        "Media detail fetch failed.",
+                    ),
+                    "error_stage": "DETAIL_FETCH",
+                    "error_type": item.get(
+                        "fetch_error_type",
+                        "DetailFetchError",
+                    ),
+                }
+
+                self.records.append(
+                    failed_record
+                )
+
+                yield failed_record
+                continue
+
             # Reuse the existing Media method.
             # This is the point where a separate
             # detail HTML file is saved.
@@ -311,6 +311,10 @@ class SavedHtmlMediaSpider(MediaSpider):
 
                 source_record_id=item.get(
                     "source_record_id"
+                ),
+
+                identity_fields=item.get(
+                    "identity_fields"
                 ),
             )
 
@@ -331,9 +335,6 @@ class SavedHtmlMediaSpider(MediaSpider):
                 record_key=item[
                     "record_key"
                 ],
-                source_record_id=item.get(
-                    "source_record_id"
-                ),
             )
         )
 

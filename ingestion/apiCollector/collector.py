@@ -594,9 +594,31 @@ def _get_json_with_retry(
         try:
             return transport.get_json(url, params)
 
-        except requests.RequestException:
+        except requests.RequestException as error:
             if attempt == task.retry:
                 raise
+
+            delay = min(
+                float(task.retry_max_delay_seconds),
+                float(task.retry_delay_seconds)
+                * (
+                    float(task.retry_backoff_multiplier)
+                    ** (attempt - 1)
+                ),
+            )
+
+            logger.warning(
+                "%s: API request failed (%s). "
+                "retry=%s/%s delay=%.1fs",
+                task.list_name,
+                type(error).__name__,
+                attempt + 1,
+                task.retry,
+                delay,
+            )
+
+            if delay > 0:
+                time.sleep(delay)
 
     raise RuntimeError(f"Failed to collect API page: {url} {params}")
 

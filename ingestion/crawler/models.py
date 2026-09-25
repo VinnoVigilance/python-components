@@ -51,3 +51,13 @@ class CrawlResult:
     source_file_path: Optional[str]
     records: list[dict[str, Any]]
     record_count: int
+    discovered_count: int | None = None
+    known_count: int = 0
+    new_count: int = 0
+    selected_detail_count: int = 0
+    missing_detail_count: int = 0
+    identity_failure_count: int = 0
+    discovery_failure_count: int = 0
+    reached_source_end: bool | None = None
+    stop_reason: str | None = None
+    completed_safely: bool | None = None

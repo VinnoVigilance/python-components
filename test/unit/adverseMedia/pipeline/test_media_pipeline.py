@@ -47,6 +47,14 @@ def _acquisition(records):
         stored_count=len(records),
         duplicate_count=0,
         failed_count=sum(1 for r in records if r.get("failed")),
+        acquired_count=len(records),
+        known_count=0,
+        new_count=len(records),
+        discovery_failed_count=0,
+        identity_failure_count=0,
+        reached_source_end=True,
+        stop_reason="SOURCE_EXHAUSTED",
+        completed_safely=True,
         records=records,
     )
 
@@ -104,7 +112,10 @@ class TestMediaPipelineWiring:
             mp.PipelineVersionService, "resolve", MagicMock(return_value="v1")
         )
         with pytest.raises(ValueError, match="Unknown Media dataset"):
-            mp.run_media_pipeline("NOPE")
+            mp.run_media_pipeline(
+                "NOPE",
+                mode="INCREMENTAL",
+            )
 
     def test_disabled_dataset_raises(self, monkeypatch):
         monkeypatch.setattr(mp, "load_media_config", lambda: _config(enabled=False))
@@ -112,7 +123,10 @@ class TestMediaPipelineWiring:
             mp.PipelineVersionService, "resolve", MagicMock(return_value="v1")
         )
         with pytest.raises(ValueError, match="disabled"):
-            mp.run_media_pipeline("TEST_DATASET")
+            mp.run_media_pipeline(
+                "TEST_DATASET",
+                mode="INCREMENTAL",
+            )
 
     def test_all_records_processed_and_inserted(self, monkeypatch):
         mocks = _wire(monkeypatch, [
@@ -120,13 +134,23 @@ class TestMediaPipelineWiring:
             {"record_key": "b", "media_file_id": 11},
         ])
 
-        result = mp.run_media_pipeline("TEST_DATASET")
+        result = mp.run_media_pipeline(
+            "TEST_DATASET",
+            mode="INCREMENTAL",
+        )
 
         assert result["processed_count"] == 2
         assert result["core_inserted_count"] == 2
         assert result["processing_failed_count"] == 0
         assert result["source_name"] == "TESTSRC"
+        assert result["mode"] == "INCREMENTAL"
+        assert result["run_status"] == "SUCCESS"
+        assert result["total_failed_count"] == 0
         assert mocks.core.process.call_count == 2
+        mocks.acquisition.acquire.assert_called_once_with(
+            source_config=_config()["sources"]["TEST_DATASET"],
+            mode="INCREMENTAL",
+        )
 
     def test_one_record_failure_is_isolated(self, monkeypatch):
         # The 2nd record's normalization raises: it is marked FAILED while the
@@ -142,11 +166,16 @@ class TestMediaPipelineWiring:
             normalize_side_effect=[{"ok": 1}, ValueError("boom"), {"ok": 3}],
         )
 
-        result = mp.run_media_pipeline("TEST_DATASET")
+        result = mp.run_media_pipeline(
+            "TEST_DATASET",
+            mode="INCREMENTAL",
+        )
 
         assert result["processed_count"] == 2
         assert result["core_inserted_count"] == 2
         assert result["processing_failed_count"] == 1
+        assert result["run_status"] == "PARTIAL"
+        assert result["total_failed_count"] == 1
         mocks.core.mark_failed.assert_called_once_with(media_file_id=11)
 
         statuses = {r["record_key"]: r["status"] for r in result["records"]}
@@ -160,10 +189,107 @@ class TestMediaPipelineWiring:
             {"record_key": "bad", "media_file_id": 11, "failed": True, "error": "download"},
         ])
 
-        result = mp.run_media_pipeline("TEST_DATASET")
+        result = mp.run_media_pipeline(
+            "TEST_DATASET",
+            mode="INCREMENTAL",
+        )
 
         assert result["processed_count"] == 1
         # a failed acquisition never reaches normalization or core
         assert mocks.core.process.call_count == 1
         statuses = {r["record_key"]: r["status"] for r in result["records"]}
         assert statuses["bad"] == "ACQUISITION_FAILED"
+        assert result["acquisition_failed_count"] == 1
+        assert result["processing_failed_count"] == 0
+        assert result["run_status"] == "PARTIAL"
+
+    def test_invalid_mode_is_rejected_before_work(self):
+        with pytest.raises(ValueError, match="Unknown Media run mode"):
+            mp.run_media_pipeline(
+                "TEST_DATASET",
+                mode="WRONG",
+            )
+
+    def test_initial_mode_is_passed_to_acquisition(self, monkeypatch):
+        mocks = _wire(
+            monkeypatch,
+            [{"record_key": "a", "media_file_id": 10}],
+        )
+
+        result = mp.run_media_pipeline(
+            "TEST_DATASET",
+            mode="initial",
+        )
+
+        assert result["mode"] == "INITIAL"
+        mocks.acquisition.acquire.assert_called_once_with(
+            source_config=_config()["sources"]["TEST_DATASET"],
+            mode="INITIAL",
+        )
+
+    def test_reprocess_uses_raw_loader_not_acquisition(
+        self,
+        monkeypatch,
+    ):
+        mocks = _wire(
+            monkeypatch,
+            [{"record_key": "a", "media_file_id": 10}],
+        )
+
+        reprocessing = MagicMock()
+        reprocessing.load.return_value = _acquisition(
+            [{"record_key": "a", "media_file_id": 10}]
+        )
+        monkeypatch.setattr(
+            mp,
+            "MediaReprocessingService",
+            MagicMock(return_value=reprocessing),
+        )
+
+        result = mp.run_media_pipeline(
+            "TEST_DATASET",
+            mode="REPROCESS",
+        )
+
+        assert result["mode"] == "REPROCESS"
+        mocks.acquisition.acquire.assert_not_called()
+        reprocessing.load.assert_called_once_with(
+            source_config=_config()["sources"]["TEST_DATASET"],
+        )
+
+    def test_incomplete_discovery_is_not_reported_as_success(
+        self,
+        monkeypatch,
+    ):
+        mocks = _wire(
+            monkeypatch,
+            [{"record_key": "a", "media_file_id": 10}],
+        )
+        mocks.acquisition.acquire.return_value.completed_safely = False
+        mocks.acquisition.acquire.return_value.stop_reason = "UNEXPECTED_STOP"
+
+        result = mp.run_media_pipeline(
+            "TEST_DATASET",
+            mode="INITIAL",
+        )
+
+        assert result["run_status"] == "PARTIAL"
+        assert result["stop_reason"] == "UNEXPECTED_STOP"
+        assert mp.media_pipeline_exit_code(result) == 2
+
+    @pytest.mark.parametrize(
+        ("status", "expected"),
+        [
+            ("SUCCESS", 0),
+            ("PARTIAL", 2),
+            ("FAILED", 2),
+        ],
+    )
+    def test_cli_exit_code_reflects_run_status(
+        self,
+        status,
+        expected,
+    ):
+        assert mp.media_pipeline_exit_code(
+            {"run_status": status}
+        ) == expected

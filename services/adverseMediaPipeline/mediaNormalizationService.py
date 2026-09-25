@@ -1,3 +1,5 @@
+import logging
+
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,7 @@ from transforms.postNormalization import (
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
+logger = logging.getLogger(__name__)
 
 
 class MediaNormalizationService:
@@ -41,14 +44,15 @@ class MediaNormalizationService:
 
         record = deepcopy(raw_record)
 
-        # فقط برای اینکه MappingEngine بداند این رکورد Media است.
-        # raw_record اصلی تغییر نمی‌کند.
+        # MappingEngine uses entity_type to select Media rules. The original
+        # raw record is not mutated.
         record["entity_type"] = "Media"
 
-        print("\n=== DEBUG NORMALIZATION ===")
-        print("DATASET NAME:", self.dataset_name)
-        print("ENTITY TYPE INPUT:", record.get("entity_type"))
-        print("RAW RECORD KEYS:", list(record.keys()))
+        logger.debug(
+            "Normalizing Media record. dataset=%s field_count=%s",
+            self.dataset_name,
+            len(record),
+        )
 
         if self.pre_normalizer is not None:
             record = self.pre_normalizer.pre_normalize_record(
@@ -56,28 +60,27 @@ class MediaNormalizationService:
                 raw_json=record,
             )
 
-            print(
-                "AFTER PRE-NORMALIZATION KEYS:",
-                list(record.keys()),
+            logger.debug(
+                "Media pre-normalization completed. "
+                "dataset=%s field_count=%s",
+                self.dataset_name,
+                len(record),
             )
         else:
-            print("PRE-NORMALIZATION: SKIPPED")
+            logger.debug(
+                "Media pre-normalization skipped. dataset=%s",
+                self.dataset_name,
+            )
 
         mapped_record = self.mapper.map_record(
             record
         )
-
-        print("\n=== MAPPED RECORD ===")
-        print(mapped_record)
 
         canonical_record = (
             self.post_normalizer.post_normalize_record(
                 mapped_record
             )
         )
-
-        print("\n=== AFTER POST-NORMALIZATION ===")
-        print(canonical_record)
 
         if not isinstance(canonical_record, dict):
             raise TypeError(
@@ -104,37 +107,22 @@ class MediaNormalizationService:
             "mapping"
         )
 
-        print("\n=== DEBUG MAPPING FILE ===")
-        print("MAPPING FILE:", mapping_file)
-        print("DATASET:", self.dataset_name)
-
         rules = load_rules(
             mapping_file=str(mapping_file),
             source_name=self.dataset_name,
         )
 
-        print("RULE COUNT:", len(rules))
-
-        for index, rule in enumerate(
-            rules[:15],
-            start=1,
-        ):
-            print(
-                f"RULE {index}:",
-                "entity_type=",
-                getattr(rule, "entity_type", None),
-                "| target_path=",
-                getattr(rule, "target_path", None),
-                "| source_type=",
-                getattr(rule, "source_type", None),
-                "| source_path=",
-                getattr(rule, "source_path", None),
-            )
+        logger.debug(
+            "Loaded Media mapping rules. dataset=%s file=%s count=%s",
+            self.dataset_name,
+            mapping_file,
+            len(rules),
+        )
 
         if not rules:
-            print(
-                "\nWARNING: No mapping rules were loaded "
-                f"for source '{self.dataset_name}'."
+            logger.warning(
+                "No Media mapping rules were loaded. dataset=%s",
+                self.dataset_name,
             )
 
         return MappingEngine(
@@ -149,15 +137,15 @@ class MediaNormalizationService:
             "pre_normalization"
         )
 
-        print("\n=== DEBUG PRE-NORMALIZATION FILE ===")
-        print("PRE FILE:", pre_file)
-
         pre_df = pd.read_excel(
             pre_file
         )
 
-        print(
-            "PRE-NORMALIZATION ROW COUNT:",
+        logger.debug(
+            "Loaded Media pre-normalization rules. "
+            "dataset=%s file=%s count=%s",
+            self.dataset_name,
+            pre_file,
             len(pre_df),
         )
 
@@ -186,15 +174,15 @@ class MediaNormalizationService:
             "post_normalization"
         )
 
-        print("\n=== DEBUG POST-NORMALIZATION FILE ===")
-        print("POST FILE:", post_file)
-
         post_df = pd.read_excel(
             post_file
         )
 
-        print(
-            "POST-NORMALIZATION ROW COUNT:",
+        logger.debug(
+            "Loaded Media post-normalization rules. "
+            "dataset=%s file=%s count=%s",
+            self.dataset_name,
+            post_file,
             len(post_df),
         )
 

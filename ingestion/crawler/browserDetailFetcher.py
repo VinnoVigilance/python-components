@@ -84,7 +84,7 @@ class BrowserDetailFetcher:
     ) -> Iterator[
         tuple[
             dict[str, Any],
-            HtmlResponse,
+            HtmlResponse | None,
         ]
     ]:
         """
@@ -130,117 +130,154 @@ class BrowserDetailFetcher:
                     "detail_url"
                 )
 
-                if not detail_url:
-                    raise ValueError(
-                        "detail_url is missing from "
-                        "browser detail item."
+                try:
+                    if not detail_url:
+                        raise ValueError(
+                            "detail_url is missing from "
+                            "browser detail item."
+                        )
+
+                    self.logger.info(
+                        "Processing browser detail "
+                        "%s/%s: %s",
+                        index,
+                        len(pending_details),
+                        detail_url,
                     )
 
-                self.logger.info(
-                    "Processing browser detail "
-                    "%s/%s: %s",
-                    index,
-                    len(pending_details),
-                    detail_url,
-                )
-
-                cached_response = (
-                    self._load_cached_response(
-                        item=item,
-                        detail_url=detail_url,
-                        reuse_saved_pages=(
-                            reuse_saved_pages
-                        ),
-                        minimum_saved_size=(
-                            minimum_saved_size
-                        ),
+                    cached_response = (
+                        self._load_cached_response(
+                            item=item,
+                            detail_url=detail_url,
+                            reuse_saved_pages=(
+                                reuse_saved_pages
+                            ),
+                            minimum_saved_size=(
+                                minimum_saved_size
+                            ),
+                        )
                     )
-                )
 
-                if cached_response is not None:
+                    if cached_response is not None:
+                        yield (
+                            item,
+                            cached_response,
+                        )
+
+                        continue
+
+                    if engine is None:
+                        self.logger.info(
+                            "Starting detail browser."
+                        )
+
+                        engine = self.engine_factory(
+                            headless=(
+                                self.browser_config.get(
+                                    "headless",
+                                    False,
+                                )
+                            ),
+                            successCriteria=(
+                                self.browser_config.get(
+                                    "success_criteria",
+                                    [],
+                                )
+                            ),
+                            timeoutSeconds=(
+                                timeout_seconds
+                            ),
+                            driverVersion=(
+                                self.browser_config.get(
+                                    "driver_version",
+                                    "mlatest",
+                                )
+                            ),
+                            binaryLocation=(
+                                self.browser_config.get(
+                                    "binary_location"
+                                )
+                            ),
+                        )
+
+                        engine.__enter__()
+
+                    if not engine.navigate(
+                        detail_url
+                    ):
+                        raise RuntimeError(
+                            "Could not open detail page: "
+                            f"{detail_url}"
+                        )
+
+                    if (
+                        wait_selector
+                        and not engine.waitForElement(
+                            wait_selector,
+                            timeout_seconds,
+                        )
+                    ):
+                        raise RuntimeError(
+                            "Detail page did not become "
+                            f"ready: {detail_url}"
+                        )
+
+                    html = engine.getHtml()
+
+                    if not html:
+                        raise RuntimeError(
+                            "Detail page returned empty "
+                            f"HTML: {detail_url}"
+                        )
+
+                    detail_response = HtmlResponse(
+                        url=detail_url,
+                        body=html.encode(
+                            "utf-8"
+                        ),
+                        encoding="utf-8",
+                    )
+
                     yield (
                         item,
-                        cached_response,
+                        detail_response,
                     )
 
-                    continue
-
-                if engine is None:
-                    self.logger.info(
-                        "Starting detail browser."
+                except Exception as error:
+                    self.logger.exception(
+                        "Browser Media detail failed; "
+                        "continuing with the next item. "
+                        "url=%s",
+                        detail_url,
                     )
 
-                    engine = self.engine_factory(
-                        headless=(
-                            self.browser_config.get(
-                                "headless",
-                                False,
+                    if engine is not None:
+                        try:
+                            engine.__exit__(
+                                None,
+                                None,
+                                None,
                             )
-                        ),
-                        successCriteria=(
-                            self.browser_config.get(
-                                "success_criteria",
-                                [],
+
+                        except Exception:
+                            self.logger.exception(
+                                "Failed to close browser "
+                                "after a detail error."
                             )
-                        ),
-                        timeoutSeconds=(
-                            timeout_seconds
-                        ),
-                        driverVersion=(
-                            self.browser_config.get(
-                                "driver_version",
-                                "mlatest",
-                            )
-                        ),
-                        binaryLocation=(
-                            self.browser_config.get(
-                                "binary_location"
-                            )
-                        ),
+
+                        finally:
+                            engine = None
+
+                    yield (
+                        {
+                            **item,
+                            "fetch_error": str(error),
+                            "fetch_error_type": (
+                                type(error).__name__
+                            ),
+                        },
+                        None,
                     )
-
-                    engine.__enter__()
-
-                if not engine.navigate(
-                    detail_url
-                ):
-                    raise RuntimeError(
-                        "Could not open detail page: "
-                        f"{detail_url}"
-                    )
-
-                if (
-                    wait_selector
-                    and not engine.waitForElement(
-                        wait_selector,
-                        timeout_seconds,
-                    )
-                ):
-                    raise RuntimeError(
-                        "Detail page did not become "
-                        f"ready: {detail_url}"
-                    )
-
-                html = engine.getHtml()
-
-                if not html:
-                    raise RuntimeError(
-                        "Detail page returned empty "
-                        f"HTML: {detail_url}"
-                    )
-
-                detail_response = HtmlResponse(
-                    url=detail_url,
-                    body=html.encode(
-                        "utf-8"
-                    ),
-                    encoding="utf-8",
-                )
-
-                yield (
-                    item,
-                    detail_response,
-                )
 
         finally:
             if engine is not None:
