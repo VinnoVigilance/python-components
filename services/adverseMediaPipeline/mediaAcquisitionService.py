@@ -60,9 +60,39 @@ class MediaAcquisitionResult:
     duplicate_count: int
     failed_count: int
 
+    acquired_count: int = 0
+    known_count: int = 0
+    new_count: int = 0
+    selected_detail_count: int = 0
+    missing_detail_count: int = 0
+    discovery_failed_count: int = 0
+    identity_failure_count: int = 0
+    reached_source_end: bool | None = None
+    stop_reason: str = "UNEXPECTED_STOP"
+    completed_safely: bool = False
+
     records: list[dict[str, Any]] = field(
         default_factory=list
     )
+
+
+@dataclass
+class MediaSourceAcquisitionResult:
+    """Source-level acquisition result before Raw persistence."""
+
+    records: list[dict[str, Any]] = field(
+        default_factory=list
+    )
+    discovered_count: int = 0
+    known_count: int = 0
+    new_count: int = 0
+    selected_detail_count: int = 0
+    missing_detail_count: int = 0
+    discovery_failed_count: int = 0
+    identity_failure_count: int = 0
+    reached_source_end: bool | None = None
+    stop_reason: str = "UNEXPECTED_STOP"
+    completed_safely: bool = False
 
 
 class MediaAcquisitionService:
@@ -87,7 +117,17 @@ class MediaAcquisitionService:
     def acquire(
         self,
         source_config: dict[str, Any],
+        mode: str,
     ) -> MediaAcquisitionResult:
+
+        if mode not in {
+            "INITIAL",
+            "INCREMENTAL",
+        }:
+            raise ValueError(
+                "Media acquisition mode must be "
+                "INITIAL or INCREMENTAL."
+            )
 
         # =================================================
         # 1. Validate source configuration
@@ -153,7 +193,7 @@ class MediaAcquisitionService:
         ]
 
         # =================================================
-        # 3. Read discovery threshold
+        # 3. Read discovery policy
         # =================================================
 
         discovery_config = (
@@ -163,33 +203,64 @@ class MediaAcquisitionService:
             )
         )
 
-        stop_condition = (
+        discovery_policy = str(
             discovery_config.get(
-                "stop_condition",
-                {},
+                "policy",
+                "",
             )
+        ).strip().lower()
+
+        if discovery_policy not in {
+            "full_scan",
+            "stop_after_known",
+        }:
+            raise ValueError(
+                "discovery.policy must be "
+                "full_scan or stop_after_known."
+            )
+
+        known_threshold = discovery_config.get(
+            "threshold"
         )
 
-        known_threshold = int(
-            stop_condition.get(
-                "threshold",
-                10,
+        if discovery_policy == "stop_after_known":
+            if known_threshold is None:
+                raise ValueError(
+                    "discovery.threshold is required "
+                    "when policy=stop_after_known."
+                )
+
+            known_threshold = int(
+                known_threshold
             )
-        )
+
+            if known_threshold <= 0:
+                raise ValueError(
+                    "discovery.threshold must be "
+                    "greater than zero."
+                )
+
+        else:
+            # The threshold has no meaning for a full scan.
+            known_threshold = 1
 
         # =================================================
         # 4. Acquire source files
         # =================================================
 
-        acquired_records = (
+        source_result = (
             self._acquire_source(
                 source_config=source_config,
                 acquisition_type=acquisition_type,
                 source_id=source_id,
                 dataset_id=dataset_id,
+                mode=mode,
+                discovery_policy=discovery_policy,
                 known_threshold=known_threshold,
             )
         )
+
+        acquired_records = source_result.records
 
         # =================================================
         # 5. Persist every acquired detail file
@@ -201,11 +272,29 @@ class MediaAcquisitionService:
 
         stored_count = 0
         duplicate_count = 0
-        failed_count = 0
+        failed_count = (
+            source_result.discovery_failed_count
+            + source_result.missing_detail_count
+        )
 
         for record in acquired_records:
 
             try:
+                if record.get("failed"):
+                    failed_count += 1
+                    record.setdefault(
+                        "error_stage",
+                        "DETAIL_FETCH",
+                    )
+                    record.setdefault(
+                        "error_type",
+                        "DetailFetchError",
+                    )
+                    processed_results.append(
+                        record
+                    )
+                    continue
+
                 processed_record = (
                     self._persist_record(
                         record=record,
@@ -258,6 +347,8 @@ class MediaAcquisitionService:
                         ),
                         "failed": True,
                         "error": str(error),
+                        "error_stage": "RAW_PERSISTENCE",
+                        "error_type": type(error).__name__,
                     }
                 )
 
@@ -269,13 +360,38 @@ class MediaAcquisitionService:
             source_id=source_id,
             dataset_id=dataset_id,
 
-            discovered_count=len(
-                acquired_records
+            discovered_count=(
+                source_result.discovered_count
             ),
 
             stored_count=stored_count,
             duplicate_count=duplicate_count,
             failed_count=failed_count,
+
+            acquired_count=len(
+                acquired_records
+            ),
+            known_count=source_result.known_count,
+            new_count=source_result.new_count,
+            selected_detail_count=(
+                source_result.selected_detail_count
+            ),
+            missing_detail_count=(
+                source_result.missing_detail_count
+            ),
+            discovery_failed_count=(
+                source_result.discovery_failed_count
+            ),
+            identity_failure_count=(
+                source_result.identity_failure_count
+            ),
+            reached_source_end=(
+                source_result.reached_source_end
+            ),
+            stop_reason=source_result.stop_reason,
+            completed_safely=(
+                source_result.completed_safely
+            ),
 
             records=processed_results,
         )
@@ -349,8 +465,10 @@ class MediaAcquisitionService:
         acquisition_type: str,
         source_id: int,
         dataset_id: int,
+        mode: str,
+        discovery_policy: str,
         known_threshold: int,
-    ) -> list[dict[str, Any]]:
+    ) -> MediaSourceAcquisitionResult:
 
         if acquisition_type == "crawler":
 
@@ -360,6 +478,11 @@ class MediaAcquisitionService:
                     source_config=source_config,
                     source_id=source_id,
                     dataset_id=dataset_id,
+                    stop_after_known=(
+                        mode == "INCREMENTAL"
+                        and discovery_policy
+                        == "stop_after_known"
+                    ),
                     known_threshold=(
                         known_threshold
                     ),
@@ -375,7 +498,75 @@ class MediaAcquisitionService:
                 )
             )
 
-            return crawl_result.records
+            discovered_count = getattr(
+                crawl_result,
+                "discovered_count",
+                None,
+            )
+
+            if discovered_count is None:
+                discovered_count = len(
+                    crawl_result.records
+                )
+
+            return MediaSourceAcquisitionResult(
+                records=crawl_result.records,
+                discovered_count=discovered_count,
+                known_count=getattr(
+                    crawl_result,
+                    "known_count",
+                    0,
+                ),
+                new_count=getattr(
+                    crawl_result,
+                    "new_count",
+                    0,
+                ),
+                selected_detail_count=getattr(
+                    crawl_result,
+                    "selected_detail_count",
+                    0,
+                ),
+                missing_detail_count=getattr(
+                    crawl_result,
+                    "missing_detail_count",
+                    0,
+                ),
+                discovery_failed_count=getattr(
+                    crawl_result,
+                    "discovery_failure_count",
+                    getattr(
+                        crawl_result,
+                        "identity_failure_count",
+                        0,
+                    ),
+                ),
+                identity_failure_count=getattr(
+                    crawl_result,
+                    "identity_failure_count",
+                    0,
+                ),
+                reached_source_end=getattr(
+                    crawl_result,
+                    "reached_source_end",
+                    None,
+                ),
+                stop_reason=(
+                    getattr(
+                        crawl_result,
+                        "stop_reason",
+                        None,
+                    )
+                    or "UNEXPECTED_STOP"
+                ),
+                completed_safely=bool(
+                    getattr(
+                        crawl_result,
+                        "completed_safely",
+                        False,
+                    )
+                ),
+            )
 
         if acquisition_type == "api":
 
@@ -396,6 +587,7 @@ class MediaAcquisitionService:
         source_config: dict[str, Any],
         source_id: int,
         dataset_id: int,
+        stop_after_known: bool,
         known_threshold: int,
         source_name: str,
         dataset_name: str,
@@ -464,6 +656,9 @@ class MediaAcquisitionService:
                         dataset_id=dataset_id,
                         source_config=(
                             source_config
+                        ),
+                        stop_after_known=(
+                            stop_after_known
                         ),
                         known_threshold=(
                             known_threshold
@@ -564,7 +759,7 @@ class MediaAcquisitionService:
     @staticmethod
     def _collect_api_source(
         source_config: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+    ) -> MediaSourceAcquisitionResult:
 
         collection_result = (
             collect_artifacts(
@@ -574,13 +769,26 @@ class MediaAcquisitionService:
             )
         )
 
-        return [
+        records = [
             {
                 "detail_file_path": file_path,
             }
             for file_path
             in collection_result.file_paths
         ]
+
+        return MediaSourceAcquisitionResult(
+            records=records,
+            discovered_count=(
+                collection_result.record_count
+            ),
+            new_count=(
+                collection_result.record_count
+            ),
+            reached_source_end=True,
+            stop_reason="SOURCE_EXHAUSTED",
+            completed_safely=True,
+        )
 
     # =====================================================
     # Persist one acquired record
@@ -607,15 +815,15 @@ class MediaAcquisitionService:
                 "from Media acquisition result."
             )
 
-        extracted = (
-            record.get(
-                "extracted"
-            )
-            or {}
+        # Crawler records may already contain extracted fields, while API
+        # records contain only a path to their individual JSON file. Preserve
+        # None for API records so MediaRawRecordService parses that file.
+        extracted = record.get(
+            "extracted"
         )
 
         source_url = (
-            extracted.get(
+            (extracted or {}).get(
                 "SourceURL"
             )
             or acquisition_url

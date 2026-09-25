@@ -1,3 +1,6 @@
+import asyncio
+import threading
+
 from pathlib import Path
 from unittest.mock import (
     MagicMock,
@@ -47,6 +50,8 @@ def _build_spider(
 
         "discovery": {
             "strategy": "list_detail",
+            "policy": "stop_after_known",
+            "threshold": 10,
 
             "start_page": 1,
 
@@ -60,12 +65,6 @@ def _build_spider(
                 ),
             },
 
-            "stop_condition": {
-                "type": (
-                    "consecutive_known_records"
-                ),
-                "threshold": 10,
-            },
         },
 
         "extraction": {
@@ -281,14 +280,13 @@ def test_saved_listing_uses_media_discovery_and_stops(
 
     # The third article must not be processed
     # after the discovery service says stop.
-    assert len(pending_details) == 2
+    assert len(pending_details) == 1
 
     assert [
         item["source_record_id"]
         for item in pending_details
     ] == [
         "101",
-        "102",
     ]
 
     assert [
@@ -296,16 +294,11 @@ def test_saved_listing_uses_media_discovery_and_stops(
         for item in pending_details
     ] == [
         "DOJ-PH|DOJ-PH-NEWS|101",
-        "DOJ-PH|DOJ-PH-NEWS|102",
     ]
 
     assert pending_details[0][
         "is_known"
     ] is False
-
-    assert pending_details[1][
-        "is_known"
-    ] is True
 
     assert (
         discovery_service
@@ -318,6 +311,87 @@ def test_saved_listing_uses_media_discovery_and_stops(
         discovery_service
         .check_record_key
         .call_count
+        == 2
+    )
+
+
+def test_start_yields_every_selected_detail(
+    tmp_path,
+):
+    spider, _, _, _ = _build_spider(tmp_path)
+
+    pending = [
+        {"record_key": f"key-{index}"}
+        for index in range(25)
+    ]
+
+    spider._discover_from_saved_listing = MagicMock(
+        return_value=pending
+    )
+    main_thread_id = threading.get_ident()
+    worker_thread_ids = []
+
+    def fetch_details(items):
+        worker_thread_ids.append(threading.get_ident())
+        return iter(items)
+
+    spider._fetch_and_parse_details = MagicMock(
+        side_effect=fetch_details
+    )
+
+    async def collect():
+        return [item async for item in spider.start()]
+
+    results = asyncio.run(collect())
+
+    assert results == pending
+    assert len(worker_thread_ids) == 1
+    assert worker_thread_ids[0] != main_thread_id
+    spider._fetch_and_parse_details.assert_called_once_with(
+        pending
+    )
+
+
+def test_known_doj_records_are_not_queued_for_download(
+    tmp_path,
+):
+    (
+        spider,
+        _,
+        _,
+        discovery_service,
+    ) = _build_spider(
+        tmp_path
+    )
+
+    listing_response = HtmlResponse(
+        url="https://www.doj.gov.ph/news.html",
+        body=(
+            b'<a class="news-link" href="?newsid=101">One</a>'
+            b'<a class="news-link" href="?newsid=102">Two</a>'
+            b'<a class="news-link" href="?newsid=103">Three</a>'
+        ),
+        encoding="utf-8",
+    )
+
+    discovery_service.build_record_key.side_effect = [
+        "DOJ-PH|DOJ-PH-NEWS|101",
+        "DOJ-PH|DOJ-PH-NEWS|102",
+    ]
+    discovery_service.check_record_key.side_effect = [
+        (True, False),
+        (True, True),
+    ]
+
+    pending_details = (
+        spider._discover_from_saved_listing(
+            listing_response
+        )
+    )
+
+    assert pending_details == []
+    assert (
+        discovery_service.check_record_key.call_count
         == 2
     )
 
@@ -452,12 +526,22 @@ def test_media_details_are_saved_as_individual_files(
     # One physical file for each news article.
     first_file = (
         storage.detail_path
-        / "101.html"
+        / (
+            spider._build_file_name_id(
+                pending_details[0]["record_key"]
+            )
+            + ".html"
+        )
     )
 
     second_file = (
         storage.detail_path
-        / "102.html"
+        / (
+            spider._build_file_name_id(
+                pending_details[1]["record_key"]
+            )
+            + ".html"
+        )
     )
 
     assert first_file.is_file()

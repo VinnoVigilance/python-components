@@ -44,6 +44,33 @@ class TestGenerateRecordKey:
         with pytest.raises(ValueError, match="Missing value for record_key field: b"):
             MediaIdentityService.generate_record_key(source_config, {"a": "x", "b": "  "})
 
+    def test_hashed_key_is_stable_after_text_normalization(self):
+        source_config = {
+            "source_name": "DOJ_PH",
+            "identity": {
+                "record_key": {
+                    "fields": [
+                        "source_name",
+                        "date",
+                        "title",
+                    ],
+                    "hash": True,
+                },
+            },
+        }
+
+        first = MediaIdentityService.generate_record_key(
+            source_config,
+            {"date": "09/11/2026", "title": "Same DOJ Article"},
+        )
+        second = MediaIdentityService.generate_record_key(
+            source_config,
+            {"date": " 09/11/2026 ", "title": "same   doj article"},
+        )
+
+        assert first == second
+        assert len(first) == 64
+
 
 class TestExtractExternalId:
 

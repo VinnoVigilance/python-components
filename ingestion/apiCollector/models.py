@@ -26,6 +26,9 @@ class ApiCollectorTask:
     headers: Dict[str, str] = field(default_factory=dict)
     timeout: int = 30
     retry: int = 3
+    retry_delay_seconds: float = 1.0
+    retry_backoff_multiplier: float = 2.0
+    retry_max_delay_seconds: float = 30.0
     throttle_delay: float = 0.0
     write_mode: str = "single_jsonl"
     download_dir: Optional[str] = None
@@ -60,6 +63,18 @@ class ApiCollectorTask:
             headers=api_config.get("headers", {}),
             timeout=api_config.get("timeout", 30),
             retry=api_config.get("retry", 3),
+            retry_delay_seconds=api_config.get(
+                "retry_delay_seconds",
+                1.0,
+            ),
+            retry_backoff_multiplier=api_config.get(
+                "retry_backoff_multiplier",
+                2.0,
+            ),
+            retry_max_delay_seconds=api_config.get(
+                "retry_max_delay_seconds",
+                30.0,
+            ),
             throttle_delay=api_config.get("throttle_delay", 0.0),
             write_mode=api_config.get("write_mode", "single_jsonl"),
             transport=api_config.get("transport", "requests"),

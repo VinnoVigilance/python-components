@@ -78,6 +78,7 @@ class MediaRawService:
                 local_path=file_metadata[
                     "local_path"
                 ],
+                file_hash=file_hash,
             )
         )
 
@@ -168,11 +169,18 @@ class MediaRawService:
         source_name: str,
         dataset_name: str,
         local_path: str,
+        file_hash: str,
     ) -> str:
 
         path = Path(local_path)
 
         stored_at = datetime.now()
+
+        immutable_file_name = (
+            f"{path.stem}__"
+            f"{file_hash[:16]}"
+            f"{path.suffix}"
+        )
 
         object_path = (
             f"{source_name}/"
@@ -180,7 +188,7 @@ class MediaRawService:
             f"year={stored_at:%Y}/"
             f"month={stored_at:%m}/"
             f"day={stored_at:%d}/"
-            f"{path.name}"
+            f"{immutable_file_name}"
         )
 
         return seaweedClient.upload_file(

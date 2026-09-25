@@ -17,6 +17,7 @@ Two behaviours are locked in here:
 from unittest.mock import patch
 
 import pytest
+import requests
 
 from ingestion.apiCollector import collector
 from ingestion.apiCollector.models import ApiCollectorTask
@@ -281,3 +282,43 @@ class TestIterPages:
 
         assert result == [[{"id": 1}]]
         assert calls["count"] == 1
+
+
+class TestRetryBackoff:
+    def test_request_retries_use_exponential_backoff(self):
+        task = _task({"type": "none"})
+        task.retry = 3
+        task.retry_delay_seconds = 1
+        task.retry_backoff_multiplier = 2
+        task.retry_max_delay_seconds = 10
+
+        transport = type(
+            "Transport",
+            (),
+            {
+                "get_json": lambda self, url, params: None,
+            },
+        )()
+
+        with (
+            patch.object(
+                transport,
+                "get_json",
+                side_effect=[
+                    requests.ConnectionError("down"),
+                    requests.Timeout("slow"),
+                    {"items": []},
+                ],
+            ) as get_json,
+            patch.object(collector.time, "sleep") as sleep,
+        ):
+            result = collector._get_json_with_retry(
+                task,
+                task.url,
+                params={},
+                transport=transport,
+            )
+
+        assert result == {"items": []}
+        assert get_json.call_count == 3
+        assert [call.args[0] for call in sleep.call_args_list] == [1, 2]

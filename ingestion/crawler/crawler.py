@@ -27,6 +27,44 @@ from ingestion.crawler.spiders.savedHtmlSpider import (
 )
 
 
+def _finalize_media_completion(
+    discovery_summary: dict,
+    record_count: int,
+) -> tuple[int, int, str | None, bool | None]:
+    """Validate that every selected detail produced a result record."""
+
+    selected_detail_count = int(
+        discovery_summary.get(
+            "selected_detail_count",
+            0,
+        )
+    )
+
+    missing_detail_count = max(
+        selected_detail_count - record_count,
+        0,
+    )
+
+    stop_reason = discovery_summary.get(
+        "stop_reason"
+    )
+
+    completed_safely = discovery_summary.get(
+        "completed_safely"
+    )
+
+    if missing_detail_count:
+        stop_reason = "DETAIL_RESULTS_INCOMPLETE"
+        completed_safely = False
+
+    return (
+        selected_detail_count,
+        missing_detail_count,
+        stop_reason,
+        completed_safely,
+    )
+
+
 def crawl_source(
     task: CrawlerTask,
     discovery_service=None,
@@ -449,10 +487,72 @@ def crawl_source(
     # 12. RESULT
     # =====================================================
 
+    discovery_summary = {}
+
+    if (
+        is_media
+        and discovery_service is not None
+        and hasattr(
+            discovery_service,
+            "get_summary",
+        )
+    ):
+        discovery_summary = (
+            discovery_service.get_summary()
+        )
+
+    (
+        selected_detail_count,
+        missing_detail_count,
+        stop_reason,
+        completed_safely,
+    ) = _finalize_media_completion(
+        discovery_summary=discovery_summary,
+        record_count=len(records),
+    )
+
     return CrawlResult(
         source_file_path=(
             result_source_file_path
         ),
         records=records,
         record_count=len(records),
+        discovered_count=(
+            discovery_summary.get(
+                "discovered_count"
+            )
+        ),
+        known_count=discovery_summary.get(
+            "known_count",
+            0,
+        ),
+        new_count=discovery_summary.get(
+            "new_count",
+            0,
+        ),
+        selected_detail_count=(
+            selected_detail_count
+        ),
+        missing_detail_count=(
+            missing_detail_count
+        ),
+        identity_failure_count=(
+            discovery_summary.get(
+                "identity_failure_count",
+                0,
+            )
+        ),
+        discovery_failure_count=(
+            discovery_summary.get(
+                "discovery_failure_count",
+                0,
+            )
+        ),
+        reached_source_end=(
+            discovery_summary.get(
+                "reached_source_end"
+            )
+        ),
+        stop_reason=stop_reason,
+        completed_safely=completed_safely,
     )
