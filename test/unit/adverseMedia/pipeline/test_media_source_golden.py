@@ -46,6 +46,7 @@ SAMPLES = {
     "PCIJ_CORRUPTION_WATCH": "PCIJ_CORRUPTION_WATCH_extracted_sample.jsonl",
     "PCIJ_INVESTIGATIVE_REPORTS": "PCIJ_INVESTIGATIVE_REPORTS_extracted_sample.jsonl",
     "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
+    "DTI_FAIR_TRADE_PRESS_RELEASES": "DTI_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
 }
 
 # dataset_name -> the constant Sources[]/Publisher fields every record must carry.
@@ -63,12 +64,12 @@ GOLDEN = {
         "PublisherName": "AMLC",
     },
     "PCIJ_CORRUPTION_WATCH": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "News Article",
         "DatasetName": "PCIJ_CORRUPTION_WATCH", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
     "PCIJ_INVESTIGATIVE_REPORTS": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "News Article",
         "DatasetName": "PCIJ_INVESTIGATIVE_REPORTS", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
@@ -77,6 +78,11 @@ GOLDEN = {
     "UK_GOV_NEWS_COMMUNICATIONS": {
         "SourceType": "Official", "DatasetCategory": "News Article",
         "DatasetName": "UK_GOV_NEWS_COMMUNICATIONS", "SourceName": "UK_GOV",
+    },
+    "DTI_FAIR_TRADE_PRESS_RELEASES": {
+        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "DatasetName": "DTI_FAIR_TRADE_PRESS_RELEASES", "SourceName": "DTI",
+        "PublisherName": "Department of Trade and Industry (Philippines)",
     },
 }
 
@@ -196,7 +202,7 @@ class TestPcijEmbedsBecomeAttachments:
 
 
 class TestPcijFeaturedImageAndTags:
-    """FeaturedImageUrl (og:image) -> Attachments[Photograph], TagNames -> Taxonomy.Tags[]."""
+    """FeaturedImageUrl (og:image) -> Attachments[Image], TagNames -> Taxonomy.Tags[]."""
 
     def _by_title(self, needle):
         for rec in _canonical_records("PCIJ_INVESTIGATIVE_REPORTS"):
@@ -204,17 +210,17 @@ class TestPcijFeaturedImageAndTags:
                 return rec
         raise AssertionError(f"no PCIJ_INVESTIGATIVE_REPORTS sample record matching {needle!r}")
 
-    def test_featured_image_becomes_photograph_attachment(self):
+    def test_featured_image_becomes_image_attachment(self):
         rec = self._by_title("Have you come across pro-China propaganda")
-        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Photograph"]
-        assert photos, "expected a Photograph attachment from FeaturedImageUrl"
-        assert photos[0].get("URL"), "Photograph attachment has no URL"
+        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Image"]
+        assert photos, "expected an Image attachment from FeaturedImageUrl"
+        assert photos[0].get("URL"), "Image attachment has no URL"
 
-    def test_missing_featured_image_produces_no_photograph_attachment(self):
+    def test_missing_featured_image_produces_no_image_attachment(self):
         """Some older articles genuinely have no og:image -- must not fabricate one."""
         rec = self._by_title("SALN files of wannabe presidents")
-        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Photograph"]
-        assert not photos, f"expected no Photograph attachment, got {photos}"
+        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Image"]
+        assert not photos, f"expected no Image attachment, got {photos}"
 
     def test_tag_names_become_taxonomy_tags(self):
         rec = self._by_title("Have you come across pro-China propaganda")
@@ -229,3 +235,29 @@ class TestPcijFeaturedImageAndTags:
         docs = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Document"]
         assert docs, "expected a Document attachment from EmbeddedPdfUrls"
         assert ".pdf" in (docs[0].get("URL") or ""), docs[0].get("URL")
+
+
+class TestDtiAttachments:
+    """Featured media + body images -> Attachments[Image], body PDFs -> Attachments[Document]."""
+
+    def _by_id(self, record_id):
+        for rec in _canonical_records("DTI_FAIR_TRADE_PRESS_RELEASES"):
+            if str((rec.get("Sources") or [{}])[0].get("SourceRecordId")) == record_id:
+                return rec
+        raise AssertionError(f"no DTI sample record with SourceRecordId {record_id!r}")
+
+    def _urls(self, rec, attach_type):
+        return [a.get("URL") for a in (rec.get("Attachments") or []) if a.get("Type") == attach_type]
+
+    def test_featured_and_body_images_become_images(self):
+        photos = self._urls(self._by_id("6453"), "Image")
+        assert len(photos) == 2, f"expected featured + body image, got {photos}"
+
+    def test_body_pdf_becomes_document_attachment(self):
+        docs = self._urls(self._by_id("3313"), "Document")
+        assert docs and docs[0].endswith(".pdf"), f"expected a PDF Document attachment, got {docs}"
+
+    def test_staging_domain_urls_are_excluded(self):
+        for rec in _canonical_records("DTI_FAIR_TRADE_PRESS_RELEASES"):
+            for a in rec.get("Attachments") or []:
+                assert "fteb-staging" not in (a.get("URL") or ""), a

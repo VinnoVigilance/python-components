@@ -77,7 +77,7 @@ def _mock_database(
 
 
 def _amlc_style_config():
-    """No discovery.stop_condition -- the current AMLC shape."""
+    """discovery.policy=full_scan -- the AMLC shape."""
 
     return {
         "source_name": "AMLC",
@@ -86,6 +86,9 @@ def _amlc_style_config():
         "acquisition": {
             "type": "api",
             "download_method": "API",
+        },
+        "discovery": {
+            "policy": "full_scan",
         },
         "api_config": {
             "write_mode": "record_files",
@@ -104,7 +107,7 @@ def _amlc_style_config():
 
 
 def _ukgov_style_config():
-    """discovery.stop_condition configured -- the UK_GOV shape."""
+    """discovery.policy=stop_after_known -- the UK_GOV shape."""
 
     config = _amlc_style_config()
 
@@ -112,17 +115,15 @@ def _ukgov_style_config():
     config["dataset_name"] = "UK_GOV_NEWS_COMMUNICATIONS"
 
     config["discovery"] = {
-        "stop_condition": {
-            "type": "consecutive_known_records",
-            "threshold": 10,
-        },
+        "policy": "stop_after_known",
+        "threshold": 10,
     }
 
     return config
 
 
-class TestCollectApiSourceWithoutStopCondition:
-    """AMLC-shaped config: no discovery.stop_condition -> unchanged behaviour."""
+class TestCollectApiSourceWithoutStopAfterKnown:
+    """stop_after_known=False -> every page is fetched, no DB lookups."""
 
     def test_does_not_touch_the_database(
         self,
@@ -159,11 +160,12 @@ class TestCollectApiSourceWithoutStopCondition:
                 source_config=_amlc_style_config(),
                 source_id=1,
                 dataset_id=2,
+                stop_after_known=False,
                 known_threshold=10,
             )
         )
 
-        assert result == [
+        assert result.records == [
             {"detail_file_path": "a.json"},
             {"detail_file_path": "b.json"},
         ]
@@ -180,8 +182,8 @@ class TestCollectApiSourceWithoutStopCondition:
         )
 
 
-class TestCollectApiSourceWithStopCondition:
-    """UK_GOV-shaped config: discovery.stop_condition -> wires the checker."""
+class TestCollectApiSourceWithStopAfterKnown:
+    """stop_after_known=True -> wires the consecutive-known checker."""
 
     def test_builds_discovery_service_and_passes_stop_check(
         self,
@@ -217,11 +219,12 @@ class TestCollectApiSourceWithStopCondition:
                 source_config=_ukgov_style_config(),
                 source_id=5,
                 dataset_id=6,
+                stop_after_known=True,
                 known_threshold=10,
             )
         )
 
-        assert result == [
+        assert result.records == [
             {"detail_file_path": "a.json"},
         ]
 
@@ -230,6 +233,7 @@ class TestCollectApiSourceWithStopCondition:
             source_id=5,
             dataset_id=6,
             source_config=_ukgov_style_config(),
+            stop_after_known=True,
             known_threshold=10,
         )
 

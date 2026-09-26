@@ -580,6 +580,11 @@ class MediaAcquisitionService:
                     source_config=source_config,
                     source_id=source_id,
                     dataset_id=dataset_id,
+                    stop_after_known=(
+                        mode == "INCREMENTAL"
+                        and discovery_policy
+                        == "stop_after_known"
+                    ),
                     known_threshold=known_threshold,
                 )
             )
@@ -768,30 +773,15 @@ class MediaAcquisitionService:
         source_config: dict[str, Any],
         source_id: int,
         dataset_id: int,
+        stop_after_known: bool,
         known_threshold: int,
     ) -> MediaSourceAcquisitionResult:
         """
-        Acquire an API-based Media source.
-
-        A source with discovery.stop_condition configured (currently
-        UK_GOV_NEWS_COMMUNICATIONS) stops requesting further pages once
-        known_threshold already-saved records appear in a row in the
-        API's own (already newest-first) order -- the same rule the
-        crawler sources use. A source without that config (e.g. AMLC
-        today) is unaffected: every page is fetched, exactly as before.
+        Acquire an API-based Media source; with stop_after_known, stop paging
+        once known_threshold already-saved records appear in a row.
         """
 
-        discovery_config = source_config.get(
-            "discovery",
-            {},
-        )
-
-        stop_condition = discovery_config.get(
-            "stop_condition",
-            {},
-        )
-
-        if not stop_condition:
+        if not stop_after_known:
 
             collection_result = (
                 collect_artifacts(
