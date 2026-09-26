@@ -46,6 +46,7 @@ SAMPLES = {
     "PCIJ_CORRUPTION_WATCH": "PCIJ_CORRUPTION_WATCH_extracted_sample.jsonl",
     "PCIJ_INVESTIGATIVE_REPORTS": "PCIJ_INVESTIGATIVE_REPORTS_extracted_sample.jsonl",
     "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
+    "DTI_FAIR_TRADE_PRESS_RELEASES": "DTI_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
 }
 
 # dataset_name -> the constant Sources[]/Publisher fields every record must carry.
@@ -77,6 +78,11 @@ GOLDEN = {
     "UK_GOV_NEWS_COMMUNICATIONS": {
         "SourceType": "Official", "DatasetCategory": "News Article",
         "DatasetName": "UK_GOV_NEWS_COMMUNICATIONS", "SourceName": "UK_GOV",
+    },
+    "DTI_FAIR_TRADE_PRESS_RELEASES": {
+        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "DatasetName": "DTI_FAIR_TRADE_PRESS_RELEASES", "SourceName": "DTI",
+        "PublisherName": "Department of Trade and Industry (Philippines)",
     },
 }
 
@@ -229,3 +235,29 @@ class TestPcijFeaturedImageAndTags:
         docs = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Document"]
         assert docs, "expected a Document attachment from EmbeddedPdfUrls"
         assert ".pdf" in (docs[0].get("URL") or ""), docs[0].get("URL")
+
+
+class TestDtiAttachments:
+    """Featured media + body images -> Attachments[Image], body PDFs -> Attachments[Document]."""
+
+    def _by_id(self, record_id):
+        for rec in _canonical_records("DTI_FAIR_TRADE_PRESS_RELEASES"):
+            if str((rec.get("Sources") or [{}])[0].get("SourceRecordId")) == record_id:
+                return rec
+        raise AssertionError(f"no DTI sample record with SourceRecordId {record_id!r}")
+
+    def _urls(self, rec, attach_type):
+        return [a.get("URL") for a in (rec.get("Attachments") or []) if a.get("Type") == attach_type]
+
+    def test_featured_and_body_images_become_images(self):
+        photos = self._urls(self._by_id("6453"), "Image")
+        assert len(photos) == 2, f"expected featured + body image, got {photos}"
+
+    def test_body_pdf_becomes_document_attachment(self):
+        docs = self._urls(self._by_id("3313"), "Document")
+        assert docs and docs[0].endswith(".pdf"), f"expected a PDF Document attachment, got {docs}"
+
+    def test_staging_domain_urls_are_excluded(self):
+        for rec in _canonical_records("DTI_FAIR_TRADE_PRESS_RELEASES"):
+            for a in rec.get("Attachments") or []:
+                assert "fteb-staging" not in (a.get("URL") or ""), a
