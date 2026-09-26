@@ -63,12 +63,12 @@ GOLDEN = {
         "PublisherName": "AMLC",
     },
     "PCIJ_CORRUPTION_WATCH": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "News Article",
         "DatasetName": "PCIJ_CORRUPTION_WATCH", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
     "PCIJ_INVESTIGATIVE_REPORTS": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "News Article",
         "DatasetName": "PCIJ_INVESTIGATIVE_REPORTS", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
@@ -196,7 +196,7 @@ class TestPcijEmbedsBecomeAttachments:
 
 
 class TestPcijFeaturedImageAndTags:
-    """FeaturedImageUrl (og:image) -> Attachments[Photograph], TagNames -> Taxonomy.Tags[]."""
+    """FeaturedImageUrl (og:image) -> Attachments[Image], TagNames -> Taxonomy.Tags[]."""
 
     def _by_title(self, needle):
         for rec in _canonical_records("PCIJ_INVESTIGATIVE_REPORTS"):
@@ -204,17 +204,17 @@ class TestPcijFeaturedImageAndTags:
                 return rec
         raise AssertionError(f"no PCIJ_INVESTIGATIVE_REPORTS sample record matching {needle!r}")
 
-    def test_featured_image_becomes_photograph_attachment(self):
+    def test_featured_image_becomes_image_attachment(self):
         rec = self._by_title("Have you come across pro-China propaganda")
-        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Photograph"]
-        assert photos, "expected a Photograph attachment from FeaturedImageUrl"
-        assert photos[0].get("URL"), "Photograph attachment has no URL"
+        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Image"]
+        assert photos, "expected an Image attachment from FeaturedImageUrl"
+        assert photos[0].get("URL"), "Image attachment has no URL"
 
-    def test_missing_featured_image_produces_no_photograph_attachment(self):
+    def test_missing_featured_image_produces_no_image_attachment(self):
         """Some older articles genuinely have no og:image -- must not fabricate one."""
         rec = self._by_title("SALN files of wannabe presidents")
-        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Photograph"]
-        assert not photos, f"expected no Photograph attachment, got {photos}"
+        photos = [a for a in (rec.get("Attachments") or []) if a.get("Type") == "Image"]
+        assert not photos, f"expected no Image attachment, got {photos}"
 
     def test_tag_names_become_taxonomy_tags(self):
         rec = self._by_title("Have you come across pro-China propaganda")
