@@ -640,12 +640,12 @@ sources:
           output_field: ContentApiUrl
           template: "https://www.gov.uk/api/content{link}"
 
-  DTI_FAIR_TRADE_PRESS_RELEASES:
+  DTI_PH_FAIR_TRADE_PRESS_RELEASES:
     enabled: true
     active: true
 
-    source_name: DTI
-    dataset_name: DTI_FAIR_TRADE_PRESS_RELEASES
+    source_name: DTI_PH
+    dataset_name: DTI_PH_FAIR_TRADE_PRESS_RELEASES
     dataset_category: PRESS_RELEASE
 
     schedule: daily
