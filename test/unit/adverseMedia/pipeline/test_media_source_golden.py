@@ -202,7 +202,7 @@ class TestPcijEmbedsBecomeAttachments:
 
 
 class TestPcijFeaturedImageAndTags:
-    """FeaturedImageUrl (og:image) -> Attachments[Image], TagNames -> Taxonomy.Tags[]."""
+    """FeaturedImageUrl (og:image) -> Attachments[Image], TagNames -> Metadata.Tags[]."""
 
     def _by_title(self, needle):
         for rec in _canonical_records("PCIJ_INVESTIGATIVE_REPORTS"):
@@ -224,9 +224,9 @@ class TestPcijFeaturedImageAndTags:
 
     def test_tag_names_become_taxonomy_tags(self):
         rec = self._by_title("Have you come across pro-China propaganda")
-        tags = (rec.get("Taxonomy") or {}).get("Tags") or []
+        tags = (rec.get("Metadata") or {}).get("Tags") or []
         assert "China" in tags, f"expected 'China' tag, got {tags}"
-        assert all(isinstance(t, str) for t in tags), "Taxonomy.Tags[] must be flat strings"
+        assert all(isinstance(t, str) for t in tags), "Metadata.Tags[] must be flat strings"
 
     def test_embedded_pdf_becomes_document_attachment(self):
         """Older SALN articles embed the PDF via a raw <iframe src=*.pdf>, not the
