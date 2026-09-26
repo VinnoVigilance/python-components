@@ -328,8 +328,8 @@ class TestIterPagesStopCheck:
 
     def test_stop_check_false_does_not_affect_normal_pagination(self):
         # A stop_check that never fires must behave exactly like passing none
-        # at all -- this is the AMLC case (no discovery.stop_condition
-        # configured, so mediaAcquisitionService never builds a stop_check,
+        # at all -- this is the AMLC case (discovery.policy=full_scan,
+        # so mediaAcquisitionService never builds a stop_check,
         # but this locks in that a harmless stop_check would be a no-op too).
         task = _task(
             {

@@ -589,7 +589,8 @@ sources:
       download_method: API
 
     discovery:
-      policy: full_scan
+      policy: stop_after_known
+      threshold: 10
 
     api_config:
       params:
@@ -617,11 +618,6 @@ sources:
       retry_backoff_multiplier: 2
       retry_max_delay_seconds: 8
       throttle_delay: 0.5
-
-    discovery:
-      stop_condition:
-        type: consecutive_known_records
-        threshold: 10
 
     parser:
       type: json
@@ -667,6 +663,10 @@ sources:
     acquisition:
       type: api
       download_method: API
+
+    discovery:
+      policy: stop_after_known
+      threshold: 10
 
     api_config:
       params:
