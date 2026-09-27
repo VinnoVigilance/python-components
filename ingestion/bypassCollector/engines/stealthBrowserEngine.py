@@ -15,6 +15,8 @@ from ingestion.bypassCollector.engines.compatibleDriver import (
 )
 logger = logging.getLogger(__name__)
 
+CHALLENGE_INDICATORS = ("turnstile", "just a moment", "verify you are human")
+
 
 class StealthBrowserEngine(BaseEngine):
     """
@@ -75,7 +77,8 @@ class StealthBrowserEngine(BaseEngine):
                     binary_location=self.binaryLocation,
                 ),
             )
-            
+            self._bot.CHALLENGE_INDICATORS = CHALLENGE_INDICATORS
+
             self._bot.__enter__()
             self.sb = self._bot.sb
             
