@@ -1,5 +1,6 @@
 import asyncio
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from urllib.parse import unquote, urljoin, urlparse
 
 import scrapy
 
@@ -11,6 +12,8 @@ from ingestion.bypassCollector.engines.stealthBrowserEngine import (
 from ingestion.crawler.browserDetailFetcher import (
     BrowserDetailFetcher,
 )
+from ingestion.downloader.interface import download
+from ingestion.downloader.models import DownloadTask
 from ingestion.crawler.spiders.mediaSpider import (
     MediaSpider,
 )
@@ -307,7 +310,7 @@ class SavedHtmlMediaSpider(MediaSpider):
             # Reuse the existing Media method.
             # This is the point where a separate
             # detail HTML file is saved.
-            yield from super().parse_detail(
+            detail_results = super().parse_detail(
                 response=detail_response,
 
                 record_key=item[
@@ -326,6 +329,129 @@ class SavedHtmlMediaSpider(MediaSpider):
                     "identity_fields"
                 ),
             )
+
+            for result in detail_results:
+                self._download_documents(
+                    result=result,
+                    fetcher=fetcher,
+                )
+
+                yield result
+
+    def _download_documents(
+        self,
+        result: dict,
+        fetcher: BrowserDetailFetcher,
+    ) -> None:
+        """Download files linked from the detail page, per `document_download` config."""
+
+        document_config = self.source_config.get(
+            "document_download"
+        )
+
+        extracted = result.get("extracted")
+
+        if not document_config or not extracted:
+            return
+
+        document_urls = []
+
+        for field_name in document_config.get(
+            "url_fields",
+            [],
+        ):
+            values = extracted.get(field_name)
+
+            if not isinstance(values, list):
+                values = [values]
+
+            for value in values:
+                if not value:
+                    continue
+
+                document_url = urljoin(
+                    extracted["SourceURL"],
+                    value,
+                )
+
+                if document_url not in document_urls:
+                    document_urls.append(
+                        document_url
+                    )
+
+        extracted["DocumentUrls"] = document_urls
+        extracted["DocumentFilePaths"] = []
+
+        if not document_urls:
+            if document_config.get("required", False):
+                self._mark_document_failure(
+                    result,
+                    "No document URL found on the detail page.",
+                )
+            return
+
+        file_name_id = self._build_file_name_id(
+            record_key=result["record_key"],
+        )
+
+        for index, document_url in enumerate(
+            document_urls
+        ):
+            suffix = PurePosixPath(
+                unquote(urlparse(document_url).path)
+            ).suffix.lower()
+
+            try:
+                document_path = download(
+                    DownloadTask(
+                        url=document_url,
+                        source_name=self.task.source_name,
+                        list_name=self.task.list_name,
+                        download_dir=self.task.download_dir,
+                        filename=f"{file_name_id}_{index}{suffix}",
+                        headers=fetcher.session_headers(),
+                    )
+                )
+
+            except Exception:
+                self.logger.exception(
+                    "Media document download failed. url=%s",
+                    document_url,
+                )
+                self._mark_document_failure(
+                    result,
+                    f"Document download failed: {document_url}",
+                )
+                return
+
+            extracted["DocumentFilePaths"].append(
+                document_path
+            )
+
+        if document_config.get(
+            "store_as_record_file",
+            False,
+        ):
+            result["detail_file_path"] = (
+                extracted["DocumentFilePaths"][0]
+            )
+            result["file_url"] = document_urls[0]
+
+    @staticmethod
+    def _mark_document_failure(
+        result: dict,
+        error: str,
+    ) -> None:
+        """Fail the record so it is retried on the next run instead of stored."""
+
+        result.update(
+            {
+                "failed": True,
+                "error": error,
+                "error_stage": "DOCUMENT_FETCH",
+                "error_type": "DocumentFetchError",
+            }
+        )
 
     def _build_detail_cache_path(
         self,

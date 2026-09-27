@@ -40,6 +40,13 @@ class TestFinalFilename:
         stamp = datetime.datetime(2026, 8, 17, 10, 30, 0)
         assert sd._build_final_filename(task, "list.csv", stamp) == "MYLIST_20260817_103000.csv"
 
+    def test_explicit_filename_is_kept(self):
+        task = DownloadTask(
+            url="https://x/a.pdf", source_name="S", list_name="MYLIST", filename="abc_0.pdf"
+        )
+        stamp = datetime.datetime(2026, 8, 17, 10, 30, 0)
+        assert sd._build_final_filename(task, "abc_0.pdf", stamp) == "abc_0.pdf"
+
 
 class TestDownloadDirectory:
     def test_uses_task_dir_and_dated_layout(self, tmp_path):

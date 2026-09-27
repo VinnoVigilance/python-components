@@ -181,6 +181,18 @@ class StealthBrowserEngine(BaseEngine):
             logger.error(f"Failed to fetch body: {type(e).__name__}: {e}")
             return None
 
+    def getSessionHeaders(self) -> dict:
+        """Return the cleared session's User-Agent and cookies as HTTP headers."""
+        userAgent = self.evaluateAwait("Promise.resolve(navigator.userAgent)")
+        cookies = self.sb.get_cookies() or []
+
+        return {
+            "User-Agent": userAgent,
+            "Cookie": "; ".join(
+                f"{cookie['name']}={cookie['value']}" for cookie in cookies
+            ),
+        }
+
     def getPageTitle(self) -> Optional[str]:
         """Get current page title."""
         try:
