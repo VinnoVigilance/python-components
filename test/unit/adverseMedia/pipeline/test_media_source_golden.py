@@ -47,6 +47,7 @@ SAMPLES = {
     "PCIJ_INVESTIGATIVE_REPORTS": "PCIJ_INVESTIGATIVE_REPORTS_extracted_sample.jsonl",
     "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": "DTI_PH_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
+    "ADB_CASE_SUMMARIES": "ADB_CASE_SUMMARIES_extracted_sample.jsonl",
 }
 
 # dataset_name -> the constant Sources[]/Publisher fields every record must carry.
@@ -83,6 +84,11 @@ GOLDEN = {
         "SourceType": "Official", "DatasetCategory": "Press Release",
         "DatasetName": "DTI_PH_FAIR_TRADE_PRESS_RELEASES", "SourceName": "DTI_PH",
         "PublisherName": "Department of Trade and Industry (Philippines)",
+    },
+    "ADB_CASE_SUMMARIES": {
+        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "DatasetName": "ADB_CASE_SUMMARIES", "SourceName": "ADB",
+        "PublisherName": "Asian Development Bank",
     },
 }
 
@@ -261,3 +267,27 @@ class TestDtiAttachments:
         for rec in _canonical_records("DTI_PH_FAIR_TRADE_PRESS_RELEASES"):
             for a in rec.get("Attachments") or []:
                 assert "fteb-staging" not in (a.get("URL") or ""), a
+
+
+class TestAdbCaseSummaries:
+    """Each table row maps to one record: case number, two-digit-year date, entity type tag."""
+
+    def test_every_row_becomes_a_record(self):
+        assert len(_canonical_records("ADB_CASE_SUMMARIES")) == 7
+
+    def test_case_number_is_source_record_id_and_identifier(self):
+        rec = _canonical_records("ADB_CASE_SUMMARIES")[0]
+        assert rec["Sources"][0]["SourceRecordId"] == "20-0223-2306"
+        assert rec["Identifiers"] == [{"Type": "Source Reference", "Value": "20-0223-2306"}]
+
+    def test_two_digit_year_resolves_to_full_date(self):
+        dates = [rec["Dates"][0] for rec in _canonical_records("ADB_CASE_SUMMARIES")]
+        assert dates[0]["OriginalValue"] == "23-Jun-26"
+        assert dates[0]["FullDate"] == "2026-06-23"
+        assert all(d["FullDate"] for d in dates)
+
+    def test_firm_and_individual_rows_differ_by_tag(self):
+        records = _canonical_records("ADB_CASE_SUMMARIES")
+        assert records[0]["Metadata"]["Tags"] == ["Firm"]
+        assert records[1]["Metadata"]["Tags"] == ["Individual"]
+        assert records[0]["Content"]["BodyText"] == records[1]["Content"]["BodyText"]

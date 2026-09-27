@@ -699,3 +699,99 @@ sources:
           - source_name
           - dataset_name
           - id
+
+  ADB_CASE_SUMMARIES:
+    enabled: true
+    active: true
+
+    source_name: ADB
+    dataset_name: ADB_CASE_SUMMARIES
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+
+    url: https://www.adb.org/who-we-are/integrity/case-summaries
+
+    date_order: DMY
+
+    acquisition:
+      type: crawler
+      spider: media
+      fetch_strategy: saved_html
+      download_method: BYPASS
+
+    bypass_config:
+      challenge: cloudflare
+      headless: false
+      timeout_seconds: 120
+
+      actions:
+        - action: wait
+          type: selector
+          selector: "table.table-striped"
+          timeout: 120
+
+        - action: save_html
+          filename_pattern: "{source}_{list}_{timestamp}.html"
+
+      validation:
+        required_content:
+          - "Case Summaries"
+          - "table-striped"
+
+        min_size_bytes: 10000
+
+    discovery:
+      strategy: list_only
+      policy: full_scan
+
+      start_url: https://www.adb.org/who-we-are/integrity/case-summaries
+
+      article:
+        row_selector: "table.table-striped tbody tr"
+
+        identity_fields:
+          CaseNumber:
+            source: xpath
+            selectors:
+              - "./td[3]//text()"
+
+          EntityType:
+            source: xpath
+            selectors:
+              - "./td[4]//text()"
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      date.originalValue:
+        selector: "td:nth-child(1)"
+        output: text
+
+      BodyText:
+        selector: "td:nth-child(2)"
+        output: text
+
+      CaseNumber:
+        selector: "td:nth-child(3)"
+        output: text
+
+      EntityType:
+        selector: "td:nth-child(4)"
+        output: text
+
+      SanctionPeriod:
+        selector: "td:nth-child(5)"
+        output: text
+
+    parser:
+      type: html
+
+    identity:
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - CaseNumber
+          - EntityType
