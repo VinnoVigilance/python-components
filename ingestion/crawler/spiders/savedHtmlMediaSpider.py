@@ -72,6 +72,15 @@ class SavedHtmlMediaSpider(MediaSpider):
             encoding="utf-8",
         )
 
+        if self.discovery_config.get(
+            "strategy"
+        ) == "list_only":
+            for result in self.parse_list_rows(
+                listing_response
+            ):
+                yield result
+            return
+
         pending_details = (
             self._discover_from_saved_listing(
                 listing_response
