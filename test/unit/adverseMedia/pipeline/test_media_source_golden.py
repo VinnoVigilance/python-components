@@ -48,6 +48,7 @@ SAMPLES = {
     "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": "DTI_PH_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
     "ADB_CASE_SUMMARIES": "ADB_CASE_SUMMARIES_extracted_sample.jsonl",
+    "SEC_PH_ADVISORIES": "SEC_PH_ADVISORIES_extracted_sample.jsonl",
 }
 
 # dataset_name -> the constant Sources[]/Publisher fields every record must carry.
@@ -89,6 +90,11 @@ GOLDEN = {
         "SourceType": "Official", "DatasetCategory": "Press Release",
         "DatasetName": "ADB_CASE_SUMMARIES", "SourceName": "ADB",
         "PublisherName": "Asian Development Bank",
+    },
+    "SEC_PH_ADVISORIES": {
+        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "DatasetName": "SEC_PH_ADVISORIES", "SourceName": "SEC_PH",
+        "PublisherName": "Securities and Exchange Commission (Philippines)",
     },
 }
 
@@ -291,3 +297,46 @@ class TestAdbCaseSummaries:
         assert records[0]["Metadata"]["Tags"] == ["Firm"]
         assert records[1]["Metadata"]["Tags"] == ["Individual"]
         assert records[0]["Content"]["BodyText"] == records[1]["Content"]["BodyText"]
+
+
+class TestSecAdvisories:
+    """Page metadata, PDF text and PDF links map into the canonical record."""
+
+    def _by_post_id(self, post_id):
+        for rec in _canonical_records("SEC_PH_ADVISORIES"):
+            if rec["Sources"][0]["SourceRecordId"] == post_id:
+                return rec
+        raise AssertionError(f"no SEC sample record with PostId {post_id!r}")
+
+    def test_post_id_is_source_record_id_and_identifier(self):
+        rec = self._by_post_id("150359")
+        assert rec["Identifiers"] == [{"Type": "Source Reference", "Value": "150359"}]
+
+    def test_author_language_and_category(self):
+        rec = self._by_post_id("150359")
+        assert rec["Authors"] == [{"Name": "Michael Abrasia"}]
+        assert rec["Metadata"]["Language"] == "en"
+        assert rec["Metadata"]["Categories"] == ["Advisories 2026"]
+
+    def test_multiple_categories_are_split(self):
+        rec = self._by_post_id("28635")
+        assert rec["Metadata"]["Categories"] == ["Advisories 2018", "notice-lcfc"]
+
+    def test_published_and_updated_dates(self):
+        dates = {d["Type"]: d["FullDate"] for d in self._by_post_id("150359")["Dates"]}
+        assert dates["Published"] == "2026-09-04"
+
+    def test_pdf_text_becomes_body(self):
+        body = self._by_post_id("150359")["Content"]["BodyText"]
+        assert "PUERTA FARM" in body
+
+    def test_both_pdf_links_become_document_attachments(self):
+        docs = self._by_post_id("121133")["Attachments"]
+        assert len(docs) == 2
+        assert all(a["Type"] == "Document" and a["URL"].endswith(".pdf") for a in docs)
+
+    def test_scanned_pdf_keeps_every_field_but_body(self):
+        rec = self._by_post_id("146421")
+        assert not rec["Content"].get("BodyText")
+        assert rec["Content"]["Title"]
+        assert rec["Dates"] and rec["Attachments"] and rec["Authors"]
