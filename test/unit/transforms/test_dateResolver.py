@@ -18,6 +18,7 @@ from transforms.dateResolver import (
     clean_text,
     disbelieved_year,
     expand_range,
+    expand_two_digit_year,
     parse_date_string,
     read_approximate,
     read_day,
@@ -73,6 +74,14 @@ class TestDisbelievedYear:
     def test_placeholder_is_not_a_disbelieved_year(self):
         # "19yy" is an unknown marker, not a foreign number
         assert disbelieved_year("19yy") is False
+
+
+class TestExpandTwoDigitYear:
+    def test_past_year_is_this_century(self):
+        assert expand_two_digit_year("05") == "2005"
+
+    def test_future_year_is_last_century(self):
+        assert expand_two_digit_year("99") == "1999"
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +166,15 @@ class TestParseDateString:
     def test_placeholder_parts_keep_only_the_year(self):
         # "dd/mm/1957" -- day and month are unknown markers, year survives
         assert parse_date_string("dd/mm/1957") == ("1957", "", "", False)
+
+    def test_two_digit_year_next_to_month_name(self):
+        assert parse_date_string("23-Jun-26") == ("2026", "06", "23", False)
+
+    def test_future_two_digit_year_falls_back_a_century(self):
+        assert parse_date_string("01-Jan-99") == ("1999", "01", "01", False)
+
+    def test_two_digit_year_without_month_name_is_not_expanded(self):
+        assert parse_date_string("01/02/26") == ("", "02", "01", False)
 
     def test_approx_word_sets_the_flag(self):
         assert parse_date_string("circa 1963") == ("1963", "", "", True)

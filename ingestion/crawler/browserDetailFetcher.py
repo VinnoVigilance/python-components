@@ -76,6 +76,8 @@ class BrowserDetailFetcher:
             or logger
         )
 
+        self._engine = None
+
     def fetch(
         self,
         pending_details: list[
@@ -118,8 +120,6 @@ class BrowserDetailFetcher:
                 1000,
             )
         )
-
-        engine = None
 
         try:
             for index, item in enumerate(
@@ -166,41 +166,7 @@ class BrowserDetailFetcher:
 
                         continue
 
-                    if engine is None:
-                        self.logger.info(
-                            "Starting detail browser."
-                        )
-
-                        engine = self.engine_factory(
-                            headless=(
-                                self.browser_config.get(
-                                    "headless",
-                                    False,
-                                )
-                            ),
-                            successCriteria=(
-                                self.browser_config.get(
-                                    "success_criteria",
-                                    [],
-                                )
-                            ),
-                            timeoutSeconds=(
-                                timeout_seconds
-                            ),
-                            driverVersion=(
-                                self.browser_config.get(
-                                    "driver_version",
-                                    "mlatest",
-                                )
-                            ),
-                            binaryLocation=(
-                                self.browser_config.get(
-                                    "binary_location"
-                                )
-                            ),
-                        )
-
-                        engine.__enter__()
+                    engine = self._ensure_engine()
 
                     if not engine.navigate(
                         detail_url
@@ -251,22 +217,14 @@ class BrowserDetailFetcher:
                         detail_url,
                     )
 
-                    if engine is not None:
-                        try:
-                            engine.__exit__(
-                                None,
-                                None,
-                                None,
-                            )
+                    try:
+                        self._close_engine()
 
-                        except Exception:
-                            self.logger.exception(
-                                "Failed to close browser "
-                                "after a detail error."
-                            )
-
-                        finally:
-                            engine = None
+                    except Exception:
+                        self.logger.exception(
+                            "Failed to close browser "
+                            "after a detail error."
+                        )
 
                     yield (
                         {
@@ -280,12 +238,73 @@ class BrowserDetailFetcher:
                     )
 
         finally:
-            if engine is not None:
-                engine.__exit__(
-                    None,
-                    None,
-                    None,
+            self._close_engine()
+
+    def session_headers(self) -> dict[str, str]:
+        """Return the browser session's User-Agent and cookies for plain HTTP downloads."""
+
+        return self._ensure_engine().getSessionHeaders()
+
+    def _ensure_engine(self):
+        """Start the shared browser session on first use."""
+
+        if self._engine is not None:
+            return self._engine
+
+        self.logger.info(
+            "Starting detail browser."
+        )
+
+        engine = self.engine_factory(
+            headless=(
+                self.browser_config.get(
+                    "headless",
+                    False,
                 )
+            ),
+            successCriteria=(
+                self.browser_config.get(
+                    "success_criteria",
+                    [],
+                )
+            ),
+            timeoutSeconds=int(
+                self.browser_config.get(
+                    "timeout_seconds",
+                    90,
+                )
+            ),
+            driverVersion=(
+                self.browser_config.get(
+                    "driver_version",
+                    "mlatest",
+                )
+            ),
+            binaryLocation=(
+                self.browser_config.get(
+                    "binary_location"
+                )
+            ),
+        )
+
+        engine.__enter__()
+
+        self._engine = engine
+
+        return engine
+
+    def _close_engine(self) -> None:
+        """Close the shared browser session if it is open."""
+
+        engine = self._engine
+        self._engine = None
+
+        if engine is not None:
+            engine.__exit__(
+                None,
+                None,
+                None,
+            )
 
     def _load_cached_response(
         self,

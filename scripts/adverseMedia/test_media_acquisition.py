@@ -1,3 +1,4 @@
+import argparse
 import sys
 from pathlib import Path
 
@@ -18,6 +19,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from services.adverseMediaPipeline.mediaAcquisitionService import (
     MediaAcquisitionService,
 )
+from services.adverseMediaPipeline.mediaDiscoveryService import (
+    MediaDiscoveryService,
+)
 
 
 MEDIA_CONFIG_PATH = (
@@ -27,7 +31,7 @@ MEDIA_CONFIG_PATH = (
 )
 
 
-def load_nbi_config() -> dict:
+def load_source_config(dataset_name: str) -> dict:
 
     with MEDIA_CONFIG_PATH.open(
         "r",
@@ -41,26 +45,73 @@ def load_nbi_config() -> dict:
     return config[
         "sources"
     ][
-        "NBI_PRESS_RELEASES"
+        dataset_name
     ]
+
+
+def cap_discovery(max_records: int) -> None:
+    """Stop discovery after max_records links, for a quick dev run."""
+
+    check_record_key = MediaDiscoveryService.check_record_key
+
+    def capped_check_record_key(self, record_key):
+        is_known, should_stop = check_record_key(self, record_key)
+
+        if self.discovered_count >= max_records:
+            self.stop_reason = "MAX_RECORDS_REACHED"
+            should_stop = True
+
+        return is_known, should_stop
+
+    MediaDiscoveryService.check_record_key = capped_check_record_key
 
 
 def main():
 
+    parser = argparse.ArgumentParser(
+        description="Run Media acquisition for one dataset.",
+    )
+    parser.add_argument(
+        "dataset_name",
+        nargs="?",
+        default="NBI_PRESS_RELEASES",
+        help="key under 'sources' in config/mediaSources.yaml",
+    )
+    parser.add_argument(
+        "--mode",
+        default="INCREMENTAL",
+        type=str.upper,
+        choices=["INITIAL", "INCREMENTAL"],
+        help="INITIAL or INCREMENTAL (default: INCREMENTAL)",
+    )
+    parser.add_argument(
+        "--max-records",
+        type=int,
+        default=None,
+        help="stop after this many discovered links (default: no cap)",
+    )
+    args = parser.parse_args()
+
+    if args.max_records:
+        cap_discovery(args.max_records)
+
     print(
         "\n"
-        "=== NBI MEDIA ACQUISITION TEST ==="
+        f"=== {args.dataset_name} MEDIA ACQUISITION TEST ==="
         "\n"
     )
 
     source_config = (
-        load_nbi_config()
+        load_source_config(
+            args.dataset_name
+        )
     )
 
     result = (
         MediaAcquisitionService()
         .acquire(
-            source_config=source_config
+            source_config=source_config,
+            mode=args.mode,
         )
     )
 

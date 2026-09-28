@@ -157,3 +157,48 @@ class TestRealPdf:
 
     def test_rows_carry_the_institution_code_column(self):
         assert any("INSTITUTION CODE" in r for r in _real_records())
+
+
+FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "parsing"
+TEXT_MODE = {"parser": {"type": "pdf", "mode": "text"}}
+
+
+class TestTextMode:
+    """Text mode: the whole document as one record (SEC advisory PDFs)."""
+
+    def test_returns_one_record_with_the_full_text(self):
+        records = PdfParser().parse(FIXTURES / "sec_advisory_text.pdf", TEXT_MODE)
+
+        assert len(records) == 1
+        body = records[0]["BodyText"]
+        assert body.startswith("A D V I S O R Y")
+        assert "EXNESS GLOBAL LIMITED" in body
+        assert "NOT\nAUTHORIZED TO SOLICIT INVESTMENTS FROM THE PUBLIC" in body
+        assert "https://linktr.ee/secphilippines" in body
+
+    def test_joins_pages_without_page_markers(self):
+        body = PdfParser().parse(FIXTURES / "sec_advisory_text.pdf", TEXT_MODE)[0]["BodyText"]
+
+        assert "--- PAGE" not in body
+        assert "\n\n" in body
+
+    def test_scanned_pdf_without_a_text_layer_gives_none(self):
+        records = PdfParser().parse(FIXTURES / "sec_advisory_scanned.pdf", TEXT_MODE)
+
+        assert records == [{"BodyText": None}]
+
+    def test_mode_is_case_insensitive(self):
+        records = PdfParser().parse(
+            FIXTURES / "sec_advisory_text.pdf", {"parser": {"mode": " TEXT "}}
+        )
+
+        assert list(records[0]) == ["BodyText"]
+
+    def test_without_text_mode_the_table_parser_still_runs(self):
+        records = PdfParser().parse(FIXTURE, {"parser": {"type": "pdf"}})
+
+        assert records == list(_real_records())
+
+    def test_missing_file_raises_in_text_mode(self):
+        with pytest.raises(FileNotFoundError):
+            PdfParser().parse("does_not_exist.pdf", TEXT_MODE)
