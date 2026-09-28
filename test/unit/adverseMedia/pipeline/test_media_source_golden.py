@@ -49,6 +49,7 @@ SAMPLES = {
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": "DTI_PH_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
     "ADB_CASE_SUMMARIES": "ADB_CASE_SUMMARIES_extracted_sample.jsonl",
     "SEC_PH_ADVISORIES": "SEC_PH_ADVISORIES_extracted_sample.jsonl",
+    "PTV_NEWS": "PTV_NEWS_extracted_sample.jsonl",
 }
 
 # dataset_name -> the constant Sources[]/Publisher fields every record must carry.
@@ -95,6 +96,11 @@ GOLDEN = {
         "SourceType": "Official", "DatasetCategory": "Press Release",
         "DatasetName": "SEC_PH_ADVISORIES", "SourceName": "SEC_PH",
         "PublisherName": "Securities and Exchange Commission (Philippines)",
+    },
+    "PTV_NEWS": {
+        "SourceType": "Official", "DatasetCategory": "News Article",
+        "DatasetName": "PTV_NEWS", "SourceName": "PTV",
+        "PublisherName": "People's Television Network (Philippines)",
     },
 }
 
@@ -340,3 +346,45 @@ class TestSecAdvisories:
         assert not rec["Content"].get("BodyText")
         assert rec["Content"]["Title"]
         assert rec["Dates"] and rec["Attachments"] and rec["Authors"]
+
+
+class TestPtvNews:
+    """Body byline -> Authors[], featured media -> Thumbnail, body images/files -> Image/Document, terms -> Tags."""
+
+    def _by_id(self, record_id):
+        for rec in _canonical_records("PTV_NEWS"):
+            if rec["Sources"][0]["SourceRecordId"] == record_id:
+                return rec
+        raise AssertionError(f"no PTV sample record with id {record_id!r}")
+
+    def _urls(self, rec, attach_type):
+        return [a["URL"] for a in rec["Attachments"] if a["Type"] == attach_type]
+
+    @pytest.mark.parametrize("record_id,author", [
+        (252351, "Dean Aubrey Caratiquet"),
+        (252337, "Christopher Lloyd Caliwan"),
+        (235295, "Anna Leah Gonzales"),
+        (220346, "Gabriela Baron"),
+    ])
+    def test_byline_becomes_author(self, record_id, author):
+        assert self._by_id(record_id)["Authors"] == [{"Name": author}]
+
+    def test_end_of_article_credit_leaves_author_empty(self):
+        assert self._by_id(70637)["Authors"] == []
+
+    def test_featured_media_is_the_only_thumbnail(self):
+        for rec in _canonical_records("PTV_NEWS"):
+            assert len(self._urls(rec, "Thumbnail")) == 1, rec["Attachments"]
+
+    def test_body_image_becomes_image(self):
+        images = self._urls(self._by_id(252351), "Image")
+        assert images and images[0].endswith("-1024x683.jpg"), images
+
+    def test_body_pdf_becomes_document(self):
+        docs = self._urls(self._by_id(235295), "Document")
+        assert docs and docs[0].endswith(".pdf"), docs
+
+    def test_terms_go_to_tags_not_categories(self):
+        rec = self._by_id(252351)
+        assert "DTI Secretary Cristina Roque" in rec["Metadata"]["Tags"]
+        assert rec["Metadata"]["Categories"] == []
