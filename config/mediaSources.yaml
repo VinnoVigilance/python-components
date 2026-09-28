@@ -700,6 +700,66 @@ sources:
           - dataset_name
           - id
 
+  PTV_NEWS:
+    enabled: true
+    active: true
+
+    source_name: PTV
+    dataset_name: PTV_NEWS
+    dataset_category: News Article
+
+    schedule: daily
+    date_order: YMD
+
+    source_page_url: https://ptvnews.ph/category/nation/local-news/
+
+    url: https://ptvnews.ph/wp-json/wp/v2/posts
+
+    acquisition:
+      type: api
+      download_method: API
+
+    discovery:
+      policy: stop_after_known
+      threshold: 10
+
+    api_config:
+      params:
+        categories: "180,181,2"
+        _embed: 1
+        orderby: date
+        order: desc
+
+      pagination:
+        type: page
+        page_param: page
+        size_param: per_page
+        page_size: 20
+        start_page: 1
+
+      items_path: ""
+
+      write_mode: record_files
+      record_id_path: id
+
+      transport: requests
+      timeout: 180
+      retry: 3
+      throttle_delay: 0.5
+
+    parser:
+      type: json
+
+    identity:
+      external_id:
+        field: id
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - id
+
   SEC_PH_ADVISORIES:
     enabled: true
     active: true
