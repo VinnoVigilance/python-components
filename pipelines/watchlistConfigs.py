@@ -1307,4 +1307,58 @@ WATCHLIST_CONFIGS = {
             "write_mode": "single_jsonl",
         },
     },
+
+    "AFDB-DEBARRED-ENTITIES": {
+        "source_name": "AFDB",
+        "list_name": "AFDB-DEBARRED-ENTITIES",
+        "date_order": "YMD",
+        "download_method": "BYPASS",
+        "url": "https://www.afdb.org/en/debarred-entities-json-feed",
+        "file_type": "json",
+        "external_id_path": "unique_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "bypass_config": {
+            "challenge": "cloudflare",
+            "headless": False,
+            "timeout_seconds": 120,
+            "actions": [
+                {
+                    "action": "save_json",
+                    "url": "https://www.afdb.org/en/debarred-entities-json-feed",
+                    "filename_pattern": "{list}_{timestamp}.json",
+                },
+            ],
+        },
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["Name", "Nationality", "From", "Basis"],
+                    "output_field": "unique_id",
+                    "prefix": "AFDB",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "Name",
+                    "pattern": (
+                        r"(?is)^(?P<primary_name>.+?)\s*"
+                        r"(?P<alias_blob>,?\s*\(?\s*"
+                        r"(?:(?:also|formerly|previously)\s+known\s+as"
+                        r"|(?:also\s+)?doing\s+business\s+as"
+                        r"|formerly(?:\s+operating\s+as)?"
+                        r"|\baka\b|\bfka\b)(?!\w).*)?$"
+                    ),
+                    "outputs": {
+                        "primary_name": "primary_name",
+                        "alias_blob": "alias_blob",
+                    },
+                },
+            },
+        ],
+    },
 }

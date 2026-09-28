@@ -66,6 +66,7 @@ SAMPLES = {
     "PH-HOUSE-MEMBERS": "PH-HOUSE-MEMBERS_raw_sample.jsonl",
     "CIA-WORLD-LEADERS-HISTORICAL": "CIA-WORLD-LEADERS-HISTORICAL_raw_sample.jsonl",
     "ADB-DEBARMENT-SUSPENSION": "ADB-DEBARMENT-SUSPENSION_raw_sample.jsonl",
+    "AFDB-DEBARRED-ENTITIES": "AFDB-DEBARRED-ENTITIES_raw_sample.jsonl",
 }
 
 VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel"}

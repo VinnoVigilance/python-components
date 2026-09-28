@@ -62,6 +62,7 @@ SAMPLES = {
     "PH-HOUSE-MEMBERS": "PH-HOUSE-MEMBERS_raw_sample.jsonl",
     "CIA-WORLD-LEADERS-HISTORICAL": "CIA-WORLD-LEADERS-HISTORICAL_raw_sample.jsonl",
     "ADB-DEBARMENT-SUSPENSION": "ADB-DEBARMENT-SUSPENSION_raw_sample.jsonl",
+    "AFDB-DEBARRED-ENTITIES": "AFDB-DEBARRED-ENTITIES_raw_sample.jsonl",
 }
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
@@ -178,6 +179,10 @@ GOLDEN = {
     "ADB-DEBARMENT-SUSPENSION": {
         "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "ADB-DEBARMENT-SUSPENSION", "SourceName": "ADB",
+    },
+    "AFDB-DEBARRED-ENTITIES": {
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
+        "ListName": "AFDB-DEBARRED-ENTITIES", "SourceName": "AFDB",
     },
 }
 
