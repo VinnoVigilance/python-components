@@ -4,6 +4,8 @@ from typing import Any
 
 import scrapy
 
+from scrapy.http import HtmlResponse
+
 
 class MediaSpider(scrapy.Spider):
     """
@@ -311,6 +313,116 @@ class MediaSpider(scrapy.Spider):
                 "page_number": page_number + 1,
             },
         )
+
+    def parse_list_rows(
+        self,
+        response,
+    ):
+        """Build one record per listing row for list_only sources (no detail pages)."""
+
+        row_selector = self.discovery_config.get(
+            "article",
+            {},
+        ).get(
+            "row_selector"
+        )
+
+        if not row_selector:
+            raise ValueError(
+                "discovery.article.row_selector "
+                "is required for list_only."
+            )
+
+        rows = response.css(
+            row_selector
+        )
+
+        if not rows:
+            self.logger.error(
+                "No media rows found on the listing; "
+                "treating the run as incomplete."
+            )
+            self.discovery_service.mark_discovery_failure(
+                "EMPTY_FIRST_LISTING_PAGE"
+            )
+            return
+
+        for row in rows:
+
+            try:
+                identity_fields = (
+                    self._extract_identity_fields(
+                        row
+                    )
+                )
+
+                record_key = (
+                    self.discovery_service
+                    .build_record_key(
+                        {
+                            "SourceURL": response.url,
+                            **identity_fields,
+                        }
+                    )
+                )
+
+            except ValueError as exc:
+                self.discovery_service.record_identity_failure()
+                self.logger.warning(
+                    "Could not build media identity "
+                    "for listing row: %s",
+                    exc,
+                )
+                continue
+
+            if record_key in self.seen_record_keys:
+                continue
+
+            self.seen_record_keys.add(
+                record_key
+            )
+
+            try:
+                (
+                    is_known,
+                    should_stop,
+                ) = (
+                    self.discovery_service
+                    .check_record_key(
+                        record_key
+                    )
+                )
+
+            except Exception as exc:
+                self.discovery_service.record_identity_failure()
+                self.logger.warning(
+                    "Could not check media record "
+                    "key=%s: %s",
+                    record_key,
+                    exc,
+                )
+                continue
+
+            self.discovery_service.record_detail_selected()
+
+            row_response = HtmlResponse(
+                url=response.url,
+                body=row.get(),
+                encoding="utf-8",
+            )
+
+            yield from self.parse_detail(
+                response=row_response,
+                record_key=record_key,
+                is_known=is_known,
+                source_record_id=None,
+                identity_fields=identity_fields,
+            )
+
+            if should_stop:
+                return
+
+        self.discovery_service.mark_source_end()
 
     def parse_detail(
         self,

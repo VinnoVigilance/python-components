@@ -57,6 +57,9 @@ def _build_final_filename(
     original_name: str,
     downloaded_at: datetime,
 ) -> str:
+    if task.filename:
+        return task.filename
+
     timestamp = downloaded_at.strftime("%Y%m%d_%H%M%S")
     extension = Path(original_name).suffix
 

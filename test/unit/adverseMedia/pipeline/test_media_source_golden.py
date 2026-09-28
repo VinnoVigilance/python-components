@@ -46,7 +46,10 @@ SAMPLES = {
     "PCIJ_CORRUPTION_WATCH": "PCIJ_CORRUPTION_WATCH_extracted_sample.jsonl",
     "PCIJ_INVESTIGATIVE_REPORTS": "PCIJ_INVESTIGATIVE_REPORTS_extracted_sample.jsonl",
     "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
-    "DTI_FAIR_TRADE_PRESS_RELEASES": "DTI_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
+    "DTI_PH_FAIR_TRADE_PRESS_RELEASES": "DTI_PH_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
+    "ADB_CASE_SUMMARIES": "ADB_CASE_SUMMARIES_extracted_sample.jsonl",
+    "SEC_PH_ADVISORIES": "SEC_PH_ADVISORIES_extracted_sample.jsonl",
+    "PTV_NEWS": "PTV_NEWS_extracted_sample.jsonl",
 }
 
 # dataset_name -> the constant Sources[]/Publisher fields every record must carry.
@@ -79,10 +82,25 @@ GOLDEN = {
         "SourceType": "Official", "DatasetCategory": "News Article",
         "DatasetName": "UK_GOV_NEWS_COMMUNICATIONS", "SourceName": "UK_GOV",
     },
-    "DTI_FAIR_TRADE_PRESS_RELEASES": {
+    "DTI_PH_FAIR_TRADE_PRESS_RELEASES": {
         "SourceType": "Official", "DatasetCategory": "Press Release",
-        "DatasetName": "DTI_FAIR_TRADE_PRESS_RELEASES", "SourceName": "DTI",
+        "DatasetName": "DTI_PH_FAIR_TRADE_PRESS_RELEASES", "SourceName": "DTI_PH",
         "PublisherName": "Department of Trade and Industry (Philippines)",
+    },
+    "ADB_CASE_SUMMARIES": {
+        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "DatasetName": "ADB_CASE_SUMMARIES", "SourceName": "ADB",
+        "PublisherName": "Asian Development Bank",
+    },
+    "SEC_PH_ADVISORIES": {
+        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "DatasetName": "SEC_PH_ADVISORIES", "SourceName": "SEC_PH",
+        "PublisherName": "Securities and Exchange Commission (Philippines)",
+    },
+    "PTV_NEWS": {
+        "SourceType": "Official", "DatasetCategory": "News Article",
+        "DatasetName": "PTV_NEWS", "SourceName": "PTV",
+        "PublisherName": "People's Television Network (Philippines)",
     },
 }
 
@@ -202,7 +220,7 @@ class TestPcijEmbedsBecomeAttachments:
 
 
 class TestPcijFeaturedImageAndTags:
-    """FeaturedImageUrl (og:image) -> Attachments[Image], TagNames -> Taxonomy.Tags[]."""
+    """FeaturedImageUrl (og:image) -> Attachments[Image], TagNames -> Metadata.Tags[]."""
 
     def _by_title(self, needle):
         for rec in _canonical_records("PCIJ_INVESTIGATIVE_REPORTS"):
@@ -224,9 +242,9 @@ class TestPcijFeaturedImageAndTags:
 
     def test_tag_names_become_taxonomy_tags(self):
         rec = self._by_title("Have you come across pro-China propaganda")
-        tags = (rec.get("Taxonomy") or {}).get("Tags") or []
+        tags = (rec.get("Metadata") or {}).get("Tags") or []
         assert "China" in tags, f"expected 'China' tag, got {tags}"
-        assert all(isinstance(t, str) for t in tags), "Taxonomy.Tags[] must be flat strings"
+        assert all(isinstance(t, str) for t in tags), "Metadata.Tags[] must be flat strings"
 
     def test_embedded_pdf_becomes_document_attachment(self):
         """Older SALN articles embed the PDF via a raw <iframe src=*.pdf>, not the
@@ -241,7 +259,7 @@ class TestDtiAttachments:
     """Featured media + body images -> Attachments[Image], body PDFs -> Attachments[Document]."""
 
     def _by_id(self, record_id):
-        for rec in _canonical_records("DTI_FAIR_TRADE_PRESS_RELEASES"):
+        for rec in _canonical_records("DTI_PH_FAIR_TRADE_PRESS_RELEASES"):
             if str((rec.get("Sources") or [{}])[0].get("SourceRecordId")) == record_id:
                 return rec
         raise AssertionError(f"no DTI sample record with SourceRecordId {record_id!r}")
@@ -258,6 +276,115 @@ class TestDtiAttachments:
         assert docs and docs[0].endswith(".pdf"), f"expected a PDF Document attachment, got {docs}"
 
     def test_staging_domain_urls_are_excluded(self):
-        for rec in _canonical_records("DTI_FAIR_TRADE_PRESS_RELEASES"):
+        for rec in _canonical_records("DTI_PH_FAIR_TRADE_PRESS_RELEASES"):
             for a in rec.get("Attachments") or []:
                 assert "fteb-staging" not in (a.get("URL") or ""), a
+
+
+class TestAdbCaseSummaries:
+    """Each table row maps to one record: case number, two-digit-year date, entity type tag."""
+
+    def test_every_row_becomes_a_record(self):
+        assert len(_canonical_records("ADB_CASE_SUMMARIES")) == 7
+
+    def test_case_number_is_source_record_id_and_identifier(self):
+        rec = _canonical_records("ADB_CASE_SUMMARIES")[0]
+        assert rec["Sources"][0]["SourceRecordId"] == "20-0223-2306"
+        assert rec["Identifiers"] == [{"Type": "Source Reference", "Value": "20-0223-2306"}]
+
+    def test_two_digit_year_resolves_to_full_date(self):
+        dates = [rec["Dates"][0] for rec in _canonical_records("ADB_CASE_SUMMARIES")]
+        assert dates[0]["OriginalValue"] == "23-Jun-26"
+        assert dates[0]["FullDate"] == "2026-06-23"
+        assert all(d["FullDate"] for d in dates)
+
+    def test_firm_and_individual_rows_differ_by_tag(self):
+        records = _canonical_records("ADB_CASE_SUMMARIES")
+        assert records[0]["Metadata"]["Tags"] == ["Firm"]
+        assert records[1]["Metadata"]["Tags"] == ["Individual"]
+        assert records[0]["Content"]["BodyText"] == records[1]["Content"]["BodyText"]
+
+
+class TestSecAdvisories:
+    """Page metadata, PDF text and PDF links map into the canonical record."""
+
+    def _by_post_id(self, post_id):
+        for rec in _canonical_records("SEC_PH_ADVISORIES"):
+            if rec["Sources"][0]["SourceRecordId"] == post_id:
+                return rec
+        raise AssertionError(f"no SEC sample record with PostId {post_id!r}")
+
+    def test_post_id_is_source_record_id_and_identifier(self):
+        rec = self._by_post_id("150359")
+        assert rec["Identifiers"] == [{"Type": "Source Reference", "Value": "150359"}]
+
+    def test_author_language_and_category(self):
+        rec = self._by_post_id("150359")
+        assert rec["Authors"] == [{"Name": "Michael Abrasia"}]
+        assert rec["Metadata"]["Language"] == "en"
+        assert rec["Metadata"]["Categories"] == ["Advisories 2026"]
+
+    def test_multiple_categories_are_split(self):
+        rec = self._by_post_id("28635")
+        assert rec["Metadata"]["Categories"] == ["Advisories 2018", "notice-lcfc"]
+
+    def test_published_and_updated_dates(self):
+        dates = {d["Type"]: d["FullDate"] for d in self._by_post_id("150359")["Dates"]}
+        assert dates["Published"] == "2026-09-04"
+
+    def test_pdf_text_becomes_body(self):
+        body = self._by_post_id("150359")["Content"]["BodyText"]
+        assert "PUERTA FARM" in body
+
+    def test_both_pdf_links_become_document_attachments(self):
+        docs = self._by_post_id("121133")["Attachments"]
+        assert len(docs) == 2
+        assert all(a["Type"] == "Document" and a["URL"].endswith(".pdf") for a in docs)
+
+    def test_scanned_pdf_keeps_every_field_but_body(self):
+        rec = self._by_post_id("146421")
+        assert not rec["Content"].get("BodyText")
+        assert rec["Content"]["Title"]
+        assert rec["Dates"] and rec["Attachments"] and rec["Authors"]
+
+
+class TestPtvNews:
+    """Body byline -> Authors[], featured media -> Thumbnail, body images/files -> Image/Document, terms -> Tags."""
+
+    def _by_id(self, record_id):
+        for rec in _canonical_records("PTV_NEWS"):
+            if rec["Sources"][0]["SourceRecordId"] == record_id:
+                return rec
+        raise AssertionError(f"no PTV sample record with id {record_id!r}")
+
+    def _urls(self, rec, attach_type):
+        return [a["URL"] for a in rec["Attachments"] if a["Type"] == attach_type]
+
+    @pytest.mark.parametrize("record_id,author", [
+        (252351, "Dean Aubrey Caratiquet"),
+        (252337, "Christopher Lloyd Caliwan"),
+        (235295, "Anna Leah Gonzales"),
+        (220346, "Gabriela Baron"),
+    ])
+    def test_byline_becomes_author(self, record_id, author):
+        assert self._by_id(record_id)["Authors"] == [{"Name": author}]
+
+    def test_end_of_article_credit_leaves_author_empty(self):
+        assert self._by_id(70637)["Authors"] == []
+
+    def test_featured_media_is_the_only_thumbnail(self):
+        for rec in _canonical_records("PTV_NEWS"):
+            assert len(self._urls(rec, "Thumbnail")) == 1, rec["Attachments"]
+
+    def test_body_image_becomes_image(self):
+        images = self._urls(self._by_id(252351), "Image")
+        assert images and images[0].endswith("-1024x683.jpg"), images
+
+    def test_body_pdf_becomes_document(self):
+        docs = self._urls(self._by_id(235295), "Document")
+        assert docs and docs[0].endswith(".pdf"), docs
+
+    def test_terms_go_to_tags_not_categories(self):
+        rec = self._by_id(252351)
+        assert "DTI Secretary Cristina Roque" in rec["Metadata"]["Tags"]
+        assert rec["Metadata"]["Categories"] == []

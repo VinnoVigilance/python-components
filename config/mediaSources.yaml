@@ -640,12 +640,12 @@ sources:
           output_field: ContentApiUrl
           template: "https://www.gov.uk/api/content{link}"
 
-  DTI_FAIR_TRADE_PRESS_RELEASES:
+  DTI_PH_FAIR_TRADE_PRESS_RELEASES:
     enabled: true
     active: true
 
-    source_name: DTI
-    dataset_name: DTI_FAIR_TRADE_PRESS_RELEASES
+    source_name: DTI_PH
+    dataset_name: DTI_PH_FAIR_TRADE_PRESS_RELEASES
     dataset_category: PRESS_RELEASE
 
     schedule: daily
@@ -699,3 +699,324 @@ sources:
           - source_name
           - dataset_name
           - id
+
+  PTV_NEWS:
+    enabled: true
+    active: true
+
+    source_name: PTV
+    dataset_name: PTV_NEWS
+    dataset_category: News Article
+
+    schedule: daily
+    date_order: YMD
+
+    source_page_url: https://ptvnews.ph/category/nation/local-news/
+
+    url: https://ptvnews.ph/wp-json/wp/v2/posts
+
+    acquisition:
+      type: api
+      download_method: API
+
+    discovery:
+      policy: stop_after_known
+      threshold: 10
+
+    api_config:
+      params:
+        categories: "180,181,2"
+        _embed: 1
+        orderby: date
+        order: desc
+
+      pagination:
+        type: page
+        page_param: page
+        size_param: per_page
+        page_size: 20
+        start_page: 1
+
+      items_path: ""
+
+      write_mode: record_files
+      record_id_path: id
+
+      transport: requests
+      timeout: 180
+      retry: 3
+      throttle_delay: 0.5
+
+    parser:
+      type: json
+
+    identity:
+      external_id:
+        field: id
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - id
+
+  SEC_PH_ADVISORIES:
+    enabled: true
+    active: true
+
+    source_name: SEC_PH
+    dataset_name: SEC_PH_ADVISORIES
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+
+    url: https://www.sec.gov.ph/investors-education-and-information/advisories/
+
+    date_order: DMY
+
+    acquisition:
+      type: crawler
+      spider: media
+      fetch_strategy: saved_html
+      download_method: BYPASS
+
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 2
+        randomize_download_delay: true
+        retry_times: 3
+
+    bypass_config:
+      challenge: cloudflare
+      headless: false
+      timeout_seconds: 120
+
+      actions:
+        - action: wait
+          type: selector
+          selector: "ul.lcp_catlist"
+          timeout: 120
+
+        - action: save_html
+          filename_pattern: "{source}_{list}_{timestamp}.html"
+
+      validation:
+        required_content:
+          - "lcp_catlist"
+
+        min_size_bytes: 10000
+
+    detail_fetch_strategy: browser
+
+    detail_browser:
+      headless: false
+      timeout_seconds: 120
+
+      wait_selector: ".tb_text_wrap"
+
+    storage:
+      save_detail_pages: true
+      reuse_saved_detail_pages: false
+      minimum_detail_size_bytes: 5000
+
+    document_download:
+      required: true
+      store_as_record_file: true
+      url_fields:
+        - PdfButtonUrl
+        - PdfViewerUrl
+
+    discovery:
+      strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
+
+      start_url: https://www.sec.gov.ph/investors-education-and-information/advisories/
+      start_page: 1
+
+      pagination:
+        type: none
+
+      article:
+        link_selector: "ul.lcp_catlist li a"
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: "//[^/]+/(.+?)/*$"
+
+      PostId:
+        selector: "article[id^='post-']"
+        output: attribute
+        attribute: id
+        extraction:
+          strategy: regex
+          pattern: 'post-(\d+)'
+
+      Title:
+        selector: "h1.entry-title"
+        output: text
+
+      date.originalValue:
+        selector: "meta[property='article:published_time']"
+        output: attribute
+        attribute: content
+
+      DateModified:
+        selector: "script.yoast-schema-graph"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: '"dateModified":"([^"]+)"'
+
+      AuthorName:
+        selector: "script.yoast-schema-graph"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: '"author":\{"name":"([^"]+)"'
+
+      Language:
+        selector: "script.yoast-schema-graph"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: '"inLanguage":"([a-z]{2})'
+
+      ArticleSection:
+        selector: "script.yoast-schema-graph"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: '"articleSection":\[([^\]]*)\]'
+
+      HtmlBodyText:
+        selector: ".module_column.col4-3 .tb_text_wrap > div:not(.wp-block-cgb-block-algori-pdf-viewer)"
+        output: text
+
+      PdfButtonUrl:
+        selector: ".module-buttons a[href*='.pdf']"
+        output: attribute
+        attribute: href
+
+      PdfViewerUrl:
+        selector: "iframe.wp-block-cgb-block-algori-pdf-viewer-iframe"
+        output: html
+        extraction:
+          strategy: regex
+          pattern: '(?:file=|src=")([^"&?]+?\.pdf)'
+
+    parser:
+      type: pdf
+      mode: text
+
+    identity:
+      external_id:
+        field: PostId
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId
+
+
+  ADB_CASE_SUMMARIES:
+    enabled: true
+    active: true
+
+    source_name: ADB
+    dataset_name: ADB_CASE_SUMMARIES
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+
+    url: https://www.adb.org/who-we-are/integrity/case-summaries
+
+    date_order: DMY
+
+    acquisition:
+      type: crawler
+      spider: media
+      fetch_strategy: saved_html
+      download_method: BYPASS
+
+    bypass_config:
+      challenge: cloudflare
+      headless: false
+      timeout_seconds: 120
+
+      actions:
+        - action: wait
+          type: selector
+          selector: "table.table-striped"
+          timeout: 120
+
+        - action: save_html
+          filename_pattern: "{source}_{list}_{timestamp}.html"
+
+      validation:
+        required_content:
+          - "Case Summaries"
+          - "table-striped"
+
+        min_size_bytes: 10000
+
+    discovery:
+      strategy: list_only
+      policy: full_scan
+
+      start_url: https://www.adb.org/who-we-are/integrity/case-summaries
+
+      article:
+        row_selector: "table.table-striped tbody tr"
+
+        identity_fields:
+          CaseNumber:
+            source: xpath
+            selectors:
+              - "./td[3]//text()"
+
+          EntityType:
+            source: xpath
+            selectors:
+              - "./td[4]//text()"
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      date.originalValue:
+        selector: "td:nth-child(1)"
+        output: text
+
+      BodyText:
+        selector: "td:nth-child(2)"
+        output: text
+
+      CaseNumber:
+        selector: "td:nth-child(3)"
+        output: text
+
+      EntityType:
+        selector: "td:nth-child(4)"
+        output: text
+
+      SanctionPeriod:
+        selector: "td:nth-child(5)"
+        output: text
+
+    parser:
+      type: html
+
+    identity:
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - CaseNumber
+          - EntityType

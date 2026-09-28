@@ -15,6 +15,8 @@ date never reaches the database looking like a whole one.
 
 import re
 
+from datetime import date
+
 
 MONTHS = {
     "jan": 1, "january": 1,
@@ -143,6 +145,13 @@ def read_year(value):
         return ""
 
     return text
+
+
+def expand_two_digit_year(value):
+    """Read a two digit year as 20yy, or 19yy when 20yy is still in the future."""
+    year = 2000 + int(value)
+
+    return str(year if year <= date.today().year else year - 100)
 
 
 def disbelieved_year(value):
@@ -306,6 +315,12 @@ def parse_date_string(text, date_order="DMY"):
     if match:
         first, second, year = match.groups()
         day, month = order_day_month(first, second, date_order)
+
+        if re.fullmatch(r"\d{2}", year) and any(
+            part.lower() in MONTHS for part in (first, second)
+        ):
+            year = expand_two_digit_year(year)
+
         return result(year, month, day)
 
     # 31 Jul 1990

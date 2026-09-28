@@ -16,26 +16,49 @@ class MediaRawRecordService:
         acquired_record: dict[str, Any],
     ) -> list[dict[str, Any]]:
 
+        return self._run_preprocessing(
+            source_config=source_config,
+            records=self.extract_acquired_record(
+                source_config=source_config,
+                acquired_record=acquired_record,
+            ),
+        )
+
+    def extract_acquired_record(
+        self,
+        source_config: dict[str, Any],
+        acquired_record: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Raw fields of one acquired record; a stored PDF adds its parsed text."""
+
         extracted = acquired_record.get(
             "extracted"
         )
 
-        if extracted is not None:
-            return self.process(
+        file_path = acquired_record.get(
+            "detail_file_path"
+        )
+
+        if extracted is None:
+            return self.extract(
                 source_config=source_config,
-                records=[
-                    extracted
-                ],
+                source_file_path=file_path,
             )
 
-        return self.process(
-            source_config=source_config,
-            source_file_path=(
-                acquired_record.get(
-                    "detail_file_path"
-                )
-            ),
-        )
+        record = dict(extracted)
+
+        parser_type = str(
+            (source_config.get("parser") or {}).get("type", "")
+        ).strip().lower()
+
+        if parser_type == "pdf" and file_path:
+            for parsed in self.extract(
+                source_config=source_config,
+                source_file_path=file_path,
+            ):
+                record.update(parsed)
+
+        return [record]
 
     def process(
         self,

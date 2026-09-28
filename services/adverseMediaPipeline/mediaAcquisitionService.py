@@ -988,7 +988,8 @@ class MediaAcquisitionService:
         )
 
         source_url = (
-            (extracted or {}).get(
+            record.get("file_url")
+            or (extracted or {}).get(
                 "SourceURL"
             )
             or acquisition_url

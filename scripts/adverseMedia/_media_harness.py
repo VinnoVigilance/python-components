@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from ingestion.apiCollector.interface import ApiCollectorTask, collect_artifacts
+from ingestion.bypassCollector.collector import BypassCollector
 from ingestion.crawler.interface import crawl
 from ingestion.crawler.models import CrawlerTask
 from scripts._shared import DOWNLOADS, emit
@@ -85,6 +86,21 @@ class _NoDbDiscoveryService:
         )
         return False, should_stop
 
+    def record_detail_selected(self) -> None:
+        pass
+
+    def record_identity_failure(self) -> None:
+        pass
+
+    def mark_discovery_failure(self, reason: str) -> None:
+        pass
+
+    def mark_source_end(self) -> None:
+        pass
+
+    def get_summary(self) -> dict:
+        return {}
+
 
 def _load_engines(global_config: dict, source_config: dict) -> MediaNormalizationService:
     """Build the media normalization engines, silencing the service's debug prints."""
@@ -112,20 +128,43 @@ def stage_extract(source_config: dict, max_records: int) -> list[dict]:
 def _extract_crawler(source_config: dict, max_records: int) -> list[dict]:
     """Crawl a spider-based source DB-free -> the extracted source records."""
     discovery = _NoDbDiscoveryService(source_config, max_records=max_records)
+    fetch_strategy = str(
+        source_config.get("acquisition", {}).get("fetch_strategy", "direct")
+    ).strip().lower()
+    source_file_path = (
+        _collect_bypass_listing(source_config)
+        if fetch_strategy == "saved_html"
+        else None
+    )
     task = CrawlerTask(
         url=source_config["url"],
         source_name=source_config["source_name"],
         list_name=source_config["dataset_name"],
         source_config=source_config,
-        fetch_strategy="direct",
+        fetch_strategy=fetch_strategy,
+        source_file_path=source_file_path,
         download_dir=str(DOWNLOADS),
     )
     result = crawl(task=task, discovery_service=discovery)
+    raw_record_service = MediaRawRecordService()
     return [
-        record["extracted"]
+        raw_record
         for record in (result.records or [])
-        if record.get("extracted")
+        if record.get("extracted") and not record.get("failed")
+        for raw_record in raw_record_service.extract_acquired_record(
+            source_config, record
+        )
     ]
+
+
+def _collect_bypass_listing(source_config: dict) -> str:
+    """Save a Cloudflare-protected listing page through BypassCollector."""
+    listing_path = BypassCollector(outputDir=DOWNLOADS).collect(
+        {**source_config, "list_name": source_config["dataset_name"]}
+    )
+    if listing_path is None:
+        raise SystemExit("Bypass collection of the listing page failed.")
+    return str(Path(listing_path).resolve())
 
 
 def _extract_api(source_config: dict, max_records: int) -> list[dict]:
