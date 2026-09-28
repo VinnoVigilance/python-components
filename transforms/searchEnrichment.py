@@ -278,6 +278,11 @@ _COUNTRY_ALIASES = {
     "ZAIRE": "CD",
     "CONGO": "CG",
     "REPUBLIC OF THE CONGO": "CG",
+    "CONGO REPUBLIC OF": "CG",
+    "ST. LUCIA": "LC",
+    "TAIWAN- CHINA": "TW",
+    "HONG KONG SAR CHINA": "HK",
+    "GUINÉE CONAKRY": "GN",
     "IRAN": "IR",
     "SYRIA": "SY",
     "PALESTINE": "PS",
@@ -312,7 +317,7 @@ def _load_valid_iso2() -> set:
 def _clean_country_name(name: str) -> str:
     """Drop parentheticals and stray punctuation so both the alias lookup and
     pycountry see a tidy name: "Iran (Islamic Republic of)" -> "Iran"."""
-    cleaned = re.sub(r"\(.*?\)", " ", str(name))
+    cleaned = re.sub(r"\(.*?\)", " ", str(name)).replace("’", "'")
     cleaned = re.sub(r"\s+", " ", cleaned).strip().strip(",.").strip()
     return cleaned
 
