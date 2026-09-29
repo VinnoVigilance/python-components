@@ -203,22 +203,14 @@ class TestFilterMissingRequiredField:
 
 class TestSplitAtcDateAndPlaceOfBirth:
     def test_splits_date_and_place(self, engine):
-        record = {
-            "profile_data": {
-                "profile_fields": {"Date and Place of Birth": "1980, Manila"}
-            }
-        }
+        record = {"detail": {"date_and_place_of_birth": "1980, Manila"}}
         result = engine.split_atc_date_and_place_of_birth(record, {})
 
         assert result["atc_birth_date"] == "1980"
         assert result["atc_birth_place"] == "Manila"
 
     def test_place_only_when_no_digits(self, engine):
-        record = {
-            "profile_data": {
-                "profile_fields": {"Date and Place of Birth": "Manila City"}
-            }
-        }
+        record = {"detail": {"date_and_place_of_birth": "Manila City"}}
         result = engine.split_atc_date_and_place_of_birth(record, {})
 
         assert result["atc_birth_date"] == ""
