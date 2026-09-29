@@ -136,13 +136,19 @@ class TestCanonicalizeScript:
 
 class TestCountryToIso2:
     # A small explicit allow-list stands in for the picklist.
-    VALID = {"IR", "US", "CD", "KP"}
+    VALID = {"IR", "US", "CD", "KP", "CN", "LC"}
 
     def test_alias_table_resolves_qualified_name(self):
         assert country_to_iso2("Iran (Islamic Republic of)", self.VALID) == "IR"
 
     def test_alias_table_resolves_historical_name(self):
         assert country_to_iso2("Zaire", self.VALID) == "CD"
+
+    def test_curly_apostrophe_resolves(self):
+        assert country_to_iso2("People’s Republic of China", self.VALID) == "CN"
+
+    def test_alias_table_resolves_abbreviated_name(self):
+        assert country_to_iso2("St. Lucia", self.VALID) == "LC"
 
     def test_pycountry_resolves_plain_name(self):
         assert country_to_iso2("United States", self.VALID) == "US"

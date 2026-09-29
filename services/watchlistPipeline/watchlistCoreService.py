@@ -122,6 +122,9 @@ def process_watchlist_file(
                             if (
                                 current_member is not None
                                 and current_member[
+                                    "change_type"
+                                ] != "DELETED"
+                                and current_member[
                                     "record_hash"
                                 ] == record_hash
                             ):

@@ -35,7 +35,11 @@ KNOWN_FIELD_TYPES = {"string", "array", "object", "dict", "list", "json", "raw"}
 
 # Entity categories detect_entity_type() can actually produce; a rule tagged
 # with anything else would never be applied.
-KNOWN_ENTITY_CATEGORIES = {"Individual", "Entity", "Vessel"}
+# "Aircraft" is declared in the sheet as a future entity category but is not yet
+# routed by detect_entity_type(), so no record is typed Aircraft today -- it is
+# listed here deliberately so the guard tolerates the declared-but-unrouted
+# block rather than flagging it.
+KNOWN_ENTITY_CATEGORIES = {"Individual", "Entity", "Vessel", "Aircraft"}
 
 # Valid base handler names come straight from the engine, so adding a new
 # handler to fieldMapper.HANDLERS automatically makes it valid here too.

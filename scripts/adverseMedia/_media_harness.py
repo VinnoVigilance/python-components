@@ -1,0 +1,281 @@
+"""Shared dev harness: run any Adverse Media pipeline stage DB-free over on-disk artifacts.
+
+Mirror of scripts/watchlist/_harness.py for the Adverse Media pipeline. Five stages mirror the
+real media flow (with no DB / SeaweedFS step):
+
+    extract -> preprocess -> prenorm -> map -> postnorm
+
+extract crawls the live source with a stubbed, DB-free discovery service capped at
+--max-records articles (enough to cross a listing page and exercise pagination). It
+saves each article's HTML under data/downloads/ and the extracted source fields to
+data/raw/<DATASET>_extracted.jsonl. The other stages reuse the real media services
+and normalization engines. Artifacts share the watchlist layout: extract/prenorm/map
+under data/raw/, preprocess/postnorm under data/final/.
+
+DB-free because only discovery.check_record_key touches the DB in the real pipeline
+(the stub replaces it) and the source/dataset lookups in acquire() are bypassed.
+"""
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import sys
+from contextlib import redirect_stdout
+from copy import deepcopy
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from ingestion.apiCollector.interface import ApiCollectorTask, collect_artifacts
+from ingestion.bypassCollector.collector import BypassCollector
+from ingestion.crawler.interface import crawl
+from ingestion.crawler.models import CrawlerTask
+from scripts._shared import DOWNLOADS, emit
+from services.adverseMediaPipeline.mediaIdentityService import MediaIdentityService
+from services.adverseMediaPipeline.mediaNormalizationService import (
+    MediaNormalizationService,
+)
+from services.adverseMediaPipeline.mediaRawRecordService import MediaRawRecordService
+
+MEDIA_CONFIG_PATH = ROOT / "config" / "mediaSources.yaml"
+
+STAGES = ["extract", "preprocess", "prenorm", "map", "postnorm"]
+DEFAULT_MAX_RECORDS = None
+
+
+def get_media_config(dataset_name: str) -> tuple[dict, dict]:
+    """Return (global_config, source_config) for a dataset, or exit with the known keys."""
+    with MEDIA_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        config = yaml.safe_load(handle)
+    sources = config.get("sources", {}) if isinstance(config, dict) else {}
+    source_config = sources.get(dataset_name)
+    if source_config is None:
+        raise SystemExit(
+            f"Unknown media dataset: {dataset_name}\n"
+            f"Known: {', '.join(sorted(sources))}"
+        )
+    return config.get("global", {}), source_config
+
+
+def acquisition_type(source_config: dict) -> str:
+    return str(source_config.get("acquisition", {}).get("type", "")).strip().lower()
+
+
+class _NoDbDiscoveryService:
+    """DB-free stand-in for MediaDiscoveryService: nothing is known, stop after a cap."""
+
+    def __init__(self, source_config: dict, max_records: int):
+        self.source_config = source_config
+        self.max_records = max_records
+        self.discovered = 0
+
+    def build_record_key(self, record: dict) -> str:
+        return MediaIdentityService.generate_record_key(
+            source_config=self.source_config, record=record
+        )
+
+    def check_record_key(self, record_key: str) -> tuple[bool, bool]:
+        self.discovered += 1
+        should_stop = (
+            self.max_records is not None
+            and self.discovered >= self.max_records
+        )
+        return False, should_stop
+
+    def record_detail_selected(self) -> None:
+        pass
+
+    def record_identity_failure(self) -> None:
+        pass
+
+    def mark_discovery_failure(self, reason: str) -> None:
+        pass
+
+    def mark_source_end(self) -> None:
+        pass
+
+    def get_summary(self) -> dict:
+        return {}
+
+
+def _load_engines(global_config: dict, source_config: dict) -> MediaNormalizationService:
+    """Build the media normalization engines, silencing the service's debug prints."""
+    with redirect_stdout(io.StringIO()):
+        return MediaNormalizationService(
+            global_config=global_config,
+            source_config=source_config,
+        )
+
+
+def stage_extract(source_config: dict, max_records: int) -> list[dict]:
+    """Acquire the source DB-free (capped at max_records) -> the extracted source records.
+    Dispatches by acquisition.type so every ingestion method runs through one entry point."""
+    a_type = acquisition_type(source_config)
+    if a_type == "crawler":
+        return _extract_crawler(source_config, max_records)
+    if a_type == "api":
+        return _extract_api(source_config, max_records)
+    raise SystemExit(
+        f"The media harness extract stage does not support acquisition type "
+        f"'{a_type or 'unknown'}' for '{source_config.get('dataset_name')}'."
+    )
+
+
+def _extract_crawler(source_config: dict, max_records: int) -> list[dict]:
+    """Crawl a spider-based source DB-free -> the extracted source records."""
+    discovery = _NoDbDiscoveryService(source_config, max_records=max_records)
+    fetch_strategy = str(
+        source_config.get("acquisition", {}).get("fetch_strategy", "direct")
+    ).strip().lower()
+    source_file_path = (
+        _collect_bypass_listing(source_config)
+        if fetch_strategy == "saved_html"
+        else None
+    )
+    task = CrawlerTask(
+        url=source_config["url"],
+        source_name=source_config["source_name"],
+        list_name=source_config["dataset_name"],
+        source_config=source_config,
+        fetch_strategy=fetch_strategy,
+        source_file_path=source_file_path,
+        download_dir=str(DOWNLOADS),
+    )
+    result = crawl(task=task, discovery_service=discovery)
+    raw_record_service = MediaRawRecordService()
+    return [
+        raw_record
+        for record in (result.records or [])
+        if record.get("extracted") and not record.get("failed")
+        for raw_record in raw_record_service.extract_acquired_record(
+            source_config, record
+        )
+    ]
+
+
+def _collect_bypass_listing(source_config: dict) -> str:
+    """Save a Cloudflare-protected listing page through BypassCollector."""
+    listing_path = BypassCollector(outputDir=DOWNLOADS).collect(
+        {**source_config, "list_name": source_config["dataset_name"]}
+    )
+    if listing_path is None:
+        raise SystemExit("Bypass collection of the listing page failed.")
+    return str(Path(listing_path).resolve())
+
+
+def _extract_api(source_config: dict, max_records: int) -> list[dict]:
+    """Collect an API source DB-free -> its raw records. When max_records is set, fetch a
+    single capped page; otherwise page the whole source as the real pipeline would."""
+    config = deepcopy(source_config)
+    api_config = config.setdefault("api_config", {})
+
+    if max_records is not None:
+        pagination = api_config.get("pagination", {})
+        size_param = pagination.get("size_param")
+        params = dict(api_config.get("params", {}))
+        if size_param:
+            params[size_param] = max_records
+        api_config["params"] = params
+        api_config["pagination"] = {"type": "none"}
+
+    task = ApiCollectorTask.from_config(config)
+    task.download_dir = str(DOWNLOADS)
+
+    result = collect_artifacts(task)
+    file_paths = result.file_paths[:max_records] if max_records else result.file_paths
+    return [json.loads(Path(path).read_text(encoding="utf-8")) for path in file_paths]
+
+
+def stage_preprocess(source_config: dict, records: list[dict]) -> list[dict]:
+    """Run the real media preprocessing (config['preprocessing']) on the extract records."""
+    return MediaRawRecordService().process(
+        source_config=source_config,
+        records=records,
+    )
+
+
+def stage_prenorm(service: MediaNormalizationService, records: list[dict]) -> list[dict]:
+    """Stamp entity_type=Media, then run pre-normalization if the source has rules."""
+    pre_normalized = []
+    for record in records:
+        staged = deepcopy(record)
+        staged["entity_type"] = "Media"
+        if service.pre_normalizer is not None:
+            staged = service.pre_normalizer.pre_normalize_record(
+                source=service.dataset_name,
+                raw_json=staged,
+            )
+        pre_normalized.append(staged)
+    return pre_normalized
+
+
+def stage_map(service: MediaNormalizationService, records: list[dict]) -> list[dict]:
+    """Run the real mapping engine (raw source fields -> canonical JSON)."""
+    return [service.mapper.map_record(deepcopy(record)) for record in records]
+
+
+def stage_postnorm(service: MediaNormalizationService, records: list[dict]) -> list[dict]:
+    """Run the real post-normalization engine -> canonical/final media records."""
+    canonical = [
+        service.post_normalizer.post_normalize_record(deepcopy(record))
+        for record in records
+    ]
+    for record in canonical:
+        if not isinstance(record, dict):
+            raise TypeError("Canonical media record must be a dictionary.")
+    return canonical
+
+
+def media_stage_parser(description: str) -> argparse.ArgumentParser:
+    """Shared argument parser for the record-transforming media stage CLIs."""
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("dataset_name", help="key under 'sources' in config/mediaSources.yaml")
+    parser.add_argument("--in", dest="infile", default=None, help="override input artifact (.jsonl)")
+    parser.add_argument("--out", default=None, help="override output artifact path")
+    parser.add_argument("--preview", action="store_true", help="print the first --limit records")
+    parser.add_argument("--limit", type=int, default=3)
+    return parser
+
+
+def run_chain(
+    dataset_name: str,
+    stop: str = "postnorm",
+    max_records: int = DEFAULT_MAX_RECORDS,
+    preview: bool = False,
+    limit: int = 3,
+    quiet: bool = False,
+) -> dict:
+    """Run extract -> ... -> `stop` for one media dataset, snapshotting each stage. DB-free."""
+    global_config, source_config = get_media_config(dataset_name)
+    summary: dict = {"dataset": dataset_name}
+
+    records = stage_extract(source_config, max_records=max_records)
+    emit(dataset_name, "extract", records, quiet, preview, limit)
+    summary["extract"] = len(records)
+    if stop == "extract":
+        return summary
+
+    records = stage_preprocess(source_config, records)
+    emit(dataset_name, "preprocess", records, quiet, preview, limit)
+    summary["preprocess"] = len(records)
+    if stop == "preprocess":
+        return summary
+
+    service = _load_engines(global_config, source_config)
+
+    for stage, transform in (
+        ("prenorm", stage_prenorm),
+        ("map", stage_map),
+        ("postnorm", stage_postnorm),
+    ):
+        records = transform(service, records)
+        emit(dataset_name, stage, records, quiet, preview, limit)
+        summary[stage] = len(records)
+        if stop == stage and stage != "postnorm":
+            return summary
+
+    return summary

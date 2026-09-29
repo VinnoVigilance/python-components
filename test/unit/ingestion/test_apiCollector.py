@@ -17,6 +17,7 @@ Two behaviours are locked in here:
 from unittest.mock import patch
 
 import pytest
+import requests
 
 from ingestion.apiCollector import collector
 from ingestion.apiCollector.models import ApiCollectorTask
@@ -65,6 +66,25 @@ class TestBuildQuery:
         )
 
         assert query == {"category": "BLACKLISTED_ENTITIES"}
+
+    def test_offset_paging_multiplies_counter_by_page_size(self):
+        # ADB's api_config: the zero-based loop counter becomes a record offset
+        # (offset = counter * page_size), and the size param rides along.
+        pagination = {
+            "type": "offset",
+            "offset_param": "offset",
+            "size_param": "size",
+            "page_size": 100,
+            "start_page": 0,
+        }
+
+        first = build_query(
+            pagination=pagination, params={"sortField": "Name"}, page=0
+        )
+        third = build_query(pagination=pagination, params={}, page=3)
+
+        assert first == {"sortField": "Name", "offset": 0, "size": 100}
+        assert third == {"offset": 300, "size": 100}
 
 
 # --- extract_items ---------------------------------------------------------
@@ -123,19 +143,20 @@ class TestIterPages:
             3: {"items": []},
         }
 
-        def fake_get_page(_task, query):
+        def fake_get_page(_task, query, _transport=None):
             return pages[query["page"]]
 
         with patch.object(collector, "_get_page", side_effect=fake_get_page):
-            result = list(collector._iter_pages(task))
+            result = list(collector._iter_pages(task, None))
 
         assert result == [[{"id": 1}], [{"id": 2}]]
 
     def test_auth_failure_raises_immediately_without_retry(self):
         # A 401/403 will not fix itself on retry and must not look like an
-        # empty result; _get_page raises a clear error on the first attempt.
-        task = _task({"type": "page"})
-        task.retry = 3
+        # empty result. The transport now owns the HTTP call, so it is the
+        # transport that raises a clear error on the first response -- without
+        # a second request.
+        from ingestion.apiCollector import transport as transport_mod
 
         calls = {"count": 0}
 
@@ -152,11 +173,43 @@ class TestIterPages:
             calls["count"] += 1
             return _Resp()
 
-        with patch.object(collector.requests, "get", side_effect=fake_get):
+        with patch.object(transport_mod.requests, "get", side_effect=fake_get):
             with pytest.raises(RuntimeError, match="authentication failed"):
-                collector._get_page(task, {"page": 1})
+                transport_mod.RequestsTransport().get_json(
+                    "https://example.test/api", {"page": 1}
+                )
 
         assert calls["count"] == 1
+
+    def test_offset_source_pages_past_short_pages_until_empty(self):
+        # ADB returns ~85 records for a size=100 window (the server filters
+        # after slicing), so a short page is NOT the last page. An offset source
+        # must keep paging until a truly empty page -- unlike page-number
+        # sources, it must not stop on the first short page.
+        task = _task(
+            {
+                "type": "offset",
+                "offset_param": "offset",
+                "size_param": "size",
+                "page_size": 100,
+                "start_page": 0,
+            },
+            items_path="data",
+        )
+
+        pages = {
+            0: {"data": [{"id": i} for i in range(83)]},
+            100: {"data": [{"id": i} for i in range(87)]},
+            200: {"data": []},
+        }
+
+        def fake_get_page(_task, query, _transport=None):
+            return pages[query["offset"]]
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            result = list(collector._iter_pages(task, None))
+
+        assert [len(page) for page in result] == [83, 87]
 
     def test_single_request_source_fetches_once(self):
         # The GPPB case: the endpoint ignores paging and always returns the
@@ -167,13 +220,13 @@ class TestIterPages:
         full_list = [{"id": 1}, {"id": 2}]
         calls = {"count": 0}
 
-        def fake_get_page(_task, query):
+        def fake_get_page(_task, query, _transport=None):
             calls["count"] += 1
             assert "page" not in query  # no page param for single-request
             return full_list
 
         with patch.object(collector, "_get_page", side_effect=fake_get_page):
-            result = list(collector._iter_pages(task))
+            result = list(collector._iter_pages(task, None))
 
         assert result == [full_list]
         assert calls["count"] == 1
@@ -194,12 +247,12 @@ class TestIterPages:
 
         seen = []
 
-        def fake_get_page(_task, query):
+        def fake_get_page(_task, query, _transport=None):
             seen.append(query["category"])
             return [{"cat": query["category"]}]
 
         with patch.object(collector, "_get_page", side_effect=fake_get_page):
-            result = list(collector._iter_pages(task))
+            result = list(collector._iter_pages(task, None))
 
         assert seen == [
             "BLACKLISTED_ENTITIES",
@@ -219,13 +272,162 @@ class TestIterPages:
 
         calls = {"count": 0}
 
-        def fake_get_page(_task, query):
+        def fake_get_page(_task, query, _transport=None):
             calls["count"] += 1
             assert query == {"category": "X"}
             return [{"id": 1}]
 
         with patch.object(collector, "_get_page", side_effect=fake_get_page):
-            result = list(collector._iter_pages(task))
+            result = list(collector._iter_pages(task, None))
 
         assert result == [[{"id": 1}]]
         assert calls["count"] == 1
+
+
+# --- _iter_pages with stop_check (Media API early-stop, e.g. UK_GOV) --------
+
+class TestIterPagesStopCheck:
+    def test_stop_check_true_halts_further_pages(self):
+        # UK_GOV-style offset paging with 3 non-empty pages available. Once
+        # stop_check reports True after page 1, page 2 and 3 must never be
+        # requested -- this is the whole point of the early-stop.
+        task = _task(
+            {
+                "type": "offset",
+                "offset_param": "start",
+                "size_param": "count",
+                "page_size": 10,
+                "start_page": 0,
+            },
+            items_path="results",
+        )
+
+        pages = {
+            0: {"results": [{"id": i} for i in range(10)]},
+            10: {"results": [{"id": i} for i in range(10, 20)]},
+            20: {"results": [{"id": i} for i in range(20, 30)]},
+        }
+
+        def fake_get_page(_task, query, _transport=None):
+            return pages[query["start"]]
+
+        stop_after_first_page = iter([True])
+
+        def stop_check(_items):
+            return next(stop_after_first_page, False)
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            result = list(
+                collector._iter_pages(task, None, stop_check=stop_check)
+            )
+
+        # Page 1 is still yielded in full (records already fetched are kept);
+        # only the *next* request is skipped.
+        assert len(result) == 1
+        assert len(result[0]) == 10
+
+    def test_stop_check_false_does_not_affect_normal_pagination(self):
+        # A stop_check that never fires must behave exactly like passing none
+        # at all -- this is the AMLC case (discovery.policy=full_scan,
+        # so mediaAcquisitionService never builds a stop_check,
+        # but this locks in that a harmless stop_check would be a no-op too).
+        task = _task(
+            {
+                "type": "offset",
+                "offset_param": "start",
+                "size_param": "count",
+                "page_size": 10,
+                "start_page": 0,
+            },
+            items_path="results",
+        )
+
+        pages = {
+            0: {"results": [{"id": i} for i in range(10)]},
+            10: {"results": [{"id": i} for i in range(10, 20)]},
+            20: {"results": []},
+        }
+
+        def fake_get_page(_task, query, _transport=None):
+            return pages[query["start"]]
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            result = list(
+                collector._iter_pages(task, None, stop_check=lambda items: False)
+            )
+
+        assert [len(page) for page in result] == [10, 10]
+
+    def test_stop_check_receives_the_items_just_fetched(self):
+        # The callback must see the actual page contents (so a caller can
+        # walk them in order and count consecutive known records), not just a
+        # bare "continue?" signal.
+        task = _task(
+            {
+                "type": "offset",
+                "offset_param": "start",
+                "size_param": "count",
+                "page_size": 10,
+                "start_page": 0,
+            },
+            items_path="results",
+        )
+
+        pages = {
+            0: {"results": [{"id": 1}, {"id": 2}]},
+            10: {"results": []},
+        }
+
+        def fake_get_page(_task, query, _transport=None):
+            return pages[query["start"]]
+
+        seen_pages = []
+
+        def stop_check(items):
+            seen_pages.append(items)
+            return False
+
+        with patch.object(collector, "_get_page", side_effect=fake_get_page):
+            list(collector._iter_pages(task, None, stop_check=stop_check))
+
+        assert seen_pages == [[{"id": 1}, {"id": 2}]]
+
+
+class TestRetryBackoff:
+    def test_request_retries_use_exponential_backoff(self):
+        task = _task({"type": "none"})
+        task.retry = 3
+        task.retry_delay_seconds = 1
+        task.retry_backoff_multiplier = 2
+        task.retry_max_delay_seconds = 10
+
+        transport = type(
+            "Transport",
+            (),
+            {
+                "get_json": lambda self, url, params: None,
+            },
+        )()
+
+        with (
+            patch.object(
+                transport,
+                "get_json",
+                side_effect=[
+                    requests.ConnectionError("down"),
+                    requests.Timeout("slow"),
+                    {"items": []},
+                ],
+            ) as get_json,
+            patch.object(collector.time, "sleep") as sleep,
+        ):
+            result = collector._get_json_with_retry(
+                task,
+                task.url,
+                params={},
+                transport=transport,
+            )
+
+        assert result == {"items": []}
+        assert get_json.call_count == 3
+        assert [call.args[0] for call in sleep.call_args_list] == [1, 2]

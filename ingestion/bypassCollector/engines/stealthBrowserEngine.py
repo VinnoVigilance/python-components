@@ -2,6 +2,7 @@
 StealthBot browser engine implementation.
 """
 
+import json
 import logging
 from typing import Optional, Any
 import time
@@ -9,7 +10,12 @@ import time
 from sb_stealth_wrapper import StealthBot
 
 from ingestion.bypassCollector.engines.baseEngine import BaseEngine
+from ingestion.bypassCollector.engines.compatibleDriver import (
+    CompatibleSeleniumBaseDriver,
+)
 logger = logging.getLogger(__name__)
+
+CHALLENGE_INDICATORS = ("turnstile", "just a moment", "verify you are human")
 
 
 class StealthBrowserEngine(BaseEngine):
@@ -24,19 +30,26 @@ class StealthBrowserEngine(BaseEngine):
         self,
         headless: bool = False,
         successCriteria: Optional[list] = None,
-        timeoutSeconds: int = 90
+        timeoutSeconds: int = 90,
+        driverVersion: str = "mlatest",
+        binaryLocation: Optional[str] = None
     ):
         """
         Initialize StealthBrowserEngine.
-        
+
         Args:
             headless: Run browser in headless mode
             successCriteria: Text indicating successful page load
             timeoutSeconds: Default timeout for operations
+            driverVersion: chromedriver selector; "mlatest" matches the device's
+                Chrome. Override to pin an exact build or "keep" for offline.
+            binaryLocation: explicit Chrome binary path; None = auto-detect.
         """
         self.headless = headless
         self.successCriteria = successCriteria or []
         self.timeoutSeconds = timeoutSeconds
+        self.driverVersion = driverVersion
+        self.binaryLocation = binaryLocation
         self._bot = None
         self.sb = None
     
@@ -58,9 +71,14 @@ class StealthBrowserEngine(BaseEngine):
             
             self._bot = StealthBot(
                 headless=self.headless,
-                success_criteria=success_criteria
+                success_criteria=success_criteria,
+                driver_strategy=CompatibleSeleniumBaseDriver(
+                    driver_version=self.driverVersion,
+                    binary_location=self.binaryLocation,
+                ),
             )
-            
+            self._bot.CHALLENGE_INDICATORS = CHALLENGE_INDICATORS
+
             self._bot.__enter__()
             self.sb = self._bot.sb
             
@@ -126,7 +144,55 @@ class StealthBrowserEngine(BaseEngine):
         except Exception as e:
             logger.error(f"Failed to retrieve HTML: {type(e).__name__}: {e}")
             return None
-    
+
+    def fetchText(self, url: str) -> Optional[str]:
+        """
+        Fetch a URL's raw body from inside the cleared browser session.
+
+        Runs a same-origin XHR in the page, so the Cloudflare clearance
+        cookies set during navigate() are sent automatically. This is the
+        "bypass then API" step: the challenge is already cleared, so we pull
+        the JSON straight from the endpoint instead of reading the <pre> the
+        browser wraps around a rendered .json page.
+        """
+        logger.info(f"Fetching body via browser session: {url}")
+
+        try:
+            # UC/CDP mode evaluates the script as an expression, so a top-level
+            # `return` is illegal and script arguments are not passed. Wrap the
+            # synchronous XHR in an IIFE (an expression) with the URL embedded.
+            script = (
+                "(function(u){"
+                "var xhr = new XMLHttpRequest();"
+                "xhr.open('GET', u, false);"
+                "xhr.send(null);"
+                "return xhr.responseText;"
+                "})(" + json.dumps(url) + ")"
+            )
+            text = self.sb.execute_script(script)
+
+            if text:
+                logger.info(f"Fetched {len(text):,} characters")
+                return text
+
+            logger.error("Fetched empty response")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to fetch body: {type(e).__name__}: {e}")
+            return None
+
+    def getSessionHeaders(self) -> dict:
+        """Return the cleared session's User-Agent and cookies as HTTP headers."""
+        userAgent = self.evaluateAwait("Promise.resolve(navigator.userAgent)")
+        cookies = self.sb.get_cookies() or []
+
+        return {
+            "User-Agent": userAgent,
+            "Cookie": "; ".join(
+                f"{cookie['name']}={cookie['value']}" for cookie in cookies
+            ),
+        }
+
     def getPageTitle(self) -> Optional[str]:
         """Get current page title."""
         try:
@@ -246,11 +312,11 @@ class StealthBrowserEngine(BaseEngine):
     def executeScript(self, script: str, *args) -> Any:
         """
         Execute JavaScript.
-        
+
         Args:
             script: JavaScript code to execute
             *args: Arguments for script
-            
+
         Returns:
             Script result
         """
@@ -258,4 +324,20 @@ class StealthBrowserEngine(BaseEngine):
             return self.sb.execute_script(script, *args)
         except Exception as e:
             logger.error(f"Script execution failed: {type(e).__name__}: {e}")
+            return None
+
+    def evaluateAwait(self, expression: str) -> Any:
+        """Evaluate a Promise-returning JS expression and return its value (CDP
+        ``await_promise``); falls back to ``executeScript`` without CDP."""
+        cdp = getattr(self.sb, "cdp", None)
+
+        if cdp is None:
+            return self.executeScript(expression)
+
+        try:
+            return cdp.loop.run_until_complete(
+                cdp.page.evaluate(expression, await_promise=True)
+            )
+        except Exception as e:
+            logger.error(f"Async evaluate failed: {type(e).__name__}: {e}")
             return None

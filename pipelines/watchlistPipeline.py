@@ -26,7 +26,10 @@ from services.watchlistPipeline import (
 logger = logging.getLogger(__name__)
 
 
-def run_watchlist_pipeline(watchlist_name: str) -> dict[str, Any]:
+def run_watchlist_pipeline(
+    watchlist_name: str,
+    acquisition: watchlistFileService.AcquisitionResult | None = None,
+) -> dict[str, Any]:
     """Run the watchlist ingestion pipeline."""
 
     if watchlist_name not in WATCHLIST_CONFIGS:
@@ -39,10 +42,11 @@ def run_watchlist_pipeline(watchlist_name: str) -> dict[str, Any]:
     started_at = perf_counter()
     config: dict[str, Any] = WATCHLIST_CONFIGS[watchlist_name]
 
-    acquisition = watchlistFileService.acquire_source(
-        config=config,
-        downloader=downloader,
-    )
+    if acquisition is None:
+        acquisition = watchlistFileService.acquire_source(
+            config=config,
+            downloader=downloader,
+        )
 
     source_file_path = acquisition.source_file_path
 
@@ -71,6 +75,9 @@ def run_watchlist_pipeline(watchlist_name: str) -> dict[str, Any]:
         "lookup_values": lookup_values,
         "download_method": config["download_method"],
         "duplicate_status": duplicate_status,
+        "broken_detail_urls": [
+            item["detail_url"] for item in acquisition.broken_details
+        ],
     }
 
     if duplicate_status == "DUPLICATE_COMPLETED":
@@ -238,8 +245,29 @@ def run_watchlist_pipeline(watchlist_name: str) -> dict[str, Any]:
                 "raw_record_count": raw_result[
                     "raw_record_count"
                 ],
+                "broken_detail_urls": raw_result[
+                    "broken_detail_urls"
+                ],
             }
         )
+
+    return result
+
+
+def retry_held_watchlist(watchlist_name: str) -> dict[str, Any] | None:
+    """Fetch a held list's missing pages and save the list once it is complete."""
+
+    config: dict[str, Any] = WATCHLIST_CONFIGS[watchlist_name]
+    acquisition = watchlistFileService.retry_held_crawl(config)
+
+    if acquisition is None:
+        return None
+
+    result = run_watchlist_pipeline(
+        watchlist_name,
+        acquisition=acquisition,
+    )
+    watchlistFileService.release_held_crawl(config)
 
     return result
 
@@ -249,7 +277,7 @@ if __name__ == "__main__":
 
     try:
         pipeline_result = run_watchlist_pipeline(
-            watchlist_name="DFAT"
+            watchlist_name="ATC-DESIGNATED-TERRORIST-GROUPS"
         )
 
         pprint(pipeline_result)

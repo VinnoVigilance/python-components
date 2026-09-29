@@ -59,6 +59,98 @@ class TestGenerateAtcUniqueId:
         assert record["unique_id"].startswith("ATC-UNKNOWN-")
 
 
+class TestGenerateCompositeId:
+    def test_reads_nested_dotted_fields(self, engine):
+        record = {
+            "source_record_id": "aaron-durnell-williams",
+            "list": {"name": "Aaron Durnell Williams"},
+            "detail": {"date_of_birth": "June 04, 1980"},
+        }
+        config = {
+            "fields": ["source_record_id", "list.name", "detail.date_of_birth"],
+            "output_field": "source_record_id",
+            "prefix": "US-MARSHALS",
+        }
+        out = engine.generate_composite_id(dict(record), config)
+
+        assert out["source_record_id"].startswith("US-MARSHALS-")
+        # 64-char sha256 hex digest after the prefix
+        digest = out["source_record_id"][len("US-MARSHALS-"):]
+        assert len(digest) == 64
+
+    def test_deterministic_and_distinct(self, engine):
+        config = {
+            "fields": ["list.name"],
+            "output_field": "id",
+            "prefix": "X",
+        }
+        a = engine.generate_composite_id({"list": {"name": "Alice"}}, config)["id"]
+        a2 = engine.generate_composite_id({"list": {"name": "Alice"}}, config)["id"]
+        b = engine.generate_composite_id({"list": {"name": "Bob"}}, config)["id"]
+
+        assert a == a2  # same input -> same id
+        assert a != b   # different input -> different id
+
+    def test_missing_nested_field_is_treated_as_empty(self, engine):
+        config = {"fields": ["detail.missing"], "output_field": "id"}
+        out = engine.generate_composite_id({"detail": {}}, config)
+        # no prefix -> bare 64-char digest, computed over the empty value
+        assert len(out["id"]) == 64
+
+
+class TestSplitFieldRegex:
+    PATTERN = r"(?P<from>.+?)\s*[-–—]\s*(?P<to>.+)$"
+
+    def test_reads_nested_dotted_field(self, engine):
+        record = {"list": {"date_of_sanction": "June 17, 2025 – December 16, 2026"}}
+        out = engine.split_field_regex(
+            dict(record),
+            {
+                "input_field": "list.date_of_sanction",
+                "pattern": self.PATTERN,
+                "outputs": {"from": "wb_sanction_from", "to": "wb_sanction_to"},
+            },
+        )
+        assert out["wb_sanction_from"] == "June 17, 2025"
+        assert out["wb_sanction_to"] == "December 16, 2026"
+
+    def test_flat_field_still_works(self, engine):
+        out = engine.split_field_regex(
+            {"name": "66. VILLAR, CAMILLE"},
+            {
+                "input_field": "name",
+                "pattern": r"^(?P<ballot>\d+)\.\s*(?P<rest>.+)$",
+                "outputs": {"ballot": "ballot_number", "rest": "clean_name"},
+            },
+        )
+        assert out["ballot_number"] == "66"
+        assert out["clean_name"] == "VILLAR, CAMILLE"
+
+    def test_no_match_yields_empty_outputs(self, engine):
+        out = engine.split_field_regex(
+            {"list": {"date_of_sanction": "Ongoing"}},
+            {
+                "input_field": "list.date_of_sanction",
+                "pattern": self.PATTERN,
+                "outputs": {"from": "wb_sanction_from", "to": "wb_sanction_to"},
+            },
+        )
+        assert out["wb_sanction_from"] == ""
+        assert out["wb_sanction_to"] == ""
+
+    def test_missing_nested_field_is_empty(self, engine):
+        out = engine.split_field_regex(
+            {"list": {}},
+            {
+                "input_field": "list.date_of_sanction",
+                "pattern": self.PATTERN,
+                "outputs": {"from": "a", "to": "b"},
+            },
+        )
+        assert out["a"] == ""
+        assert out["b"] == ""
+
+
 class TestExtractNameFromUrl:
     def test_extracts_slug(self, engine):
         record = engine.extract_name_from_url(
@@ -111,22 +203,14 @@ class TestFilterMissingRequiredField:
 
 class TestSplitAtcDateAndPlaceOfBirth:
     def test_splits_date_and_place(self, engine):
-        record = {
-            "profile_data": {
-                "profile_fields": {"Date and Place of Birth": "1980, Manila"}
-            }
-        }
+        record = {"detail": {"date_and_place_of_birth": "1980, Manila"}}
         result = engine.split_atc_date_and_place_of_birth(record, {})
 
         assert result["atc_birth_date"] == "1980"
         assert result["atc_birth_place"] == "Manila"
 
     def test_place_only_when_no_digits(self, engine):
-        record = {
-            "profile_data": {
-                "profile_fields": {"Date and Place of Birth": "Manila City"}
-            }
-        }
+        record = {"detail": {"date_and_place_of_birth": "Manila City"}}
         result = engine.split_atc_date_and_place_of_birth(record, {})
 
         assert result["atc_birth_date"] == ""

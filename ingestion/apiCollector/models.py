@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
 @dataclass
-class ApiCollectorTask:
-    """
-    Source-agnostic description of a single API acquisition run.
+class ApiCollectionResult:
+    """Result of a single API collection run."""
 
-    The service builds this from a watchlist config's ``api_config`` block,
-    so the collector code never reads raw config dicts directly.
-    """
+    file_paths: List[str] = field(default_factory=list)
+    record_count: int = 0
+
+
+@dataclass
+class ApiCollectorTask:
+    """Source-agnostic description of a single API acquisition run."""
 
     url: str
     source_name: str
@@ -17,15 +22,66 @@ class ApiCollectorTask:
     pagination: Dict[str, Any] = field(default_factory=dict)
     items_path: str = "items"
     params: Dict[str, Any] = field(default_factory=dict)
-    # Optional: fetch the source once per variant, merging each variant over
-    # ``params``, and concatenate the results. Lets one source pull several
-    # partitions of the same dataset (e.g. an API split by a ``category`` query
-    # param) into a single snapshot. Empty = a single fetch with ``params``.
     param_variants: List[Dict[str, Any]] = field(default_factory=list)
     headers: Dict[str, str] = field(default_factory=dict)
     timeout: int = 30
     retry: int = 3
+    retry_delay_seconds: float = 1.0
+    retry_backoff_multiplier: float = 2.0
+    retry_max_delay_seconds: float = 30.0
     throttle_delay: float = 0.0
     write_mode: str = "single_jsonl"
     download_dir: Optional[str] = None
     filename: Optional[str] = None
+    transport: str = "requests"
+    bypass_config: Dict[str, Any] = field(default_factory=dict)
+    detail: Dict[str, Any] = field(default_factory=dict)
+    record_shape: Dict[str, Any] = field(default_factory=dict)
+    dedup_path: Optional[str] = None
+    faceting: Dict[str, Any] = field(default_factory=dict)
+    record_id_path: Optional[str] = None
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> "ApiCollectorTask":
+        """Build a task from a source config's ``api_config`` block."""
+
+        api_config = config.get("api_config", {})
+        collection_name = (
+            config.get("list_name")
+            or config.get("dataset_name")
+            or config["source_name"]
+        )
+
+        return cls(
+            url=config["url"],
+            source_name=config["source_name"],
+            list_name=collection_name,
+            pagination=api_config.get("pagination", {}),
+            items_path=api_config.get("items_path", "items"),
+            params=api_config.get("params", {}),
+            param_variants=api_config.get("param_variants", []),
+            headers=api_config.get("headers", {}),
+            timeout=api_config.get("timeout", 30),
+            retry=api_config.get("retry", 3),
+            retry_delay_seconds=api_config.get(
+                "retry_delay_seconds",
+                1.0,
+            ),
+            retry_backoff_multiplier=api_config.get(
+                "retry_backoff_multiplier",
+                2.0,
+            ),
+            retry_max_delay_seconds=api_config.get(
+                "retry_max_delay_seconds",
+                30.0,
+            ),
+            throttle_delay=api_config.get("throttle_delay", 0.0),
+            write_mode=api_config.get("write_mode", "single_jsonl"),
+            transport=api_config.get("transport", "requests"),
+            bypass_config=api_config.get("bypass_config", {}),
+            detail=api_config.get("detail", {}),
+            faceting=api_config.get("faceting", {}),
+            record_shape=api_config.get("record_shape", {}),
+            dedup_path=api_config.get("dedup_path"),
+            record_id_path=api_config.get("record_id_path"),
+        )

@@ -3,8 +3,10 @@ data/downloads/
 data/final/
 data/preprocessed/
 data/reports/
+data/state/
 data/test
 /db/
+logs/
 
 # ============================================
 # Bypass Collector / SeleniumBase runtime files
@@ -59,5 +61,6 @@ __pycache__/
 # Personal / local working docs (not shared)
 # ============================================
 CLAUDE.md
+.claudeignore
 docs/field-mapper-guide.md
 docs/server-and-pgadmin-guide.md

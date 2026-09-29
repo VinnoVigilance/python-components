@@ -17,16 +17,23 @@ lxml==6.1.1
 pdfplumber==0.11.10
 Scrapy==2.17.0
 nameparser==1.4.0
+inscriptis==2.7.3
 
 # --- Ingestion / infrastructure ---
 requests==2.34.2         # source file downloads
-sb-stealth-wrapper==0.4.0  # stealth browser engine for bypassCollector (Cloudflare-protected sources)
+sb-stealth-wrapper==0.5.0  # stealth browser engine for bypassCollector (Cloudflare-protected sources)
+seleniumbase==4.54.10    # SeleniumBase driver, pinned to a device-matched chromedriver (compatibleDriver.py)
 psycopg2-binary==2.9.12  # PostgreSQL access
 boto3                    # SeaweedFS/S3 storage client (not pinned: install if using infrastructure/storage)
 python-dotenv==1.0.1     # load config/secrets from a local .env file
+tzdata; sys_platform == "win32"  # IANA zones for watchlist schedules on Windows
+PyYAML==6.0.3           # YAML source configs; >=6.0.3 required by seleniumbase
+elasticsearch==9.5.0
 
 # --- LLM (risk classification / extraction) ---
 ollama==0.6.2
 
 # --- Analyst UI (utils/vvAnalystApp.py) ---
 streamlit==1.59.2
+tqdm>=4.66,<5
+

@@ -1,0 +1,30 @@
+services:
+  python-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: watchlist_python_image:latest
+    container_name: watchlist_python_pipeline
+    restart: unless-stopped
+    depends_on:
+      database-engine:
+        condition: service_healthy
+      message-broker:
+        condition: service_healthy
+      object-storage:
+        condition: service_started
+    volumes:
+      # Mounts the current directory (python-components) to /app
+      - .:/app
+    env_file:
+      - ../.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+    networks:
+      - platform_secure_backplane
+
+
+networks:
+  platform_secure_backplane:
+    name: platform_secure_backplane

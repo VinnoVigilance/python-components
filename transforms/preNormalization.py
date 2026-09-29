@@ -1,6 +1,7 @@
 import json
 import re
 import pandas as pd
+import pycountry
 from pathlib import Path
 from copy import deepcopy
 
@@ -159,20 +160,43 @@ class RegexExtractHandler(BaseHandler):
     "9037123"
     """
 
-    def normalize(self, value, rule):
+    @staticmethod
+    def _find_matches(value, rule):
 
         if value is None:
-            return ""
+            return []
 
-        match = re.search(str(rule), str(value))
+        return [
+            match.group(1) if match.groups() else match.group(0)
+            for match in re.finditer(str(rule), str(value))
+        ]
 
-        if not match:
-            return ""
+    def normalize(self, value, rule):
 
-        if match.groups():
-            return match.group(1)
+        matches = self._find_matches(value, rule)
 
-        return match.group(0)
+        return matches[0] if matches else ""
+
+
+class RegexExtractAllHandler(RegexExtractHandler):
+
+    """
+    Like RegexExtractHandler, but keeps every match instead of only the
+    first, returning a list. Reuses the same matching logic -- pair it with
+    the engine's optional target_field column so the list lands on a new
+    field instead of overwriting the field it was read from.
+
+    Example (DTI-FTEB press releases):
+
+    field "content.rendered" = '<p><img src="a.jpg"></p><p><img src="b.png"></p>'
+    rule  = <img[^>]+src="([^"]+)"
+    ->
+    ["a.jpg", "b.png"]
+    """
+
+    def normalize(self, value, rule):
+
+        return self._find_matches(value, rule)
 
 
 # =========================================================
@@ -193,7 +217,8 @@ class SplitPatternHandler(BaseHandler):
 
     Conventions:
 
-      * The field is split on line breaks; each non-empty line is matched.
+      * The field is split on line breaks; every match found on each non-empty
+        line becomes an entry, so one line can yield several objects.
       * A named group whose name starts with ``_`` is matched but **discarded**
         (use it to swallow a redundant fragment without emitting it).
       * A line that does not match is emitted as ``{first_key: line}`` so nothing
@@ -243,17 +268,19 @@ class SplitPatternHandler(BaseHandler):
             if not line:
                 continue
 
-            match = regex.search(line)
+            matches = list(regex.finditer(line))
 
-            if match:
+            if matches:
 
-                obj = {}
+                for match in matches:
 
-                for key in keys:
-                    captured = match.group(key)
-                    obj[key] = captured.strip() if captured else ""
+                    obj = {}
 
-                results.append(obj)
+                    for key in keys:
+                        captured = match.group(key)
+                        obj[key] = captured.strip() if captured else ""
+
+                    results.append(obj)
 
             else:
 
@@ -334,6 +361,26 @@ class FlattenDictHandler(BaseHandler):
 
 
 # =========================================================
+# Language Name Handler
+# =========================================================
+
+class LanguageNameHandler(BaseHandler):
+
+    """Resolve an ISO 639-2 language code (e.g. FRE) to its English name via
+    pycountry; an unresolvable code is left unchanged."""
+
+    def normalize(self, value, rule):
+
+        if value is None:
+            return value
+
+        try:
+            return pycountry.languages.lookup(str(value).strip()).name
+        except LookupError:
+            return value
+
+
+# =========================================================
 # Handler Registry
 # =========================================================
 
@@ -343,8 +390,10 @@ HANDLERS = {
     "remove_list_markers": RemoveListMarkersHandler(),
     "date_format": DateFormatHandler(),
     "regex_extract": RegexExtractHandler(),
+    "regex_extract_all": RegexExtractAllHandler(),
     "split_pattern": SplitPatternHandler(),
     "flatten_dict": FlattenDictHandler(),
+    "language_name": LanguageNameHandler(),
 }
 
 
@@ -627,6 +676,16 @@ class PreNormalizationEngine:
                 rule["normalization_rule"]
             ).strip()
 
+            # target_field is optional and absent from every existing rule
+            # (watchlist and media alike): when blank, a rule normalizes its
+            # field in place exactly as before. Set it only when the result
+            # must NOT overwrite the field it was read from -- e.g. pulling a
+            # list of image URLs out of an HTML body while the body itself
+            # (BodyOriginalValue) still needs to reach mapping untouched.
+            target_field = str(
+                rule.get("target_field", "") or ""
+            ).strip()
+
             # -----------------------------------------
             # Handler Exists?
             # -----------------------------------------
@@ -667,11 +726,19 @@ class PreNormalizationEngine:
                     normalization_rule,
                 )
 
-                set_nested_value(
-                    parent,
-                    key,
-                    normalized_value,
-                )
+                if target_field:
+
+                    normalized_json[target_field] = (
+                        normalized_value
+                    )
+
+                else:
+
+                    set_nested_value(
+                        parent,
+                        key,
+                        normalized_value,
+                    )
 
         return normalized_json
 

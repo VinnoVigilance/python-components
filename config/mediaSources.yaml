@@ -1,0 +1,1022 @@
+global:
+  mapping:
+    file: data/rules/mediaMapping.xlsx
+
+  pre_normalization:
+    file: data/rules/mediaPreNormalization.xlsx
+
+  post_normalization:
+    file: data/rules/mediaPostNormalization.xlsx
+
+
+sources:
+  NBI_PRESS_RELEASES:
+    enabled: true
+    active: true
+
+    source_name: NBI
+    dataset_name: NBI_PRESS_RELEASES
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+
+    url: https://nbi.gov.ph/press_releases/
+
+    date_order: MDY
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 2
+        randomize_download_delay: true
+        retry_times: 3
+
+        retry_http_codes:
+          - 408
+          - 429
+          - 500
+          - 502
+          - 503
+          - 504
+          - 521
+          - 522
+          - 524
+
+    discovery:
+      strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
+
+      start_url: https://nbi.gov.ph/press_releases/
+      start_page: 1
+
+      pagination:
+        type: page_number
+        url_pattern: "https://nbi.gov.ph/press_releases/page/{page}/"
+
+      article:
+        link_selector: "h2 a"
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: "/(\\d+)/?$"
+
+      Title:
+        selector: "h1"
+        output: text
+
+      date.originalValue:
+        selector: "body"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: "Posted on\\s+([A-Za-z]+\\s+\\d{1,2},\\s+\\d{4})\\s+by\\s+"
+
+      AuthorName:
+        selector: "body"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: "Posted on\\s+[A-Za-z]+\\s+\\d{1,2},\\s+\\d{4}\\s+by\\s+(.+?)\\s+PRESS STATEMENT\\b"
+
+      BodyText:
+        selector: ".entry-content"
+        output: text
+
+    parser:
+      type: html
+
+    identity:
+      external_id:
+        field: SourceRecordId
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId
+
+  AMLC_NEWS_AND_ANNOUNCEMENTS:
+    enabled: true
+    active: true
+
+    source_name: AMLC
+    dataset_name: AMLC_NEWS_AND_ANNOUNCEMENTS
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+    date_order: YMD
+
+    source_page_url: https://www.amlc.gov.ph/news-and-announcements
+
+    url: https://www.amlc.gov.ph/api/news/combined/feed
+
+    acquisition:
+      type: api
+      download_method: API
+
+    discovery:
+      policy: full_scan
+
+    api_config:
+      pagination:
+        type: page
+        page_param: page
+        size_param: limit
+        page_size: 100
+        start_page: 1
+
+      items_path: data
+
+      write_mode: record_files
+      record_id_path: id
+
+      transport: requests
+      timeout: 30
+      retry: 3
+      retry_delay_seconds: 1
+      retry_backoff_multiplier: 2
+      retry_max_delay_seconds: 8
+      throttle_delay: 0.2
+
+    parser:
+      type: json
+
+    identity:
+      external_id:
+        field: id
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - id
+
+    preprocessing:
+      - handler: build_url_from_template
+        level: record
+        config:
+          output_field: SourceURL
+          template: "https://www.amlc.gov.ph/news-and-announcements/{slug}"
+
+  PCIJ_CORRUPTION_WATCH:
+    enabled: true
+    active: true
+
+    source_name: PCIJ
+    dataset_name: PCIJ_CORRUPTION_WATCH
+    dataset_category: News Article
+
+    schedule: daily
+
+    url: https://pcij.org/category/corruption-watch/
+
+    date_order: MDY
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 2
+        randomize_download_delay: true
+        retry_times: 3
+
+        retry_http_codes:
+          - 408
+          - 429
+          - 500
+          - 502
+          - 503
+          - 504
+          - 521
+          - 522
+          - 524
+
+    discovery:
+      strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
+
+      start_url: https://pcij.org/category/corruption-watch/
+      start_page: 1
+
+      pagination:
+        type: page_number
+        url_pattern: "https://pcij.org/category/corruption-watch/page/{page}/"
+
+      article:
+        link_selector: "#main h2.entry-title a"
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: "//[^/]+/(.+?)/*$"
+
+      Title:
+        selector: "h1.entry-title"
+        output: text
+
+      date.originalValue:
+        selector: ".entry-header time.entry-date"
+        output: attribute
+        attribute: datetime
+
+      AuthorName:
+        selector: ".entry-header .byline"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: "[Bb]y\\s+(.+)"
+
+      BodyText:
+        selector: ".entry-content"
+        output: text
+
+      TableEmbedUrls:
+        selector: ".entry-content .flourish-table"
+        output: attribute
+        attribute: data-src
+        multiple: true
+        prefix: "https://public.flourish.studio/"
+
+      ChartEmbedUrls:
+        selector: ".entry-content .flourish-chart"
+        output: attribute
+        attribute: data-src
+        multiple: true
+        prefix: "https://public.flourish.studio/"
+
+      DashboardEmbedUrls:
+        selector: ".entry-content iframe[src*='datawrapper']"
+        output: attribute
+        attribute: src
+        multiple: true
+
+      DocumentUrls:
+        selector: ".entry-content .wp-block-file__embed"
+        output: attribute
+        attribute: data
+        multiple: true
+
+      EmbeddedPdfUrls:
+        selector: ".entry-content iframe[src*='.pdf']"
+        output: attribute
+        attribute: src
+        multiple: true
+
+      FeaturedImageUrl:
+        selector: "meta[property='og:image']"
+        output: attribute
+        attribute: content
+
+      TagNames:
+        selector: ".entry-footer .tags-links a[rel='tag']"
+        output: text
+        multiple: true
+
+    parser:
+      type: html
+
+    identity:
+      external_id:
+        field: SourceRecordId
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId
+
+  PCIJ_INVESTIGATIVE_REPORTS:
+    enabled: true
+    active: true
+
+    source_name: PCIJ
+    dataset_name: PCIJ_INVESTIGATIVE_REPORTS
+    dataset_category: News Article
+
+    schedule: daily
+
+    url: https://pcij.org/tag/investigative-reports/
+
+    date_order: MDY
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 2
+        randomize_download_delay: true
+        retry_times: 3
+
+        retry_http_codes:
+          - 408
+          - 429
+          - 500
+          - 502
+          - 503
+          - 504
+          - 521
+          - 522
+          - 524
+
+    discovery:
+      strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
+
+      start_url: https://pcij.org/tag/investigative-reports/
+      start_page: 1
+
+      pagination:
+        type: page_number
+        url_pattern: "https://pcij.org/tag/investigative-reports/page/{page}/"
+
+      article:
+        link_selector: "#main h2.entry-title a"
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: "//[^/]+/(.+?)/*$"
+
+      Title:
+        selector: "h1.entry-title"
+        output: text
+
+      date.originalValue:
+        selector: ".entry-header time.entry-date"
+        output: attribute
+        attribute: datetime
+
+      AuthorName:
+        selector: ".entry-header .byline"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: "[Bb]y\\s+(.+)"
+
+      BodyText:
+        selector: ".entry-content"
+        output: text
+
+      TableEmbedUrls:
+        selector: ".entry-content .flourish-table"
+        output: attribute
+        attribute: data-src
+        multiple: true
+        prefix: "https://public.flourish.studio/"
+
+      ChartEmbedUrls:
+        selector: ".entry-content .flourish-chart"
+        output: attribute
+        attribute: data-src
+        multiple: true
+        prefix: "https://public.flourish.studio/"
+
+      DashboardEmbedUrls:
+        selector: ".entry-content iframe[src*='datawrapper']"
+        output: attribute
+        attribute: src
+        multiple: true
+
+      DocumentUrls:
+        selector: ".entry-content .wp-block-file__embed"
+        output: attribute
+        attribute: data
+        multiple: true
+
+      EmbeddedPdfUrls:
+        selector: ".entry-content iframe[src*='.pdf']"
+        output: attribute
+        attribute: src
+        multiple: true
+
+      FeaturedImageUrl:
+        selector: "meta[property='og:image']"
+        output: attribute
+        attribute: content
+
+      TagNames:
+        selector: ".entry-footer .tags-links a[rel='tag']"
+        output: text
+        multiple: true
+
+    parser:
+      type: html
+
+    identity:
+      external_id:
+        field: SourceRecordId
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId
+
+  DOJ_PH_NEWS:
+    enabled: true
+    active: true
+
+    source_name: DOJ_PH
+    dataset_name: DOJ_PH_NEWS
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+
+    url: https://www.doj.gov.ph/news.html
+
+    date_order: DMY
+
+    acquisition:
+      type: crawler
+      spider: media
+      fetch_strategy: saved_html
+      download_method: BYPASS
+
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 2
+        randomize_download_delay: true
+        retry_times: 3
+
+    bypass_config:
+      challenge: cloudflare
+      headless: false
+      timeout_seconds: 120
+
+      success_criteria:
+        - "News Articles"
+
+      actions:
+        - action: wait
+          type: selector
+          selector: "#blog-full-width"
+          timeout: 120
+
+        - action: save_html
+          filename_pattern: "{source}_{list}_{timestamp}.html"
+
+      validation:
+        required_content:
+          - "news_article.html?newsid="
+
+        min_size_bytes: 10000
+
+    detail_fetch_strategy: browser
+
+    detail_browser:
+      headless: false
+      timeout_seconds: 120
+
+      wait_selector: ".single-post .post-content"
+
+      success_criteria:
+        - "More News Articles"
+
+    storage:
+      save_detail_pages: true
+      reuse_saved_detail_pages: false
+      minimum_detail_size_bytes: 5000
+
+    discovery:
+      strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
+
+      start_url: https://www.doj.gov.ph/news.html
+      start_page: 1
+
+      pagination:
+        type: none
+
+      article:
+        link_selector: "#blog-full-width h3.blogpost-title a, #blog-full-width table td[align='justify'] > a"
+
+        # DOJ regenerates the newsid query token on every listing request.
+        # Published date + normalized title stays stable for the same article.
+        identity_fields:
+          ListingPublishedDate:
+            source: xpath
+            selectors:
+              - "ancestor::article[1]//*[contains(concat(' ', normalize-space(@class), ' '), ' blog-meta ')]/span[1]//text()"
+              - "ancestor::tr[1]/td[1]//text()"
+
+          ListingTitle:
+            source: link_text
+            required: false
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      Title:
+        selector: ".global-page-header h2"
+        output: text
+
+      Summary:
+        selector: "meta[name='description']"
+        output: attribute
+        attribute: content
+
+      date.originalValue:
+        selector: ".global-page-header .portfolio-meta span"
+        output: text
+
+      BodyOriginalValue:
+        selector: ".single-post .post-content"
+        output: html
+
+    parser:
+      type: html
+
+    identity:
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - ListingPublishedDate
+          - ListingTitle
+
+        hash: true
+
+  UK_GOV_NEWS_COMMUNICATIONS:
+    enabled: true
+    active: true
+
+    source_name: UK_GOV
+    dataset_name: UK_GOV_NEWS_COMMUNICATIONS
+    dataset_category: News Article
+
+    schedule: daily
+    date_order: YMD
+
+    source_page_url: https://www.gov.uk/search/news-and-communications
+
+    url: https://www.gov.uk/api/search.json
+
+    acquisition:
+      type: api
+      download_method: API
+
+    discovery:
+      policy: stop_after_known
+      threshold: 10
+
+    api_config:
+      params:
+        filter_content_purpose_supergroup: news_and_communications
+        reject_content_purpose_subgroup: decisions
+        order: "-public_timestamp"
+        fields: "title,link,description,public_timestamp,updated_at,content_store_document_type,format,organisations,primary_publishing_organisation,people,roles,world_locations,topical_events,content_id,content_purpose_subgroup,indexable_content"
+
+      pagination:
+        type: offset
+        offset_param: start
+        size_param: count
+        page_size: 1000
+        start_page: 0
+
+      items_path: results
+
+      write_mode: record_files
+      record_id_path: link
+
+      transport: requests
+      timeout: 30
+      retry: 3
+      retry_delay_seconds: 1
+      retry_backoff_multiplier: 2
+      retry_max_delay_seconds: 8
+      throttle_delay: 0.5
+
+    parser:
+      type: json
+
+    identity:
+      external_id:
+        field: content_id
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - content_id
+
+    preprocessing:
+      - handler: build_url_from_template
+        level: record
+        config:
+          output_field: SourceURL
+          template: "https://www.gov.uk{link}"
+
+      - handler: build_url_from_template
+        level: record
+        config:
+          output_field: ContentApiUrl
+          template: "https://www.gov.uk/api/content{link}"
+
+  DTI_PH_FAIR_TRADE_PRESS_RELEASES:
+    enabled: true
+    active: true
+
+    source_name: DTI_PH
+    dataset_name: DTI_PH_FAIR_TRADE_PRESS_RELEASES
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+    date_order: DMY
+
+    source_page_url: https://fairtrade.dti.gov.ph/resources/media/press-release/
+
+    url: https://fairtrade.dti.gov.ph/wp-json/wp/v2/posts
+
+    acquisition:
+      type: api
+      download_method: API
+
+    discovery:
+      policy: stop_after_known
+      threshold: 10
+
+    api_config:
+      params:
+        categories: 23
+        _embed: 1
+        orderby: date
+        order: desc
+
+      pagination:
+        type: page
+        page_param: page
+        size_param: per_page
+        page_size: 100
+        start_page: 1
+
+      items_path: ""
+
+      write_mode: record_files
+      record_id_path: id
+
+      transport: requests
+      timeout: 30
+      retry: 3
+      throttle_delay: 0.5
+
+    parser:
+      type: json
+
+    identity:
+      external_id:
+        field: id
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - id
+
+  PTV_NEWS:
+    enabled: true
+    active: true
+
+    source_name: PTV
+    dataset_name: PTV_NEWS
+    dataset_category: News Article
+
+    schedule: daily
+    date_order: YMD
+
+    source_page_url: https://ptvnews.ph/category/nation/local-news/
+
+    url: https://ptvnews.ph/wp-json/wp/v2/posts
+
+    acquisition:
+      type: api
+      download_method: API
+
+    discovery:
+      policy: stop_after_known
+      threshold: 10
+
+    api_config:
+      params:
+        categories: "180,181,2"
+        _embed: 1
+        orderby: date
+        order: desc
+
+      pagination:
+        type: page
+        page_param: page
+        size_param: per_page
+        page_size: 20
+        start_page: 1
+
+      items_path: ""
+
+      write_mode: record_files
+      record_id_path: id
+
+      transport: requests
+      timeout: 180
+      retry: 3
+      throttle_delay: 0.5
+
+    parser:
+      type: json
+
+    identity:
+      external_id:
+        field: id
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - id
+
+  SEC_PH_ADVISORIES:
+    enabled: true
+    active: true
+
+    source_name: SEC_PH
+    dataset_name: SEC_PH_ADVISORIES
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+
+    url: https://www.sec.gov.ph/investors-education-and-information/advisories/
+
+    date_order: DMY
+
+    acquisition:
+      type: crawler
+      spider: media
+      fetch_strategy: saved_html
+      download_method: BYPASS
+
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 2
+        randomize_download_delay: true
+        retry_times: 3
+
+    bypass_config:
+      challenge: cloudflare
+      headless: false
+      timeout_seconds: 120
+
+      actions:
+        - action: wait
+          type: selector
+          selector: "ul.lcp_catlist"
+          timeout: 120
+
+        - action: save_html
+          filename_pattern: "{source}_{list}_{timestamp}.html"
+
+      validation:
+        required_content:
+          - "lcp_catlist"
+
+        min_size_bytes: 10000
+
+    detail_fetch_strategy: browser
+
+    detail_browser:
+      headless: false
+      timeout_seconds: 120
+
+      wait_selector: ".tb_text_wrap"
+
+    storage:
+      save_detail_pages: true
+      reuse_saved_detail_pages: false
+      minimum_detail_size_bytes: 5000
+
+    document_download:
+      required: true
+      store_as_record_file: true
+      url_fields:
+        - PdfButtonUrl
+        - PdfViewerUrl
+
+    discovery:
+      strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
+
+      start_url: https://www.sec.gov.ph/investors-education-and-information/advisories/
+      start_page: 1
+
+      pagination:
+        type: none
+
+      article:
+        link_selector: "ul.lcp_catlist li a"
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: "//[^/]+/(.+?)/*$"
+
+      PostId:
+        selector: "article[id^='post-']"
+        output: attribute
+        attribute: id
+        extraction:
+          strategy: regex
+          pattern: 'post-(\d+)'
+
+      Title:
+        selector: "h1.entry-title"
+        output: text
+
+      date.originalValue:
+        selector: "meta[property='article:published_time']"
+        output: attribute
+        attribute: content
+
+      DateModified:
+        selector: "script.yoast-schema-graph"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: '"dateModified":"([^"]+)"'
+
+      AuthorName:
+        selector: "script.yoast-schema-graph"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: '"author":\{"name":"([^"]+)"'
+
+      Language:
+        selector: "script.yoast-schema-graph"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: '"inLanguage":"([a-z]{2})'
+
+      ArticleSection:
+        selector: "script.yoast-schema-graph"
+        output: text
+        extraction:
+          strategy: regex
+          pattern: '"articleSection":\[([^\]]*)\]'
+
+      HtmlBodyText:
+        selector: ".module_column.col4-3 .tb_text_wrap > div:not(.wp-block-cgb-block-algori-pdf-viewer)"
+        output: text
+
+      PdfButtonUrl:
+        selector: ".module-buttons a[href*='.pdf']"
+        output: attribute
+        attribute: href
+
+      PdfViewerUrl:
+        selector: "iframe.wp-block-cgb-block-algori-pdf-viewer-iframe"
+        output: html
+        extraction:
+          strategy: regex
+          pattern: '(?:file=|src=")([^"&?]+?\.pdf)'
+
+    parser:
+      type: pdf
+      mode: text
+
+    identity:
+      external_id:
+        field: PostId
+
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId
+
+
+  ADB_CASE_SUMMARIES:
+    enabled: true
+    active: true
+
+    source_name: ADB
+    dataset_name: ADB_CASE_SUMMARIES
+    dataset_category: PRESS_RELEASE
+
+    schedule: daily
+
+    url: https://www.adb.org/who-we-are/integrity/case-summaries
+
+    date_order: DMY
+
+    acquisition:
+      type: crawler
+      spider: media
+      fetch_strategy: saved_html
+      download_method: BYPASS
+
+    bypass_config:
+      challenge: cloudflare
+      headless: false
+      timeout_seconds: 120
+
+      actions:
+        - action: wait
+          type: selector
+          selector: "table.table-striped"
+          timeout: 120
+
+        - action: save_html
+          filename_pattern: "{source}_{list}_{timestamp}.html"
+
+      validation:
+        required_content:
+          - "Case Summaries"
+          - "table-striped"
+
+        min_size_bytes: 10000
+
+    discovery:
+      strategy: list_only
+      policy: full_scan
+
+      start_url: https://www.adb.org/who-we-are/integrity/case-summaries
+
+      article:
+        row_selector: "table.table-striped tbody tr"
+
+        identity_fields:
+          CaseNumber:
+            source: xpath
+            selectors:
+              - "./td[3]//text()"
+
+          EntityType:
+            source: xpath
+            selectors:
+              - "./td[4]//text()"
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      date.originalValue:
+        selector: "td:nth-child(1)"
+        output: text
+
+      BodyText:
+        selector: "td:nth-child(2)"
+        output: text
+
+      CaseNumber:
+        selector: "td:nth-child(3)"
+        output: text
+
+      EntityType:
+        selector: "td:nth-child(4)"
+        output: text
+
+      SanctionPeriod:
+        selector: "td:nth-child(5)"
+        output: text
+
+    parser:
+      type: html
+
+    identity:
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - CaseNumber
+          - EntityType

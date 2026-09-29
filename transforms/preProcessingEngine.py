@@ -1,10 +1,11 @@
 import hashlib
+import json
 import os
 import re
+from string import Formatter
 from urllib.parse import unquote, urlparse
 
 from nameparser import HumanName
-from scrapy import Selector
 
 
 # "NA" is intentionally excluded: it is Namibia's ISO country code, not a
@@ -191,92 +192,47 @@ class PreProcessingEngine:
 
         return list(grouped.values())
 
-    def enrich_atc_profile_data(self, record, config):
-        profile_dir = config.get(
-            "profile_dir",
-            "downloads/profiles",
-        )
+    def enrich_from_attachment(self, record, config):
+        """Load a per-record detail file (keyed off a stub field) and return the
+        list_detail shape ``{source_record_id, list, detail}``, so mapping reads
+        ``list.*``/``detail.*``. Unchanged if the key or detail file is missing.
 
-        images_dir = config.get(
-            "images_dir",
-            "downloads/images",
-        )
+        config: attachments_dir, key_field, filename_template (default
+        "{key}.json"), id_field/list_field/detail_field."""
 
-        detail_url = str(
-            record.get("detail_url", "")
-        ).strip()
+        attachments_dir = config.get("attachments_dir")
+        key_field = config.get("key_field")
 
-        if not detail_url:
+        if not attachments_dir or not key_field:
             return record
 
-        slug = detail_url.rstrip("/").split("/")[-1]
-        file_base_name = slug.replace("-", " ").upper()
+        key = str(record.get(key_field, "")).strip()
 
-        profile_file_name = (
-            f"{file_base_name} _ Anti-Terrorism Council.html"
-        )
-
-        profile_file = os.path.join(
-            profile_dir,
-            profile_file_name,
-        )
-
-        if not os.path.exists(profile_file):
+        if not key:
             return record
 
-        with open(
-            profile_file,
-            "r",
-            encoding="utf-8",
-        ) as file:
-            html = file.read()
+        safe_key = key
 
-        selector = Selector(text=html)
-        profile_fields = {}
+        for char in '/\\:*?"<>|':
+            safe_key = safe_key.replace(char, "-")
 
-        rows = selector.xpath("//article//table//tr")
+        filename = config.get(
+            "filename_template", "{key}.json"
+        ).format(key=safe_key)
 
-        for row in rows:
-            key = row.xpath("./td[1]//text()").getall()
-            value = row.xpath("./td[2]//text()").getall()
+        file_path = os.path.join(attachments_dir, filename)
 
-            key = " ".join(key).strip()
-            value = " ".join(value).strip()
+        if not os.path.exists(file_path):
+            return record
 
-            if not key:
-                continue
+        with open(file_path, "r", encoding="utf-8") as handle:
+            detail = json.load(handle)
 
-            profile_fields[key] = value
-
-        image_urls = selector.xpath(
-            "//article//img/@src"
-        ).getall()
-
-        local_images = []
-
-        if os.path.exists(images_dir):
-            for file_name in os.listdir(images_dir):
-                image_name = os.path.splitext(
-                    file_name
-                )[0].lower()
-
-                if image_name == slug.lower():
-                    local_images.append(
-                        os.path.join(
-                            images_dir,
-                            file_name,
-                        )
-                    )
-
-        record["profile_data"] = {
-            "profile_file": profile_file,
-            "profile_slug": slug,
-            "profile_fields": profile_fields,
-            "image_urls": image_urls,
-            "local_images": local_images,
+        return {
+            config.get("id_field", "source_record_id"): key,
+            config.get("list_field", "list"): record,
+            config.get("detail_field", "detail"): detail,
         }
-
-        return record
 
     def detect_entity_type(self, record, config):
         input_field = config["input_field"]
@@ -307,6 +263,7 @@ class PreProcessingEngine:
             "BOOKKEEPING",
             "AUDITING",
             "CONSULTANCY",
+            "CONSTRUCTION",
             "BUSINESS",
             "GROUP",
             "TRADING",
@@ -352,6 +309,67 @@ class PreProcessingEngine:
 
         return record
 
+    def build_url_from_template(self, record, config):
+        output_field = config.get(
+            "output_field",
+            "SourceURL",
+        )
+
+        template = config.get(
+            "template"
+        )
+
+        if not template:
+            raise ValueError(
+                "build_url_from_template requires template."
+            )
+
+        overwrite = config.get(
+            "overwrite",
+            False,
+        )
+
+        current_value = record.get(
+            output_field
+        )
+
+        if (
+            not overwrite
+            and current_value is not None
+            and str(current_value).strip()
+        ):
+            return record
+
+        template_fields = {
+            field_name
+            for _, field_name, _, _
+            in Formatter().parse(template)
+            if field_name
+        }
+
+        missing_fields = [
+            field_name
+            for field_name in template_fields
+            if (
+                record.get(field_name) is None
+                or str(
+                    record.get(field_name)
+                ).strip() == ""
+            )
+        ]
+
+        if missing_fields:
+            raise ValueError(
+                "Cannot build URL. Missing template "
+                f"field(s): {', '.join(sorted(missing_fields))}"
+            )
+
+        record[output_field] = (
+            template.format_map(record)
+        )
+
+        return record
+
     def generate_atc_unique_id(self, record, config):
         name_field = config.get("name_field", "name")
 
@@ -367,9 +385,11 @@ class PreProcessingEngine:
 
         prefix = config.get("prefix", "ATC")
 
-        name = str(record.get(name_field, "")).strip()
+        name = str(
+            self._resolve_field(record, name_field, "")
+        ).strip()
         resolution_text = str(
-            record.get(resolution_field, "")
+            self._resolve_field(record, resolution_field, "")
         ).strip()
 
         match = re.search(
@@ -425,7 +445,7 @@ class PreProcessingEngine:
     ):
         input_field = config.get(
             "input_field",
-            "profile_data.profile_fields.Date and Place of Birth",
+            "detail.date_and_place_of_birth",
         )
 
         date_output_field = config.get(
@@ -474,28 +494,6 @@ class PreProcessingEngine:
 
         return record
 
-    def clean_atc_profile_name_fields(
-        self,
-        record,
-        config,
-    ):
-        fields = config.get("fields", [])
-
-        profile_fields = (
-            record.get("profile_data", {})
-            .get("profile_fields", {})
-        )
-
-        for field in fields:
-            value = str(
-                profile_fields.get(field, "")
-            ).strip()
-
-            if value.upper() in EMPTY_VALUES:
-                profile_fields[field] = ""
-
-        return record
-    
     def filter_missing_required_field(self, records, config):
         required_field = config["field"]
 
@@ -546,9 +544,16 @@ class PreProcessingEngine:
         values = []
 
         for field in fields:
-            value = str(
-                record.get(field, "")
-            ).strip()
+            resolved = record
+
+            for part in field.split("."):
+                resolved = (
+                    resolved.get(part)
+                    if isinstance(resolved, dict)
+                    else None
+                )
+
+            value = str(resolved or "").strip()
 
             values.append(value.upper())
 
@@ -566,3 +571,208 @@ class PreProcessingEngine:
             record[output_field] = digest
 
         return record
+
+    def explode_nested_records(self, records, config):
+        """
+        Fan a nested list out into one record per item (dataset-level).
+
+        Turns a parent that carries a nested list (e.g. one election contest
+        holding many candidates) into many flat records -- one per child --
+        so each child can become its own watchlist member downstream. Nothing
+        here is source-specific: any "parent object -> nested list of
+        children" shape reuses it by writing config, not code.
+
+        config:
+            match_field   only explode parents whose match_field equals
+                          match_value; omit to explode every parent.
+            match_value   the value match_field must equal (compared as text).
+            list_path     dot-path to the child list inside each parent,
+                          e.g. "candidates.candidates".
+            carry_fields  {source_dot_path: output_field} -- values read from
+                          the parent by dot-path and copied onto every child,
+                          so parent-level context (contest code, statistics)
+                          rides along with each exploded record.
+
+        A child that is not a dict is wrapped as {"value": child}. carry_fields
+        use setdefault, so a child that already holds the key keeps its value.
+        """
+        match_field = config.get("match_field")
+        match_value = config.get("match_value")
+        list_path = config["list_path"]
+        carry_fields = config.get("carry_fields", {})
+
+        exploded = []
+
+        for record in records:
+            if (
+                match_field is not None
+                and str(record.get(match_field, "")) != str(match_value)
+            ):
+                continue
+
+            children = record
+
+            for part in list_path.split("."):
+                children = (
+                    children.get(part, {})
+                    if isinstance(children, dict)
+                    else {}
+                )
+
+            if not isinstance(children, list):
+                continue
+
+            carried = {}
+
+            for source_path, output_field in carry_fields.items():
+                value = record
+
+                for part in source_path.split("."):
+                    value = (
+                        value.get(part)
+                        if isinstance(value, dict)
+                        else None
+                    )
+
+                carried[output_field] = value
+
+            for child in children:
+                new_record = (
+                    dict(child)
+                    if isinstance(child, dict)
+                    else {"value": child}
+                )
+
+                for key, value in carried.items():
+                    new_record.setdefault(key, value)
+
+                exploded.append(new_record)
+
+        return exploded
+
+    def split_field_regex(self, record, config):
+        """
+        Split one field into several sibling fields via a named-group regex.
+
+        The record-level counterpart of pre-normalization's SplitPatternHandler:
+        instead of emitting a list of objects for an array field, it writes each
+        captured group onto the SAME record as a plain field. Use it when a
+        source packs several values into one string
+        ("66. VILLAR, CAMILLE (NP)" -> ballot number, name, party) and those
+        parts are needed early -- e.g. the ballot number becomes the record's
+        external id, which must exist before the raw member is stored (so this
+        cannot wait for pre-normalization). Generic: the regex and the
+        group->field mapping live in config, so any packed-string field is
+        handled by config, not code.
+
+        config:
+            input_field   field to read and split.
+            pattern       regex with (?P<name>...) named groups.
+            outputs       {group_name: output_field}. A group that did not
+                          match (optional group, or no overall match) writes ""
+                          so the output field always exists.
+        """
+        resolved = record
+        for part in config["input_field"].split("."):
+            resolved = resolved.get(part) if isinstance(resolved, dict) else None
+        value = str(resolved or "").strip()
+        match = re.match(config["pattern"], value)
+
+        for group_name, output_field in config["outputs"].items():
+            captured = match.group(group_name) if match else None
+            record[output_field] = captured.strip() if captured else ""
+
+        return record
+
+    def resolve_reference(self, record, config):
+        """
+        Resolve a per-record key against a co-located list and project fields.
+
+        Generic keyed lookup: derive a key from the record, find the one item in
+        `list_field` whose own key equals it, then copy chosen sub-fields of that
+        item onto the record. Any "row references one entry in an attached/shared
+        list" shape reuses it by config, not code. Keys can be read verbatim or
+        pulled out of free text with a regex, so an id embedded in a label
+        ("... *12", "code: 14") works the same as a plain id field. No match
+        leaves the outputs at `default` and keeps the record.
+
+        config:
+            key_field     dot-path to the value holding the record's key.
+            key_pattern   optional regex; group(1) (else whole match) is the key.
+            list_field    dot-path to the list of candidate items.
+            item_key      sub-field of each item holding its key.
+            item_pattern  optional regex applied to item_key before comparing.
+            outputs       {item_subfield: output_field} copied from the match.
+            default       written to every output when nothing matches ("").
+        """
+
+        def dig(obj, path):
+            for part in path.split("."):
+                obj = obj.get(part) if isinstance(obj, dict) else None
+            return obj
+
+        def key_of(text, pattern):
+            text = "" if text is None else str(text)
+            if not pattern:
+                return text.strip()
+            found = re.search(pattern, text)
+            if not found:
+                return ""
+            return (found.group(1) if found.groups() else found.group(0)).strip()
+
+        record_key = key_of(dig(record, config["key_field"]), config.get("key_pattern"))
+        items = dig(record, config["list_field"]) or []
+
+        chosen = None
+
+        if record_key:
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                if key_of(item.get(config["item_key"]), config.get("item_pattern")) == record_key:
+                    chosen = item
+                    break
+
+        default = config.get("default", "")
+
+        for item_subfield, output_field in config["outputs"].items():
+            record[output_field] = (chosen or {}).get(item_subfield, default)
+
+        return record
+
+    def normalize_empty_fields(self, record, config):
+        """Normalize source empty markers in flat or dotted fields."""
+
+        for field_path in config.get("fields", []):
+            parts = field_path.split(".")
+            parent = record
+
+            for part in parts[:-1]:
+                if not isinstance(parent, dict):
+                    parent = None
+                    break
+
+                parent = parent.get(part)
+
+            if not isinstance(parent, dict) or parts[-1] not in parent:
+                continue
+
+            value = parent.get(parts[-1])
+            normalized = "" if value is None else str(value).strip()
+
+            if normalized.upper() in EMPTY_VALUES:
+                parent[parts[-1]] = ""
+
+        return record
+
+    @staticmethod
+    def _resolve_field(record, field_path, default=None):
+        value = record
+
+        for part in str(field_path).split("."):
+            if not isinstance(value, dict):
+                return default
+
+            value = value.get(part, default)
+
+        return value

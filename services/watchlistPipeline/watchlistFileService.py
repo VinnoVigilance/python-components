@@ -1,6 +1,6 @@
 import mimetypes
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -10,20 +10,22 @@ from ingestion.apiCollector.interface import ApiCollectorTask, collect
 from ingestion.crawler.interface import crawl
 from ingestion.crawler.models import CrawlerTask
 from ingestion.downloader.models import DownloadTask
-from ingestion.apiCollector.interface import collect, ApiCollectorTask
 from ingestion.bypassCollector import BypassCollector
+from repositories import jobStateRepository
 from repositories import watchlistFileLogRepository
 from repositories import watchlistFileRepository
 from utils.hashing import calculate_file_hash
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
+WATCHLIST_HOLD_KIND = "watchlist"
 
 
 @dataclass
 class AcquisitionResult:
     source_file_path: Path
     records: list[dict[str, Any]] | None = None
+    broken_details: list[dict[str, Any]] = field(default_factory=list)
 
 
 def acquire_source(config: dict[str, Any], downloader: Any) -> AcquisitionResult:
@@ -55,9 +57,12 @@ def acquire_source(config: dict[str, Any], downloader: Any) -> AcquisitionResult
                 f"Crawler source file was not found: {source_file_path}"
             )
 
+        broken = hold_incomplete_crawl(config, crawl_result, source_file_path)
+
         return AcquisitionResult(
             source_file_path=source_file_path,
             records=crawl_result.records,
+            broken_details=broken,
         )
 
     source_file_path = acquire_source_file(
@@ -66,6 +71,106 @@ def acquire_source(config: dict[str, Any], downloader: Any) -> AcquisitionResult
     )
 
     return AcquisitionResult(source_file_path=source_file_path)
+
+
+class CrawlOnHold(Exception):
+    """A crawl missed detail pages, so its list waits in a holding file."""
+
+    def __init__(self, watchlist_name: str, expected_count: int, missing: list[dict]):
+        self.watchlist_name = watchlist_name
+        self.expected_count = expected_count
+        self.missing = missing
+        self.missing_urls = [item["detail_url"] for item in missing]
+        super().__init__(
+            f"{watchlist_name} is waiting: read {expected_count - len(missing)} of "
+            f"{expected_count} detail pages. Missing: {', '.join(self.missing_urls[:10])}"
+        )
+
+
+def _broken_on_source(missing: list[dict]) -> list[dict]:
+    return [item for item in missing if item.get("permanent")]
+
+
+def hold_incomplete_crawl(
+    config: dict[str, Any],
+    crawl_result: Any,
+    source_file_path: Path,
+) -> list[dict]:
+    """Hold a crawl that missed pages for temporary reasons; return pages broken on the source."""
+
+    watchlist_name = config["list_name"]
+    broken = _broken_on_source(crawl_result.missing_details)
+
+    if len(broken) == crawl_result.missing_detail_count:
+        jobStateRepository.delete_state(WATCHLIST_HOLD_KIND, watchlist_name)
+        return broken
+
+    now = datetime.now(timezone.utc).isoformat()
+    jobStateRepository.save_state(
+        WATCHLIST_HOLD_KIND,
+        watchlist_name,
+        {
+            "watchlist_name": watchlist_name,
+            "source_file_path": str(source_file_path),
+            "held_at": now,
+            "last_tried_at": now,
+            "attempts": 1,
+            "expected_count": crawl_result.selected_detail_count,
+            "records": crawl_result.records,
+            "missing": crawl_result.missing_details,
+        },
+    )
+
+    raise CrawlOnHold(
+        watchlist_name,
+        crawl_result.selected_detail_count,
+        crawl_result.missing_details,
+    )
+
+
+def retry_held_crawl(config: dict[str, Any]) -> AcquisitionResult | None:
+    """Fetch a held list's missing detail pages; return the full list once complete."""
+
+    watchlist_name = config["list_name"]
+    held = jobStateRepository.load_state(WATCHLIST_HOLD_KIND, watchlist_name)
+
+    if held is None:
+        return None
+
+    crawl_result = crawl(
+        CrawlerTask(
+            url=config["url"],
+            source_name=config["source_name"],
+            list_name=watchlist_name,
+            source_config_path=str((ROOT_DIR / config["source_config"]).resolve()),
+            source_file_path=held["source_file_path"],
+            download_dir=str(ROOT_DIR / "data" / "downloads"),
+            detail_items=held["missing"],
+        )
+    )
+
+    held.update(
+        attempts=held["attempts"] + 1,
+        last_tried_at=datetime.now(timezone.utc).isoformat(),
+        records=held["records"] + crawl_result.records,
+        missing=crawl_result.missing_details,
+    )
+
+    broken = _broken_on_source(crawl_result.missing_details)
+
+    if len(broken) < crawl_result.missing_detail_count:
+        jobStateRepository.save_state(WATCHLIST_HOLD_KIND, watchlist_name, held)
+        raise CrawlOnHold(watchlist_name, held["expected_count"], held["missing"])
+
+    return AcquisitionResult(
+        source_file_path=Path(held["source_file_path"]),
+        records=held["records"],
+        broken_details=broken,
+    )
+
+
+def release_held_crawl(config: dict[str, Any]) -> None:
+    jobStateRepository.delete_state(WATCHLIST_HOLD_KIND, config["list_name"])
 
 
 def calculate_file_metadata(
@@ -147,24 +252,7 @@ def _get_manual_file(local_path: str) -> Path:
 def _collect_api_source(config: dict[str, Any]) -> Path:
     """Acquire an API-based source into a JSONL snapshot."""
 
-    api_config = config.get("api_config", {})
-
-    task = ApiCollectorTask(
-        url=config["url"],
-        source_name=config["source_name"],
-        list_name=config.get("list_name", config["source_name"]),
-        pagination=api_config.get("pagination", {}),
-        items_path=api_config.get("items_path", "items"),
-        params=api_config.get("params", {}),
-        param_variants=api_config.get("param_variants", []),
-        headers=api_config.get("headers", {}),
-        timeout=api_config.get("timeout", 30),
-        retry=api_config.get("retry", 3),
-        throttle_delay=api_config.get("throttle_delay", 0.0),
-        write_mode=api_config.get("write_mode", "single_jsonl"),
-    )
-
-    collected_path = collect(task)
+    collected_path = collect(ApiCollectorTask.from_config(config))
     source_file_path = Path(collected_path).resolve()
 
     if not source_file_path.exists():

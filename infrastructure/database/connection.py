@@ -13,10 +13,14 @@ for two reasons:
 
 Call sites are unchanged: ``connection_pool.getconn()`` and
 ``connection_pool.putconn(conn)`` work exactly as before.
-"""
 
+you can also use get_db_connection() for AUTO safe transactions with rollback on failure and release 
+"""
+import logging
+from contextlib import contextmanager
 from psycopg2.pool import ThreadedConnectionPool
 
+logger = logging.getLogger(__name__)
 
 class _LazyConnectionPool:
     """A stand-in for ThreadedConnectionPool that builds itself on first use."""
@@ -38,14 +42,13 @@ class _LazyConnectionPool:
 
             self._pool = ThreadedConnectionPool(
                 minconn=1,
-                maxconn=10,
+                maxconn=20, # Bumped maxconn to 20 to support background workers
                 host=DB_HOST,
                 port=DB_PORT,
                 dbname=DB_NAME,
                 user=DB_USER,
                 password=DB_PASSWORD,
             )
-
         return self._pool
 
     def getconn(self, *args, **kwargs):
@@ -59,4 +62,28 @@ class _LazyConnectionPool:
             self._pool.closeall()
 
 
+# Original singleton instance
 connection_pool = _LazyConnectionPool()
+
+
+@contextmanager
+def get_db_connection():
+    """
+    Context manager that yields a connection from the pool.
+    Automatically commits on success, rolls back on exceptions, 
+    and returns the connection to the pool.
+    
+    Do not requires the developers to manually write 
+    try...except...finally blocks at every call site 
+    to commit, rollback, and return the connection.
+    """
+    conn = connection_pool.getconn()
+    try:
+        yield conn
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Transaction rolled back automatically due to error: {str(e)}")
+        raise e
+    finally:
+        connection_pool.putconn(conn)

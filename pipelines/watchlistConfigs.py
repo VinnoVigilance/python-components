@@ -1,5 +1,3 @@
-# pipelines/watchlist_configs.py
-
 WATCHLIST_CONFIGS = {
     "DFAT": {
         "source_name": "DFAT",
@@ -65,7 +63,6 @@ WATCHLIST_CONFIGS = {
         "filename_aliases": ["UK-Sanctions-List"],
     },
 
-
     "DNFBP": {
         "source_name": "AMLC",
         "date_order": "MDY",
@@ -105,21 +102,22 @@ WATCHLIST_CONFIGS = {
             "ATC-DESIGNATED-TERRORIST-INDIVIDUALS"
         ),
         "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
         "url": "https://atc.gov.ph/individuals/",
         "file_type": "html",
+        "source_config": (
+            "config/watchlistSources/"
+            "atc_designated_terrorist_individuals.yaml"
+        ),
         "external_id_path": "unique_id",
+        "minimum_record_count": 50,
         "schedule": "daily",
         "versioning_strategy": "continuous",
         "bypass_config": {
-            # Declare the challenge; the collector picks the engine that
-            # clears it (cloudflare -> stealth browser). No runtime detection.
             "challenge": "cloudflare",
-            # False = run a VISIBLE browser window (often needed so the
-            # anti-bot challenge clears); set True only on a headless server.
             "headless": False,
             "timeout_seconds": 90,
             "success_criteria": ["Designated Terrorist Individuals"],
-
             "actions": [
                 {
                     "action": "navigate",
@@ -132,11 +130,51 @@ WATCHLIST_CONFIGS = {
                     "timeout": 60
                 },
                 {
+                    "action": "execute_js",
+                    "await": True,
+                    "script": """(async () => {
+  const tableId = 'tablepress-33';
+  const table = document.getElementById(tableId);
+  if (!table) return 0;
+
+  const api = window.DT_TP && window.DT_TP['33'];
+  if (api && api.page && api.page.len) {
+    api.page.len(-1).draw();
+  } else {
+    const select = document.querySelector(
+      `select[aria-controls="${tableId}"]`
+    );
+    if (select) {
+      if (![...select.options].some(o => o.value === '-1')) {
+        select.add(new Option('All', '-1'));
+      }
+      select.value = '-1';
+      select.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const count = table.querySelectorAll('tbody tr').length;
+    if (count >= 50) return count;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return table.querySelectorAll('tbody tr').length;
+})()""",
+                },
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "#tablepress-33 tbody "
+                        "tr:nth-child(50)"
+                    ),
+                    "timeout": 15,
+                },
+                {
                     "action": "save_html",
                     "filename_pattern": "{source}_{list}_{timestamp}.html"
                 }
             ],
-            
             "validation": {
                 "required_content": [
                     "Designated Terrorist",
@@ -146,46 +184,31 @@ WATCHLIST_CONFIGS = {
                 "min_size_bytes": 10000
             }
         },
-        "profile_dir": "data/downloads/profiles",
         "attachments": [
             {
                 "scope": "member",
                 "attachment_type": "DOCUMENT",
-                "local_path_field": (
-                    "profile_data.profile_file"
-                ),
+                "local_path_field": "detail_file_path",
                 "source_url_field": "detail_url",
-            },
-            {
-                "scope": "member",
-                "attachment_type": "PHOTO",
-                "local_path_field": (
-                    "profile_data.local_images"
-                ),
-                "source_url_field": (
-                    "profile_data.image_urls"
-                ),
             },
         ],
         "preprocessing": [
-           {
-                "handler": "enrich_atc_profile_data",
+            {
+                "handler": "set_constant_field",
                 "level": "record",
-                "relative_path_fields": [
-                    "profile_dir",
-                    "images_dir",
-                ],
                 "config": {
-                    "profile_dir": "attachments/profiles",
-                    "images_dir": "attachments/images",
+                    "output_field": "entity_type",
+                    "value": "Individual",
                 },
             },
             {
                 "handler": "generate_atc_unique_id",
                 "level": "record",
                 "config": {
-                    "name_field": "name",
-                    "resolution_field": "atc_resolution_no",
+                    "name_field": "list.name",
+                    "resolution_field": (
+                        "list.atc_resolution_no"
+                    ),
                     "output_field": "unique_id",
                     "prefix": "ATC",
                 },
@@ -197,20 +220,19 @@ WATCHLIST_CONFIGS = {
                 "level": "record",
                 "config": {
                     "input_field": (
-                        "profile_data.profile_fields."
-                        "Date and Place of Birth"
+                        "detail.date_and_place_of_birth"
                     ),
                     "date_output_field": "atc_birth_date",
                     "place_output_field": "atc_birth_place",
                 },
             },
             {
-                "handler": "clean_atc_profile_name_fields",
+                "handler": "normalize_empty_fields",
                 "level": "record",
                 "config": {
                     "fields": [
-                        "Variant/s",
-                        "Alias/es",
+                        "detail.variants",
+                        "detail.aliases",
                     ],
                 },
             },
@@ -230,21 +252,22 @@ WATCHLIST_CONFIGS = {
         "date_order": "DMY",
         "list_name": "ATC-DESIGNATED-TERRORIST-GROUPS",
         "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
         "versioning_strategy": "continuous",
         "url": "https://atc.gov.ph/groups/",
         "file_type": "html",
+        "source_config": (
+            "config/watchlistSources/"
+            "atc_designated_terrorist_groups.yaml"
+        ),
         "external_id_path": "unique_id",
+        "minimum_record_count": 25,
         "schedule": "daily",
         "bypass_config": {
-            # Declare the challenge; the collector picks the engine that
-            # clears it (cloudflare -> stealth browser). No runtime detection.
             "challenge": "cloudflare",
-            # False = run a VISIBLE browser window (often needed so the
-            # anti-bot challenge clears); set True only on a headless server.
             "headless": False,
             "timeout_seconds": 90,
             "success_criteria": ["Designated Terrorist Groups"],
-
             "actions": [
                 {
                     "action": "navigate",
@@ -257,11 +280,51 @@ WATCHLIST_CONFIGS = {
                     "timeout": 60
                 },
                 {
+                    "action": "execute_js",
+                    "await": True,
+                    "script": """(async () => {
+  const tableId = 'tablepress-31';
+  const table = document.getElementById(tableId);
+  if (!table) return 0;
+
+  const api = window.DT_TP && window.DT_TP['31'];
+  if (api && api.page && api.page.len) {
+    api.page.len(-1).draw();
+  } else {
+    const select = document.querySelector(
+      `select[aria-controls="${tableId}"]`
+    );
+    if (select) {
+      if (![...select.options].some(o => o.value === '-1')) {
+        select.add(new Option('All', '-1'));
+      }
+      select.value = '-1';
+      select.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const count = table.querySelectorAll('tbody tr').length;
+    if (count >= 25) return count;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return table.querySelectorAll('tbody tr').length;
+})()""",
+                },
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "#tablepress-31 tbody "
+                        "tr:nth-child(25)"
+                    ),
+                    "timeout": 15,
+                },
+                {
                     "action": "save_html",
                     "filename_pattern": "{source}_{list}_{timestamp}.html"
                 }
             ],
-
             "validation": {
                 "required_content": [
                     "Designated Terrorist",
@@ -273,11 +336,21 @@ WATCHLIST_CONFIGS = {
         },
         "preprocessing": [
             {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
                 "handler": "generate_atc_unique_id",
                 "level": "record",
                 "config": {
-                    "name_field": "name",
-                    "resolution_field": "atc_resolution_no",
+                    "name_field": "list.name",
+                    "resolution_field": (
+                        "list.atc_resolution_no"
+                    ),
                     "output_field": "unique_id",
                     "prefix": "ATC",
                 },
@@ -331,6 +404,7 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
     "UN-SANCTIONS": {
         "source_name": "UN",
         "list_name": "UN-SANCTIONS",
@@ -342,8 +416,9 @@ WATCHLIST_CONFIGS = {
         "filename_aliases": ["UN"],
         "download_method": "HTTPS",
         "versioning_strategy": "continuous",
-
+        "schedule": "daily",
     },
+
     "EU-FINANCIAL-SANCTIONS": {
         "source_name": "EU",
         "list_name": "EU-FINANCIAL-SANCTIONS",
@@ -355,6 +430,7 @@ WATCHLIST_CONFIGS = {
         "filename_aliases": ["EU"],
         "download_method": "HTTPS",
         "versioning_strategy": "continuous",
+        "schedule": "daily",
     },
 
     "SECO-SANCTIONS": {
@@ -400,13 +476,10 @@ WATCHLIST_CONFIGS = {
         "source_name": "DILG",
         "date_order": "DMY",
         "list_name": "DILG-LOCAL-OFFICIALS",
-
         "download_method": "HTTPS",
-
         "url": (
             r"https://region5.dilg.gov.ph/wp-content/uploads/2026/05/Masterlist-of-Local-Officials-2025-2028.pdf"
         ),
-
         "url_resolver": {
             "type": "link_text",
             "source_page_url": (
@@ -414,15 +487,10 @@ WATCHLIST_CONFIGS = {
             ),
             "value": "Masterlist of Local Officials",
         },
-
         "file_type": "pdf",
-
         "external_id_path": "unique_id",
-
         "schedule": "daily",
-
         "versioning_strategy": "continuous",
-
         "parser_config": {
             "expected_headers": [
                 "REGION",
@@ -432,7 +500,6 @@ WATCHLIST_CONFIGS = {
                 "NAME",
             ],
         },
-
         "preprocessing": [
             {
                 "handler": "generate_composite_id",
@@ -452,7 +519,7 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
-        "CFTC-RED-LIST": {
+    "CFTC-RED-LIST": {
         "source_name": "CFTC",
         "date_order": "MDY",
         "list_name": "CFTC-RED-LIST",
@@ -482,6 +549,105 @@ WATCHLIST_CONFIGS = {
             }
         ],
     },
+
+    "EU-MOST-WANTED": {
+        "source_name": "EU",
+        "date_order": "MDY",
+        "list_name": "EU-MOST-WANTED",
+        "download_method": "CRAWLER",
+        "url": "https://eumostwanted.eu/",
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/eu_most_wanted.yaml",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+    },
+
+    "CIA-WORLD-LEADERS-HISTORICAL": {
+        "source_name": "CIA",
+        "list_name": "CIA-WORLD-LEADERS-HISTORICAL",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": "https://www.cia.gov/resources/world-leaders/foreign-governments/",
+        "file_type": "html",
+        "external_id_path": "external_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/cia_world_leaders.yaml",
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "headless": True,
+            "timeout_seconds": 120,
+            "success_criteria": ["Foreign Governments"],
+            "actions": [
+                {
+                    "action": "execute_js",
+                    "await": True,
+                    "script": """(async () => {
+  const sel = [...document.querySelectorAll('select')]
+    .find(s => [...s.options].some(o => /^all$/i.test(o.textContent.trim())));
+  if (sel) {
+    const opt = [...sel.options].find(o => /^all$/i.test(o.textContent.trim()));
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLSelectElement.prototype, 'value').set;
+    setter.call(sel, opt.value);
+    sel.dispatchEvent(new Event('input', {bubbles: true}));
+    sel.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  const count = () => document.querySelectorAll(
+    'a[href*="/foreign-governments/"]').length;
+  for (let i = 0; i < 60; i++) {
+    if (count() >= 190) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return count();
+})()""",
+                },
+                {"action": "wait", "type": "time", "seconds": 2},
+                {
+                    "action": "save_html",
+                    "filename_pattern": "{source}_{list}_{timestamp}.html",
+                },
+            ],
+            "validation": {
+                "required_content": ["/foreign-governments/"],
+                "min_size_bytes": 10000,
+            },
+        },
+        "preprocessing": [
+            {
+                "handler": "explode_nested_records",
+                "level": "dataset",
+                "config": {
+                    "list_path": "detail.leaders",
+                    "carry_fields": {
+                        "detail.country": "country",
+                        "detail.last_updated": "last_updated",
+                        "detail.note": "note",
+                    },
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["country", "position"],
+                    "output_field": "external_id",
+                    "prefix": "CIA-WORLD-LEADERS-HISTORICAL",
+                },
+            },
+        ],
+    },
+
     "GPPB-BLACKLISTED-ENTITIES": {
         "source_name": "GPPB",
         "date_order": "YMD",
@@ -578,6 +744,707 @@ WATCHLIST_CONFIGS = {
                 "config": {
                     "output_field": "entity_type",
                     "value": "Entity",
+                },
+            },
+        ],
+    },
+
+    "INTERPOL-RED-NOTICES": {
+        "source_name": "INTERPOL",
+        "list_name": "INTERPOL-RED-NOTICES",
+        "date_order": "DMY",
+        "download_method": "API",
+        "url": "https://ws-public.interpol.int/notices/v1/red",
+        "file_type": "jsonl",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "enrich_from_attachment",
+                "level": "record",
+                "relative_path_fields": ["attachments_dir"],
+                "config": {
+                    "attachments_dir": "attachments/members",
+                    "key_field": "entity_id",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "source_record_id",
+                        "list.name",
+                        "list.forename",
+                        "detail.date_of_birth",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "INTERPOL",
+                },
+            },
+        ],
+        "api_config": {
+            "transport": "browser",
+            "bypass_config": {
+                "headless": False,
+                "warmup_url": "https://www.interpol.int/How-we-work/Notices/Red-Notices/View-Red-Notices",
+                "timeout_seconds": 90,
+                "min_request_interval": 0.2,
+                "fetch_retries": 6,
+                "fetch_retry_delay": 1.0,
+                "fetch_backoff": 2.0,
+                "fetch_max_delay": 30.0,
+            },
+            "pagination": {
+                "type": "page",
+                "page_param": "page",
+                "size_param": "resultPerPage",
+                "page_size": 160,
+                "start_page": 1,
+            },
+            "faceting": {
+                "enabled": True,
+                "cap": 160,
+                "total_path": "total",
+                "facets": [
+                    {"type": "enum", "param": "sexId", "values": ["M", "F", "U"]},
+                    {
+                        "type": "range",
+                        "min_param": "ageMin",
+                        "max_param": "ageMax",
+                        "low": 0,
+                        "high": 120,
+                    },
+                    {"type": "substring", "param": "name", "max_depth": 1},
+                    {"type": "substring", "param": "forename", "max_depth": 1},
+                    {
+                        "type": "enum",
+                        "param": "arrestWarrantCountryId",
+                        "values_ref": "country_codes",
+                        "disjoint": False,
+                    },
+                    {
+                        "type": "enum",
+                        "param": "nationality",
+                        "values_ref": "country_codes",
+                        "disjoint": False,
+                        "complete": False,
+                    },
+                ],
+            },
+            "items_path": "_embedded.notices",
+            "detail": {"url_path": "_links.self.href"},
+            "record_shape": {"id_path": "entity_id"},
+            "dedup_path": "source_record_id",
+            "throttle_delay": 0.3,
+            "write_mode": "list_detail",
+        },
+    },
+"COMELEC-2025-SENATORS": {
+        "source_name": "COMELEC",
+        "list_name": "COMELEC-2025-SENATORS",
+        "date_order": "YMD",
+        "download_method": "BYPASS",
+        "url": "https://2025electionresults.comelec.gov.ph/coc-result",
+        "file_type": "json",
+        "items_path": "national",
+        "external_id_path": "ballot_number",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "bypass_config": {
+            "challenge": "cloudflare",
+            "headless": False,
+            "timeout_seconds": 120,
+            "actions": [
+                {
+                    "action": "save_json",
+                    "url": "https://2025electionresults.comelec.gov.ph/data/coc/0.json",
+                    "filename_pattern": "{list}_{timestamp}.json",
+                },
+            ],
+        },
+        "preprocessing": [
+            {
+                "handler": "explode_nested_records",
+                "level": "dataset",
+                "config": {
+                    "match_field": "contestCode",
+                    "match_value": "00399000",
+                    "list_path": "candidates.candidates",
+                    "carry_fields": {
+                        "contestCode": "contestCode",
+                        "contestName": "contestName",
+                        "statistic.overVotes": "overVotes",
+                        "statistic.underVotes": "underVotes",
+                        "statistic.validVotes": "validVotes",
+                        "statistic.obtainedVotes": "obtainedVotes",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name",
+                    "pattern": (
+                        r"^(?P<ballot_number>\d+)\.\s*"
+                        r"(?P<name>[^(]+?)\s*"
+                        r"(?:\((?P<party>[^)]*)\))?\s*$"
+                    ),
+                    "outputs": {
+                        "ballot_number": "ballot_number",
+                        "name": "name",
+                        "party": "party",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name",
+                    "pattern": r"^(?P<last_name>[^,]+),\s*(?P<first_name>.+)$",
+                    "outputs": {
+                        "last_name": "last_name",
+                        "first_name": "first_name",
+                    },
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "country_code",
+                    "value": "PH",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "election_year",
+                    "value": "2025",
+                },
+            },
+        ],
+    },
+
+    "PH-HOUSE-MEMBERS": {
+        "source_name": "CONGRESS-PH",
+        "date_order": "MDY",
+        "list_name": "PH-HOUSE-MEMBERS",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.congress.gov.ph/"
+            "house-members"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "ph_house_members.yaml"
+        ),
+        "minimum_record_count": 250,
+        "bypass_config": {
+            "challenge": "cloudflare",
+            "headless": False,
+            "timeout_seconds": 120,
+            "success_criteria": [
+                "House Members",
+            ],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "a[href*='/house-members/view/']"
+                    ),
+                    "timeout": 90,
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": (
+                        "{source}_{list}_"
+                        "{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "Full Name",
+                    "Representing",
+                    "/house-members/view/",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": (
+                        "jurisdiction_country"
+                    ),
+                    "value": "Philippines",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": (
+                        "jurisdiction_code"
+                    ),
+                    "value": "PH",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "congress",
+                    "value": "20th Congress",
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "output_field": "source_url",
+                    "template": (
+                        "https://www.congress.gov.ph/"
+                        "house-members/view/"
+                        "{source_record_id}"
+                    ),
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "detail.profile_name",
+                    "pattern": r'^(?P<last_name>[^,]+),(?P<_pre>[^"]*)("(?P<nickname>[^"]+)")?.*$',
+                    "outputs": {
+                        "last_name": "last_name",
+                        "nickname": "nickname",
+                    },
+                },
+            },
+        ],
+    },
+
+    "US-MARSHALS-PROFILED-FUGITIVES": {
+        "source_name": "US-MARSHALS",
+        "list_name": "US-MARSHALS-PROFILED-FUGITIVES",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.usmarshals.gov/what-we-do/"
+            "fugitive-apprehension/profiled-fugitives"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "us_marshals_profiled_fugitives.yaml"
+        ),
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "source_record_id",
+                        "list.name",
+                        "detail.date_of_birth",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "US-MARSHALS",
+                },
+            },
+        ],
+        "bypass_config": {
+            "challenge": "akamai",
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": ["Profiled Fugitives"],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "div.usms-most-wanted",
+                    "timeout": 60,
+                },
+                {
+                    "action": "save_paginated_html",
+                    "page_param": "page",
+                    "start_page": 0,
+                    "max_pages": 40,
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "usms-most-wanted",
+                    "Learn more",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+    },
+
+    "US-STATE-TERRORIST-EXCLUSION": {
+        "source_name": "US-STATE",
+        "list_name": "US-STATE-TERRORIST-EXCLUSION",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.state.gov/terrorist-exclusion-list/"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "us_state_terrorist_exclusion.yaml"
+        ),
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "list.name",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "US-STATE-TEL",
+                },
+            },
+        ],
+        "bypass_config": {
+            "challenge": "akamai",
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": [
+                "Terrorist Exclusion List Designees",
+            ],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": "div.entry-content",
+                    "timeout": 60,
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "Terrorist Exclusion List Designees",
+                    "Delisted",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+    },
+
+    "NCA-MOST-WANTED": {
+        "source_name": "NCA",
+        "date_order": "YMD",
+        "list_name": "NCA-MOST-WANTED",
+        "download_method": "CRAWLER",
+        "url": (
+            "https://www.nationalcrimeagency.gov.uk/most-wanted-search"
+            "?view=search&layout=mostwanted&area=mostwanted"
+            "&menuarea=mostwanted"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/nca_most_wanted.yaml",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "list.name",
+                        "detail.crime",
+                        "detail.date_of_incident",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "NCA",
+                },
+            },
+        ],
+    },
+
+    "WORLD-BANK-DEBARRED": {
+        "source_name": "WORLD-BANK",
+        "date_order": "YMD",
+        "list_name": "WORLD-BANK-DEBARRED",
+        "download_method": "API",
+        "url": (
+            "https://apigwext.worldbank.org/dvsvc/v1.0/json/"
+            "APPLICATION/ADOBE_EXPRNCE_MGR/FIRM/SANCTIONED_FIRM"
+        ),
+        "file_type": "jsonl",
+        "external_id_path": "SUPP_ID",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "none",
+            },
+            "items_path": "response.ZPROCSUPP",
+            "headers": {
+                "apikey": "z9duUaFUiEUYSHs97CU38fcZO7ipOPvm",
+            },
+            "write_mode": "single_jsonl",
+        },
+        "preprocessing": [
+        {
+            "handler": "detect_entity_type",
+            "level": "record",
+            "config": {"input_field": "SUPP_NAME", "output_field": "entity_type"},
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r".*Reg\.?\s*No[.:\s]+(?P<reg>[A-Za-z0-9./-]+)",
+                "outputs": {"reg": "wb_reg_no"},
+            },
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r".*(?:f/?k/?a|formerly known as|FKA)[\s:]*(?P<fka>[^)*]+)",
+                "outputs": {"fka": "wb_fka"},
+            },
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r".*(?:a/?k/?a|also known as|d/?b/?a|doing business as|now known as)[\s:]*(?P<aka>[^)*]+)",
+                "outputs": {"aka": "wb_aka"},
+            },
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r".*?(?P<script>[\u4e00-\u9fff\u0400-\u04ff][\u4e00-\u9fff\u0400-\u04ff\s,\u3000()（）]*[\u4e00-\u9fff\u0400-\u04ff])",
+                "outputs": {"script": "wb_orig_script"},
+            },
+        },
+        {
+            "handler": "split_field_regex",
+            "level": "record",
+            "config": {
+                "input_field": "ADD_SUPP_INFO",
+                "pattern": r"(?P<note>.*?)\s*(?:\*\d+)?\s*$",
+                "outputs": {"note": "wb_add_note"},
+            },
+        },
+    ],
+    },
+
+    "WORLD-BANK-OTHER-SANCTIONS": {
+        "source_name": "WORLD-BANK",
+        "date_order": "MDY",
+        "list_name": "WORLD-BANK-OTHER-SANCTIONS",
+        "download_method": "HTTPS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.worldbank.org/en/projects-operations/"
+            "procurement/debarred-firms"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/world_bank_other_sanctions.yaml"
+        ),
+        "preprocessing": [
+            {
+                "handler": "resolve_reference",
+                "level": "record",
+                "config": {
+                    "key_field": "list.name_raw",
+                    "key_pattern": r"\*(\d+)",
+                    "list_field": "list.footnotes",
+                    "item_key": "text",
+                    "item_pattern": r"\*(\d+)",
+                    "outputs": {
+                        "text": "wb_footnote_text",
+                        "pdf_urls": "wb_footnote_pdfs",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "list.date_of_sanction",
+                    "pattern": r"(?P<from>.+?)\s*[-–—]\s*(?P<to>.+)$",
+                    "outputs": {"from": "wb_sanction_from", "to": "wb_sanction_to"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "list.date_of_sanction",
+                    "pattern": r"(?i)^(?P<period>ongoing)$",
+                    "outputs": {"period": "wb_sanction_period"},
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["list.name_raw"],
+                    "output_field": "source_record_id",
+                    "prefix": "WORLD-BANK-OTHER-SANCTIONS",
+                },
+            },
+        ],
+    },
+
+    "ADB-DEBARMENT-SUSPENSION": {
+        "source_name": "ADB",
+        "date_order": "YMD",
+        "list_name": "ADB-DEBARMENT-SUSPENSION",
+        "download_method": "API",
+        "url": "https://apim.adb.org/sanctions/lists/v1/published-list",
+        "file_type": "jsonl",
+        "external_id_path": "id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "offset",
+                "offset_param": "offset",
+                "size_param": "size",
+                "page_size": 100,
+                "start_page": 0,
+            },
+            "items_path": "data",
+            "params": {
+                "sortField": "Name",
+                "isAscending": True,
+            },
+            "dedup_path": "id",
+            "write_mode": "single_jsonl",
+        },
+    },
+
+    "AFDB-DEBARRED-ENTITIES": {
+        "source_name": "AFDB",
+        "list_name": "AFDB-DEBARRED-ENTITIES",
+        "date_order": "YMD",
+        "download_method": "BYPASS",
+        "url": "https://www.afdb.org/en/debarred-entities-json-feed",
+        "file_type": "json",
+        "external_id_path": "unique_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "bypass_config": {
+            "challenge": "cloudflare",
+            "headless": False,
+            "timeout_seconds": 120,
+            "actions": [
+                {
+                    "action": "save_json",
+                    "url": "https://www.afdb.org/en/debarred-entities-json-feed",
+                    "filename_pattern": "{list}_{timestamp}.json",
+                },
+            ],
+        },
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["Name", "Nationality", "From", "Basis"],
+                    "output_field": "unique_id",
+                    "prefix": "AFDB",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "Name",
+                    "pattern": (
+                        r"(?is)^(?P<primary_name>.+?)\s*"
+                        r"(?P<alias_blob>,?\s*\(?\s*"
+                        r"(?:(?:also|formerly|previously)\s+known\s+as"
+                        r"|(?:also\s+)?doing\s+business\s+as"
+                        r"|formerly(?:\s+operating\s+as)?"
+                        r"|\baka\b|\bfka\b)(?!\w).*)?$"
+                    ),
+                    "outputs": {
+                        "primary_name": "primary_name",
+                        "alias_blob": "alias_blob",
+                    },
                 },
             },
         ],

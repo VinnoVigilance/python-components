@@ -5,7 +5,8 @@ import pdfplumber
 
 class PdfParser:
     """
-    PDF parser for tabular watchlist files.
+    PDF parser for tabular watchlist files, with a text mode
+    (config ``parser: {mode: text}``) returning the whole document text.
 
     Output:
         A list of dictionaries.
@@ -66,6 +67,22 @@ class PdfParser:
             )
 
         config = config or {}
+
+        text_mode = (
+            str(
+                (config.get("parser") or {}).get("mode", "")
+            ).strip().lower()
+            == "text"
+        )
+
+        if text_mode:
+            text = "\n\n".join(
+                self._page_texts(pdf_path)
+            )
+
+            return [
+                {"BodyText": text or None}
+            ]
 
         parser_config = config.get(
             "parser_config",
@@ -185,6 +202,17 @@ class PdfParser:
                     )
 
         return "\n".join(pages_text)
+
+    def _page_texts(self, pdf_path):
+        """Return the stripped, non-empty text of each page, in order."""
+
+        with pdfplumber.open(pdf_path) as pdf:
+            page_texts = [
+                (page.extract_text() or "").strip()
+                for page in pdf.pages
+            ]
+
+        return [text for text in page_texts if text]
 
     def _find_header_row(
         self,

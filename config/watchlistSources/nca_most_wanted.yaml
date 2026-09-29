@@ -1,0 +1,129 @@
+fetch_strategy: direct
+
+record_mode: list_detail
+
+discovery:
+  row_selector: ".mw-search-page .item"
+  detail_link_selector: ".item-image a"
+  detail_link_attribute: "href"
+
+list_fields:
+  name:
+    selector: "h3"
+    selector_type: css
+    value: text
+
+  summary:
+    selector: ".intro-text p"
+    selector_type: css
+    value: text
+
+  thumbnail:
+    selector: ".item-image img"
+    selector_type: css
+    value: attribute
+    attribute: src
+    as_attachment: Thumbnail
+
+detail_fields:
+  status:
+    selector: ".item-page .page-header .label"
+    selector_type: css
+    value: text
+
+  description:
+    selector: "//div[@itemprop='articleBody']//text()"
+    selector_type: xpath
+    value: text
+    join: " "
+
+  location:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Location:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  date_of_incident:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Date of Incident:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  crime:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Crime:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  sex:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Sex:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  age_range:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Age Range:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  height:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Height:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  build:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Build:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  hair_colour:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Hair Colour:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  hair_length:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Hair Length:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  ethnic_appearance:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Ethnic Appearance:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+  additional_information:
+    selector: "//span[contains(@class,'field-label')][normalize-space()='Additional Information:']/following-sibling::span[contains(@class,'field-value')][1]//text()"
+    selector_type: xpath
+    value: text
+
+page_fields:
+  source_note:
+    selector: "//div[@id='mod-custom113']//div[contains(@class,'category-desc')]//text()"
+    selector_type: xpath
+    value: text
+    join: " "
+
+  safety_warning:
+    selector: "//div[@id='mod-custom113']//div[contains(@style,'ffb151')]//text()"
+    selector_type: xpath
+    value: text
+    join: " "
+
+attachments:
+  - type: Profile
+    role: detail_page
+
+  - type: Photograph
+    selector: "figure.item-image img"
+    attribute: "src"
+    multiple: true
+
+record_id:
+  strategy: url_regex
+  source: detail_url
+  pattern: "/most-wanted/([a-z0-9-]+)"
+
+storage:
+  save_listing_page: true
+  save_detail_pages: true
+
+  listing_role: primary
+  detail_role: attachment
+
+  detail_directory: attachments/members

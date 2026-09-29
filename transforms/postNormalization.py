@@ -4,8 +4,17 @@ import html
 from copy import deepcopy
 from datetime import date, datetime
 import re
+import unicodedata
 
-from transforms.dateResolver import parse_date_string, resolve_dates
+from inscriptis import get_text
+
+from transforms.dateResolver import (
+    parse_date_string,
+    resolve_dates,
+    read_day,
+    read_month,
+    read_year,
+)
 from transforms.searchEnrichment import (
     normalize_text,
     tokenize,
@@ -50,6 +59,19 @@ def empty_dependency_handler(entity, rule, config=None):
     entity[tgt_list_name] = tgt_list
 
 
+def _iso_or_blank(text, date_order):
+    """Full date -> ISO 'YYYY-MM-DD'; non-date -> ''; partial -> None (keep as written)."""
+    parsed = parse_date_string(text, date_order)
+
+    if parsed and parsed[0] and parsed[1] and parsed[2]:
+        return f"{parsed[0]}-{parsed[1]}-{parsed[2]}"
+
+    if not parsed:
+        return ""
+
+    return None
+
+
 def date_normalization_handler(entity, rule, config=None):
     # If a DATE_NORMALIZATION rule is running then date_order genuinely
     # decides how ambiguous dates read (03/04 as 3 Apr under DMY vs 4 Mar
@@ -87,19 +109,16 @@ def date_normalization_handler(entity, rule, config=None):
                 if leaf not in item:
                     continue
 
-                parsed = parse_date_string(item.get(leaf), date_order)
                 # Only a whole date earns an ISO value (the resolver's own rule);
                 # a non-date (empty, junk, PERMANENT) is blanked so a permanent
                 # measure reads as "no end", partial dates are left as written.
-                if parsed and parsed[0] and parsed[1] and parsed[2]:
-                    item[leaf] = f"{parsed[0]}-{parsed[1]}-{parsed[2]}"
-                elif not parsed:
-                    item[leaf] = ""
+                iso = _iso_or_blank(item.get(leaf), date_order)
+
+                if iso is not None:
+                    item[leaf] = iso
 
         return
 
-    # Row-array mode (the original behaviour): resolve a whole Dates[]-style
-    # array of date rows into normalised rows.
     source_path = rule["condition_path"]
 
     if source_path not in entity:
@@ -107,11 +126,106 @@ def date_normalization_handler(entity, rule, config=None):
 
     values = entity.get(source_path)
 
-    if not isinstance(values, list):
+    # Row-array mode (the original behaviour): resolve a whole Dates[]-style
+    # array of date rows into normalised rows.
+    if isinstance(values, list):
+        entity[source_path] = resolve_dates(values, date_order)
         return
 
-    entity[source_path] = resolve_dates(values, date_order)
+    # Top-level scalar mode: a flat date string field (e.g. DateAdded,
+    # DateUpdated) reformatted to one ISO shape by the same resolver rules.
+    if isinstance(values, str) and values.strip():
+        iso = _iso_or_blank(values, date_order)
 
+        if iso is not None:
+            entity[source_path] = iso
+
+
+def date_component_handler(entity, rule, config=None):
+    """Normalize standalone day/month/year leaves on an array (e.g. Occupations[]
+    Since/To parts) via the resolver's read_day/read_month/read_year."""
+    array_name = str(rule["condition_path"]).split("[]")[0].strip(". ")
+    items = entity.get(array_name)
+
+    if not isinstance(items, list):
+        return
+
+    readers = {"day": read_day, "month": read_month, "year": read_year}
+    spec = _parse_kv(rule.get("value"))
+
+    for mode, reader in readers.items():
+        leaves = [
+            leaf.strip()
+            for leaf in spec.get(mode, "").split(",")
+            if leaf.strip()
+        ]
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            for leaf in leaves:
+                if leaf not in item:
+                    continue
+
+                item[leaf] = reader(item.get(leaf))
+
+
+def normalize_body_text_handler(entity, rule, config=None):
+    """Create normalized plain text from Content.BodyOriginalValue."""
+
+    content = entity.get("Content")
+
+    if not isinstance(content, dict):
+        return
+
+    if "BodyOriginalValue" not in content:
+        return
+
+    original_value = content.get("BodyOriginalValue")
+
+    if original_value is None:
+        content["BodyText"] = None
+        return
+
+    if not isinstance(original_value, str):
+        raise TypeError(
+            "Content.BodyOriginalValue must be a string or None."
+        )
+
+    # Decode encoded HTML such as &lt;p&gt; before parsing.
+    decoded_value = html.unescape(original_value)
+
+    # Convert HTML to plain text while preserving paragraph/list boundaries.
+    normalized_text = get_text(decoded_value)
+
+    # Normalize Unicode characters.
+    normalized_text = unicodedata.normalize("NFC", normalized_text)
+
+    # Normalize special spaces and line endings.
+    normalized_text = (
+        normalized_text
+        .replace("\xa0", " ")
+        .replace("\u200b", "")
+        .replace("\ufeff", "")
+        .replace("\u2028", "\n")
+        .replace("\u2029", "\n")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
+
+    # Remove additional horizontal whitespace without removing paragraphs.
+    lines = [
+        re.sub(r"[ \t]+", " ", line).strip()
+        for line in normalized_text.split("\n")
+    ]
+
+    normalized_text = "\n".join(lines)
+
+    # Keep at most one empty line between paragraphs.
+    normalized_text = re.sub(r"\n{3,}", "\n\n", normalized_text)
+
+    content["BodyText"] = normalized_text.strip()
 
 def deduplicate_all_arrays_handler(entity, rule, config=None):
 
@@ -305,14 +419,16 @@ def date_window_status_handler(entity, rule, config=None):
     the status leaf (``target_path``):
 
       * a Status already set (by mapping or the source) is left alone;
-      * no usable start *and* no usable end          -> left blank;
-      * now before the start                         -> Inactive (not begun);
-      * now after a real end                         -> Inactive (expired);
-      * otherwise -- inside the window, or a start
-        with no end (a permanent measure)            -> Active.
+      * an open-ended Duration marker (Ongoing, Permanent, Indefinitely,
+        Until Further Notice) -- in force regardless of dates    -> Active;
+      * a start that has passed AND an end still ahead           -> Active;
+      * any other date signal (past end, not-yet-begun, or a
+        start with no end and no marker)                         -> Unknown;
+      * no usable dates and no marker                            -> left blank.
 
-    A permanent measure has no end (``PERMANENT`` is not a date, so it reads as
-    "no end"), which is just "started, no end" -> Active; no special-casing here.
+    We never infer Inactive from dates: a missing or lapsed end does not prove
+    the measure ended, and screening must not silently deactivate a record. Only
+    a positive signal -- a live window or an open-ended marker -- yields Active.
 
     **Category override (config-driven, general).** A record the source has
     suspended/removed is inside its window (dates alone would say Active) but must
@@ -323,7 +439,8 @@ def date_window_status_handler(entity, rule, config=None):
 
     ``value`` config (``|`` separated, all optional):
 
-        active=Active | inactive=Inactive
+        active=Active | unknown=Unknown
+        | active_markers=Ongoing,Permanent,Indefinitely,Until Further Notice
         | hold_type=Category | hold_values=TEMPORARY_REMOVED_BLACKLISTED_ENTITIES
         | hold_status=Inactive
     """
@@ -333,8 +450,17 @@ def date_window_status_handler(entity, rule, config=None):
     _, status_leaf = _split_array_path(rule["target_path"])
 
     end_leaf = "EndDate"
+    duration_leaf = "Duration"
     active_label = cfg.get("active", "Active").strip()
-    inactive_label = cfg.get("inactive", "Inactive").strip()
+    unknown_label = cfg.get("unknown", "Unknown").strip()
+    active_markers = {
+        marker.strip().lower()
+        for marker in cfg.get(
+            "active_markers",
+            "Ongoing,Permanent,Indefinitely,Until Further Notice",
+        ).split(",")
+        if marker.strip()
+    }
 
     date_order = (config or {}).get("date_order", "DMY")
     today = datetime.now().date()
@@ -358,7 +484,12 @@ def date_window_status_handler(entity, rule, config=None):
             item[status_leaf] = hold_status
             continue
 
-        # 3. Otherwise derive it from the measure's own date window.
+        # 3. An open-ended duration marker means in force, whatever the dates.
+        if str(item.get(duration_leaf) or "").strip().lower() in active_markers:
+            item[status_leaf] = active_label
+            continue
+
+        # 4. Otherwise derive it from the measure's own date window.
         start = _as_date(item.get(start_leaf), date_order)
         end = _as_date(item.get(end_leaf), date_order)
 
@@ -366,11 +497,11 @@ def date_window_status_handler(entity, rule, config=None):
         if start is None and end is None:
             continue
 
-        begun = start is None or today >= start
-        ended = end is not None and today > end
+        begun = start is not None and today >= start
+        within_window = end is not None and today <= end
 
         item[status_leaf] = (
-            active_label if (begun and not ended) else inactive_label
+            active_label if (begun and within_window) else unknown_label
         )
 
 
@@ -455,15 +586,17 @@ HANDLERS = {
     "ENUM_NORMALIZE": enum_normalize_handler,
     "DATE_WINDOW_STATUS": date_window_status_handler,
     "SANITIZE_HTML": sanitize_html_handler,
+    "NORMALIZE_BODY_TEXT": normalize_body_text_handler,
     "SEARCH_ENRICH": search_enrich_handler,
     "DEDUPLICATE_ALL_ARRAYS": deduplicate_all_arrays_handler,
+    "DATE_COMPONENT_NORMALIZE": date_component_handler,
 }
 
 
 class PostNormalizationEngine:
 
     def __init__(self, rules_df: pd.DataFrame, config: dict):
-        self.rules_df = rules_df.sort_values("priority")
+        self.rules_df = rules_df
 
         # Carries per source settings such as date_order, so a handler
         # can read a date the way the list that published it writes them.
