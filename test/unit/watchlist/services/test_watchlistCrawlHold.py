@@ -33,12 +33,17 @@ def _missing(record_id, permanent=False):
     }
 
 
-def _crawl_result(records, missing, expected):
+def _list_only(item):
+    return {"source_record_id": item["record_id"], "list": item["list_data"], "detail": {}}
+
+
+def _crawl_result(records, missing, expected, broken=()):
     return SimpleNamespace(
         records=records,
         missing_details=missing,
         missing_detail_count=len(missing),
         selected_detail_count=expected,
+        broken_details=list(broken),
     )
 
 
@@ -58,24 +63,29 @@ class TestHoldIncompleteCrawl:
     def test_pages_broken_on_source_do_not_hold_the_list(self, tmp_path):
         gone = _missing("9", permanent=True)
 
-        broken = fs.hold_incomplete_crawl(CONFIG, _crawl_result([{}], [gone], 2), tmp_path / "l.html")
+        result = _crawl_result([{}, _list_only(gone)], [], 2, broken=[gone])
+
+        broken = fs.hold_incomplete_crawl(CONFIG, result, tmp_path / "l.html")
 
         assert broken == [gone]
         assert _held() is None
 
     def test_temporary_failure_holds_the_list(self, tmp_path):
-        records = [{"source_record_id": "1"}]
-        missing = [_missing("2"), _missing("3", permanent=True)]
+        gone = _missing("3", permanent=True)
+        records = [{"source_record_id": "1"}, _list_only(gone)]
+        missing = [_missing("2")]
+        result = _crawl_result(records, missing, 3, broken=[gone])
 
         with pytest.raises(fs.CrawlOnHold) as hold:
-            fs.hold_incomplete_crawl(CONFIG, _crawl_result(records, missing, 3), tmp_path / "l.html")
+            fs.hold_incomplete_crawl(CONFIG, result, tmp_path / "l.html")
 
         assert hold.value.expected_count == 3
-        assert hold.value.missing_urls == ["https://nca/2", "https://nca/3"]
-        assert "read 1 of 3 detail pages" in str(hold.value)
+        assert hold.value.missing_urls == ["https://nca/2"]
+        assert "read 2 of 3 detail pages" in str(hold.value)
         held = _held()
         assert held["records"] == records
         assert held["missing"] == missing
+        assert held["broken"] == [gone]
         assert held["attempts"] == 1
         assert held["source_file_path"] == str(tmp_path / "l.html")
 
@@ -115,12 +125,12 @@ class TestRetryHeldCrawl:
         self._hold(tmp_path)
         gone = _missing("3", permanent=True)
         monkeypatch.setattr(fs, "crawl", MagicMock(
-            return_value=_crawl_result([{"source_record_id": "2"}], [gone], 2)
+            return_value=_crawl_result([{"source_record_id": "2"}, _list_only(gone)], [], 2, broken=[gone])
         ))
 
         result = fs.retry_held_crawl(CONFIG)
 
-        assert len(result.records) == 2
+        assert [r["source_record_id"] for r in result.records] == ["1", "2", "3"]
         assert result.broken_details == [gone]
 
     def test_retry_still_missing_stays_held(self, monkeypatch, tmp_path):

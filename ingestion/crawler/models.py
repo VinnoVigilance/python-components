@@ -65,3 +65,6 @@ class CrawlResult:
     missing_details: list[dict[str, Any]] = field(
         default_factory=list
     )
+    broken_details: list[dict[str, Any]] = field(
+        default_factory=list
+    )

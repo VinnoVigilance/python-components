@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from scrapy.http import HtmlResponse
 
-from ingestion.crawler.crawler import _find_missing_details
+from ingestion.crawler.crawler import _find_missing_details, _keep_broken_as_list_only
 from ingestion.crawler.models import CrawlerTask
 from ingestion.crawler.spiders.genericSpider import GenericSpider
 from ingestion.crawler.spiders.mediaSpider import MediaSpider
@@ -47,6 +47,22 @@ def test_find_missing_details_compares_queued_pages_with_records():
     assert missing == [_item("2")]
 
 
+def test_broken_pages_become_list_only_records_and_are_not_missing():
+    gone = {**_item("2"), "permanent": True, "error": "HTTP 404"}
+    slow = {**_item("3"), "permanent": False, "error": "timeout"}
+    records = [{"source_record_id": "1"}]
+
+    broken = _keep_broken_as_list_only([_item("1"), gone, slow], records)
+    _, missing = _find_missing_details([_item("1"), gone, slow], records)
+
+    assert broken == [gone]
+    assert records[1] == {
+        "source_record_id": "2", "list": {"n": "2"}, "detail": {}, "attachments": [],
+        "detail_url": "https://x/2", "detail_error": "HTTP 404",
+    }
+    assert missing == [slow]
+
+
 class TestGenericSpider:
     def _spider(self, detail_items=None):
         expected = []
@@ -66,6 +82,26 @@ class TestGenericSpider:
         assert requests[0].cb_kwargs == {"list_data": {"n": "2"}, "record_id": "2",
                                          "detail_url": "https://x/2"}
         assert [item["record_id"] for item in expected] == ["2", "5"]
+
+    def test_listing_requests_skip_dupe_filter_and_repeat_ids(self):
+        spider = GenericSpider(
+            task=_task(), storage=None, records=[], expected_details=[],
+            crawler_config={
+                "discovery": {"row_selector": "tr", "detail_link_selector": "a",
+                              "detail_link_attribute": "href"},
+                "record_id": {"strategy": "url_regex", "source": "detail_url",
+                              "pattern": "/node/(\\d+)"},
+            },
+        )
+        body = (b"<table><tr><td><a href='/node/1'>A</a></td></tr>"
+                b"<tr><td><a href='//x/node/1'>A</a></td></tr>"
+                b"<tr><td><a href='/node/2'>B</a></td></tr></table>")
+        response = HtmlResponse(url="https://x/list", body=body, encoding="utf-8")
+
+        requests = list(spider.parse(response))
+
+        assert [r.cb_kwargs["record_id"] for r in requests] == ["1", "2"]
+        assert all(r.dont_filter for r in requests)
 
     @pytest.mark.parametrize("status, message, permanent", [
         (404, "Ignoring non-200 response", True),
