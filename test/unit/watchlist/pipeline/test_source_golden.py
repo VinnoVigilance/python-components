@@ -181,7 +181,7 @@ GOLDEN = {
         "ListName": "ADB-DEBARMENT-SUSPENSION", "SourceName": "ADB",
     },
     "AFDB-DEBARRED-ENTITIES": {
-        "SourceType": "Official", "DatasetCategory": "Regulatory",
+        "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "AFDB-DEBARRED-ENTITIES", "SourceName": "AFDB",
     },
 }
