@@ -2,6 +2,7 @@
 StealthBot browser engine implementation.
 """
 
+import asyncio
 import json
 import logging
 from typing import Optional, Any
@@ -16,6 +17,16 @@ from ingestion.bypassCollector.engines.compatibleDriver import (
 logger = logging.getLogger(__name__)
 
 CHALLENGE_INDICATORS = ("turnstile", "just a moment", "verify you are human")
+
+
+def _reset_closed_event_loop() -> None:
+    """Replace an event loop closed by SeleniumBase CDP mode so Scrapy can run next."""
+    try:
+        if not asyncio.get_event_loop_policy().get_event_loop().is_closed():
+            return
+    except RuntimeError:
+        pass
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
 
 class StealthBrowserEngine(BaseEngine):
@@ -96,7 +107,8 @@ class StealthBrowserEngine(BaseEngine):
                 logger.info("StealthBot closed successfully")
             except Exception as e:
                 logger.error(f"Error closing StealthBot: {type(e).__name__}: {e}")
-    
+        _reset_closed_event_loop()
+
     def navigate(self, url: str) -> bool:
         """
         Navigate to URL using safe_get.
