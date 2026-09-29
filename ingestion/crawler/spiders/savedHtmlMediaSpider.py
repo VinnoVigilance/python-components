@@ -49,6 +49,27 @@ class SavedHtmlMediaSpider(MediaSpider):
         by BypassCollector.
         """
 
+        if self.task.detail_items:
+            pending_details = [
+                {
+                    "detail_url": item["detail_url"],
+                    **self.detail_item_kwargs(item),
+                }
+                for item in self.task.detail_items
+            ]
+
+            detail_results = await asyncio.to_thread(
+                lambda: list(
+                    self._fetch_and_parse_details(
+                        pending_details
+                    )
+                )
+            )
+
+            for result in detail_results:
+                yield result
+            return
+
         source_file_path = (
             self.task.source_file_path
         )
@@ -279,26 +300,20 @@ class SavedHtmlMediaSpider(MediaSpider):
             pending_details
         ):
             if detail_response is None:
-                failed_record = {
-                    "record_key": item.get(
-                        "record_key"
+                failed_record = self.failed_detail_record(
+                    detail_url=item.get(
+                        "detail_url"
                     ),
-                    "is_known": item.get(
-                        "is_known"
-                    ),
-                    "detail_file_path": None,
-                    "extracted": None,
-                    "failed": True,
-                    "error": item.get(
+                    details=item,
+                    error=item.get(
                         "fetch_error",
                         "Media detail fetch failed.",
                     ),
-                    "error_stage": "DETAIL_FETCH",
-                    "error_type": item.get(
+                    error_type=item.get(
                         "fetch_error_type",
                         "DetailFetchError",
                     ),
-                }
+                )
 
                 self.records.append(
                     failed_record

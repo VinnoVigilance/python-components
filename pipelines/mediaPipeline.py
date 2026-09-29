@@ -36,6 +36,9 @@ from services.adverseMediaPipeline.mediaReprocessingService import (
 from services.common.pipelineVersionService import (
     PipelineVersionService,
 )
+from services.adverseMediaPipeline import (
+    mediaTodoService,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +55,7 @@ MEDIA_RUN_MODES = {
     "INITIAL",
     "INCREMENTAL",
     "REPROCESS",
+    "RETRY",
 }
 
 def normalize_media_run_mode(
@@ -561,6 +565,15 @@ def run_media_pipeline(
                 }
             )
 
+    todo_counts: dict[str, int] = {}
+
+    if run_mode != "REPROCESS":
+        todo_counts = mediaTodoService.update_items(
+            dataset_name=dataset_name,
+            acquired_records=acquisition_result.records,
+            record_results=record_results,
+        )
+
     # =====================================================
     # 6. Pipeline result
     # =====================================================
@@ -789,6 +802,8 @@ def run_media_pipeline(
             failure_summary
         ),
 
+        **todo_counts,
+
         "elapsed_seconds": round(
             perf_counter()
             - started_at,
@@ -837,7 +852,7 @@ def _parse_args() -> argparse.Namespace:
         required=True,
         type=str.upper,
         choices=sorted(MEDIA_RUN_MODES),
-        help="INITIAL, INCREMENTAL, or REPROCESS.",
+        help="INITIAL, INCREMENTAL, REPROCESS, or RETRY (the to-do list only).",
     )
 
     return parser.parse_args()

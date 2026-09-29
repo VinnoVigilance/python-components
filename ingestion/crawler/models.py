@@ -37,6 +37,7 @@ class CrawlerTask:
 
     download_dir: Optional[str] = None
     source_file_path: Optional[str] = None
+    detail_items: Optional[list[dict[str, Any]]] = None
 
 
 @dataclass
@@ -61,3 +62,6 @@ class CrawlResult:
     reached_source_end: bool | None = None
     stop_reason: str | None = None
     completed_safely: bool | None = None
+    missing_details: list[dict[str, Any]] = field(
+        default_factory=list
+    )
