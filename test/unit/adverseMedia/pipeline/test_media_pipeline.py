@@ -293,3 +293,31 @@ class TestMediaPipelineWiring:
         assert mp.media_pipeline_exit_code(
             {"run_status": status}
         ) == expected
+
+
+class TestMediaTodoList:
+
+    def test_failed_records_go_to_the_todo_list(self, monkeypatch):
+        from services.adverseMediaPipeline import mediaTodoService
+
+        _wire(monkeypatch, [
+            {"record_key": "a", "media_file_id": 10},
+            {"record_key": "bad", "failed": True, "error": "timeout",
+             "detail_url": "https://example.com/bad"},
+        ])
+
+        result = mp.run_media_pipeline("TEST_DATASET", mode="INCREMENTAL")
+
+        assert result["todo_added_count"] == 1
+        assert result["todo_pending_count"] == 1
+        [item] = mediaTodoService.load_items("TEST_DATASET")
+        assert item["kind"] == "fetch"
+        assert item["detail_url"] == "https://example.com/bad"
+
+    def test_retry_mode_is_passed_to_acquisition(self, monkeypatch):
+        mocks = _wire(monkeypatch, [{"record_key": "a", "media_file_id": 10}])
+
+        result = mp.run_media_pipeline("TEST_DATASET", mode="RETRY")
+
+        assert result["mode"] == "RETRY"
+        assert mocks.acquisition.acquire.call_args.kwargs["mode"] == "RETRY"

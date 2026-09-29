@@ -163,3 +163,40 @@ def test_article_url_is_the_raw_file_url_without_a_document(monkeypatch):
     }
 
     assert _persist_with_fakes(monkeypatch, record) == "https://example.com/article/"
+
+
+def test_retry_mode_rebuilds_records_from_the_todo_list(monkeypatch):
+    from repositories import jobStateRepository
+    from services.adverseMediaPipeline import mediaAcquisitionService as module
+
+    jobStateRepository.save_state("media", "DATA", {"items": {
+        "k1": {"kind": "process", "record_key": "k1",
+               "detail_file_path": "k1.html", "extracted": {"Title": "t"}},
+        "k2": {"kind": "fetch", "record_key": "k2", "detail_url": "https://example.test/k2"},
+    }})
+    crawl = MagicMock(return_value=SimpleNamespace(records=[{"record_key": "k2"}]))
+    monkeypatch.setattr(module, "crawl", crawl)
+
+    result = MediaAcquisitionService._acquire_todo_items(_crawler_config())
+
+    task = crawl.call_args.kwargs["task"]
+    assert [item["record_key"] for item in task.detail_items] == ["k2"]
+    assert [record["record_key"] for record in result.records] == ["k1", "k2"]
+    assert result.records[0]["detail_file_path"] == "k1.html"
+    assert result.stop_reason == "TODO_RETRY"
+
+
+def test_retry_mode_without_fetch_items_does_not_crawl(monkeypatch):
+    from repositories import jobStateRepository
+    from services.adverseMediaPipeline import mediaAcquisitionService as module
+
+    jobStateRepository.save_state("media", "DATA", {"items": {
+        "k1": {"kind": "process", "record_key": "k1", "detail_file_path": "k1.html"},
+    }})
+    crawl = MagicMock()
+    monkeypatch.setattr(module, "crawl", crawl)
+
+    result = MediaAcquisitionService._acquire_todo_items(_crawler_config())
+
+    crawl.assert_not_called()
+    assert len(result.records) == 1

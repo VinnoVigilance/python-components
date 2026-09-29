@@ -73,8 +73,14 @@ class SavedHtmlSpider(GenericSpider):
             )
         ).strip().lower()
 
-        if detail_fetch_strategy == "browser":
+        if self.task.detail_items:
+            iterator = self._iter_detail_items(
+                detail_fetch_strategy
+            )
+        else:
             iterator = self.parse(response)
+
+        if detail_fetch_strategy == "browser":
             loop = asyncio.get_running_loop()
 
             with ThreadPoolExecutor(
@@ -97,8 +103,43 @@ class SavedHtmlSpider(GenericSpider):
 
             return
 
-        for result in self.parse(response):
+        for result in iterator:
             yield result
+
+    def _iter_detail_items(
+        self,
+        detail_fetch_strategy: str,
+    ):
+        """Fetch only the given detail items, e.g. those missing from an earlier crawl."""
+
+        items = [
+            {
+                "list_data": dict(item.get("list_data") or {}),
+                "record_id": item["record_id"],
+                "detail_url": item["detail_url"],
+            }
+            for item in self.task.detail_items
+        ]
+
+        for item in items:
+            self._expect_detail(
+                item["record_id"],
+                item["detail_url"],
+                item["list_data"],
+            )
+
+        if detail_fetch_strategy == "browser":
+            yield from self._fetch_browser_details(items)
+            return
+
+        for item in items:
+            yield scrapy.Request(
+                url=item["detail_url"],
+                callback=self.parse_detail,
+                errback=self.detail_failed,
+                cb_kwargs=item,
+                dont_filter=True,
+            )
 
     def parse(self, response):
         self.current_url = response.url
@@ -256,6 +297,13 @@ class SavedHtmlSpider(GenericSpider):
                 "from saved listing HTML."
             )
 
+        for item in pending_details:
+            self._expect_detail(
+                item["record_id"],
+                item["detail_url"],
+                item["list_data"],
+            )
+
         detail_fetch_strategy = str(
             self.config.get(
                 "detail_fetch_strategy",
@@ -271,7 +319,7 @@ class SavedHtmlSpider(GenericSpider):
                     errback=(
                         self._handle_optional_detail_failure
                         if record_mode == "list_optional_detail"
-                        else None
+                        else self.detail_failed
                     ),
                     cb_kwargs=item,
                 )
@@ -358,7 +406,24 @@ class SavedHtmlSpider(GenericSpider):
                     )
                     self.records.append(record)
                     yield record
+                    continue
 
+                expected = self._expected_by_id.get(
+                    str(item.get("record_id"))
+                )
+
+                if expected is not None:
+                    expected["error"] = item.get("fetch_error")
+                    expected["permanent"] = False
+
+                self.logger.error(
+                    "Watchlist detail page failed; "
+                    "record will be missing. "
+                    "record_id=%s url=%s error=%s",
+                    item.get("record_id"),
+                    item.get("detail_url"),
+                    item.get("fetch_error"),
+                )
                 continue
 
             # GenericSpider.parse_detail builds the shared Watchlist record:

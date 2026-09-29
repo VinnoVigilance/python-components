@@ -74,6 +74,17 @@ class MediaSpider(scrapy.Spider):
         Start every discovery run from the first/newest page.
         """
 
+        if self.task.detail_items:
+            for item in self.task.detail_items:
+                yield scrapy.Request(
+                    url=item["detail_url"],
+                    callback=self.parse_detail,
+                    errback=self.detail_failed,
+                    cb_kwargs=self.detail_item_kwargs(item),
+                    dont_filter=True,
+                )
+            return
+
         start_url = self.discovery_config.get(
             "start_url",
             self.task.url,
@@ -269,6 +280,7 @@ class MediaSpider(scrapy.Spider):
                 yield scrapy.Request(
                     url=detail_url,
                     callback=self.parse_detail,
+                    errback=self.detail_failed,
                     cb_kwargs={
                         "record_key": record_key,
                         "is_known": is_known,
@@ -451,11 +463,38 @@ class MediaSpider(scrapy.Spider):
             )
         )
 
-        extracted_record = (
-            self._extract_record(
-                response
+        try:
+            extracted_record = (
+                self._extract_record(
+                    response
+                )
             )
-        )
+
+        except Exception as error:
+            self.logger.exception(
+                "Media detail extraction failed. url=%s",
+                response.url,
+            )
+
+            failed_record = self.failed_detail_record(
+                detail_url=response.url,
+                details={
+                    "record_key": record_key,
+                    "is_known": is_known,
+                    "source_record_id": source_record_id,
+                    "identity_fields": identity_fields,
+                },
+                error=str(error),
+                error_type=type(error).__name__,
+                error_stage="DETAIL_EXTRACTION",
+            )
+
+            self.records.append(
+                failed_record
+            )
+
+            yield failed_record
+            return
 
         # Ensure discovery and detail extraction use
         # the same canonical URL.
@@ -485,6 +524,66 @@ class MediaSpider(scrapy.Spider):
         )
 
         yield result
+
+    def detail_failed(
+        self,
+        failure,
+    ):
+        """Keep a failed detail request as a record so it can be retried."""
+
+        request = failure.request
+
+        self.logger.error(
+            "Media detail fetch failed. url=%s error=%s",
+            request.url,
+            failure.getErrorMessage(),
+        )
+
+        failed_record = self.failed_detail_record(
+            detail_url=request.url,
+            details=request.cb_kwargs,
+            error=failure.getErrorMessage(),
+            error_type=type(failure.value).__name__,
+        )
+
+        self.records.append(
+            failed_record
+        )
+
+        yield failed_record
+
+    @staticmethod
+    def failed_detail_record(
+        detail_url: str | None,
+        details: dict[str, Any],
+        error: str,
+        error_type: str,
+        error_stage: str = "DETAIL_FETCH",
+    ) -> dict[str, Any]:
+        return {
+            "record_key": details.get("record_key"),
+            "is_known": details.get("is_known"),
+            "detail_url": detail_url,
+            "source_record_id": details.get("source_record_id"),
+            "identity_fields": details.get("identity_fields") or {},
+            "detail_file_path": None,
+            "extracted": None,
+            "failed": True,
+            "error": error,
+            "error_stage": error_stage,
+            "error_type": error_type,
+        }
+
+    @staticmethod
+    def detail_item_kwargs(
+        item: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "record_key": item["record_key"],
+            "is_known": False,
+            "source_record_id": item.get("source_record_id"),
+            "identity_fields": item.get("identity_fields") or {},
+        }
 
     def _extract_record(
         self,

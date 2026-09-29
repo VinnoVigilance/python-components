@@ -67,6 +67,7 @@ def _mock_services(monkeypatch, duplicate_status, extra_dup=None):
             "parsed_record_count": 10,
             "processed_record_count": 9,
             "raw_record_count": 9,
+            "broken_detail_urls": [],
         }),
         "process_attachments": MagicMock(return_value={
             "processed_count": 2, "new_count": 1, "reused_count": 1,
@@ -153,3 +154,26 @@ def test_exact_duplicate_short_circuits_before_processing(monkeypatch):
 def test_unknown_watchlist_raises():
     with pytest.raises(ValueError, match="Unknown watchlist"):
         wp.run_watchlist_pipeline("NOT_A_REAL_LIST")
+
+
+def test_retry_held_watchlist_saves_then_releases(monkeypatch):
+    mocks = _mock_services(monkeypatch, duplicate_status="NEW_VERSION")
+    acquisition = wp.watchlistFileService.AcquisitionResult(
+        source_file_path=Path("source.xml"),
+        records=[{"source_record_id": "1"}],
+    )
+    monkeypatch.setattr(wp.watchlistFileService, "retry_held_crawl", MagicMock(return_value=acquisition))
+    release = MagicMock()
+    monkeypatch.setattr(wp.watchlistFileService, "release_held_crawl", release)
+
+    result = wp.retry_held_watchlist("OFAC-SDN")
+
+    assert result["pipeline_result"] == "NORMALIZED"
+    mocks["acquire_source_file"].assert_not_called()
+    release.assert_called_once()
+
+
+def test_retry_held_watchlist_with_nothing_held_does_nothing(monkeypatch):
+    monkeypatch.setattr(wp.watchlistFileService, "retry_held_crawl", MagicMock(return_value=None))
+
+    assert wp.retry_held_watchlist("OFAC-SDN") is None

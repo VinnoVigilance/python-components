@@ -38,6 +38,23 @@ def configure_logging() -> None:
     _quiet_dependencies()
 
 
+def attach_child_job_logs(full_path: str, error_path: str, source: str) -> None:
+    """Send a child process's console output into the run's full log, and its issues to the error log."""
+    stream = open(full_path, "a", encoding="utf-8", buffering=1)
+    stream.write(f"\n===== source={source} (child process output) =====\n")
+    sys.stdout = sys.stderr = stream
+    root = logging.getLogger()
+    for handler in root.handlers:
+        if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+            handler.setStream(stream)
+    errors = logging.FileHandler(error_path, encoding="utf-8")
+    errors.setLevel(logging.WARNING)
+    errors.setFormatter(logging.Formatter(
+        f"%(asctime)s | %(levelname)-7s | source={source} | %(name)s | %(message)s"
+    ))
+    root.addHandler(errors)
+
+
 class _JobContext(logging.Filter):
     def __init__(self, job_name: str, run_id: str):
         super().__init__()
@@ -120,6 +137,8 @@ class _Readable(logging.Formatter):
                 f"reason={data.get('reason') or '-'} last_error={data.get('last_error') or '-'} "
                 f"artifact_id={data.get('artifact_id')}"
             )
+            if data.get("detail"):
+                detail += f" detail={data['detail']}"
         elif self.main and event in {"ATTEMPT_FAILED", "SOURCE_SETUP_FAILED"}:
             detail = (
                 f"error_type={data.get('error_type')} error={data.get('error')} "
@@ -183,6 +202,8 @@ class JobLog:
         self.text_path = folder / f"{self.run_id}.job.log"
         self.error_path = folder / f"{self.run_id}.errors.log"
         self.json_path = folder / f"{self.run_id}.events.jsonl"
+        self.full_path = folder / f"{self.run_id}.full.log"
+        self.pending_path = folder / f"{self.run_id}.pending.csv"
         self._handlers: list[logging.Handler] = []
         self._previous_level: int | None = None
         self._old_console: list[logging.Handler] = []
@@ -209,7 +230,9 @@ class JobLog:
         errors.addFilter(_IssueOnly(self._issues))
         structured = logging.FileHandler(self.json_path, encoding="utf-8")
         structured.setFormatter(_Structured())
-        self._handlers = [text, errors, structured]
+        full = logging.FileHandler(self.full_path, encoding="utf-8")
+        full.setFormatter(_Readable(self.zone))
+        self._handlers = [text, errors, structured, full]
         root = logging.getLogger()
         self._previous_level = root.level
         self._old_console = [handler for handler in root.handlers
@@ -250,6 +273,12 @@ class JobLog:
             _source.reset(tokens[0])
             _attempt.reset(tokens[1])
             _stage.reset(tokens[2])
+
+    def write_block(self, text: str) -> None:
+        """Write a plain text block (e.g. the summary table) to the console and job log."""
+        print(text, flush=True)
+        with self.text_path.open("a", encoding="utf-8") as handle:
+            handle.write(text + "\n")
 
     def stamp(self) -> str:
         return datetime.now(timezone.utc).astimezone(self.zone).isoformat(

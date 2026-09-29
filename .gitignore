@@ -3,6 +3,7 @@ data/downloads/
 data/final/
 data/preprocessed/
 data/reports/
+data/state/
 data/test
 /db/
 logs/

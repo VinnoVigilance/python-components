@@ -37,6 +37,8 @@ def process_watchlist_source(
     )
 ).strip().upper()
 
+    broken_details = list(acquisition.broken_details)
+
     if acquisition.records is not None:
         parsed_records = acquisition.records
 
@@ -76,6 +78,12 @@ def process_watchlist_source(
             )
         )
 
+        broken_details = watchlistFileService.hold_incomplete_crawl(
+            config,
+            crawl_result,
+            file_path,
+        )
+
         parsed_records = list(
             crawl_result.records
         )
@@ -105,12 +113,18 @@ def process_watchlist_source(
             f"minimum expected count is {minimum_record_count}."
         )
 
-    return process_records(
+    raw_result = process_records(
         records=parsed_records,
         file_path=file_path,
         config=config,
         watchlist_file_id=watchlist_file_id,
     )
+
+    raw_result["broken_detail_urls"] = [
+        item["detail_url"] for item in broken_details
+    ]
+
+    return raw_result
 
 
 def process_records(

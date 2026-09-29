@@ -65,6 +65,32 @@ def _finalize_media_completion(
     )
 
 
+def _find_missing_details(
+    expected_details: list[dict],
+    records: list[dict],
+) -> tuple[int, list[dict]]:
+    """Compare queued Watchlist detail pages with the records they produced."""
+
+    expected = {
+        str(item["record_id"]): item
+        for item in expected_details
+    }
+
+    produced = {
+        str(record.get("source_record_id"))
+        for record in records
+    }
+
+    return (
+        len(expected),
+        [
+            item
+            for record_id, item in expected.items()
+            if record_id not in produced
+        ],
+    )
+
+
 def crawl_source(
     task: CrawlerTask,
     discovery_service=None,
@@ -200,7 +226,7 @@ def crawl_source(
 
         elif media_fetch_strategy == "saved_html":
 
-            if not task.source_file_path:
+            if not task.source_file_path and not task.detail_items:
                 raise ValueError(
                     "Media saved_html strategy "
                     "requires task.source_file_path."
@@ -257,6 +283,7 @@ def crawl_source(
     # =====================================================
 
     records = []
+    expected_details = []
 
     # =====================================================
     # 6. SCRAPY SETTINGS
@@ -439,6 +466,7 @@ def crawl_source(
             crawler_config=crawler_config,
             storage=storage,
             records=records,
+            expected_details=expected_details,
         )
 
     # =====================================================
@@ -511,6 +539,21 @@ def crawl_source(
         record_count=len(records),
     )
 
+    missing_details = []
+
+    if not is_media:
+        (
+            selected_detail_count,
+            missing_details,
+        ) = _find_missing_details(
+            expected_details=expected_details,
+            records=records,
+        )
+
+        missing_detail_count = len(
+            missing_details
+        )
+
     return CrawlResult(
         source_file_path=(
             result_source_file_path
@@ -555,4 +598,5 @@ def crawl_source(
         ),
         stop_reason=stop_reason,
         completed_safely=completed_safely,
+        missing_details=missing_details,
     )

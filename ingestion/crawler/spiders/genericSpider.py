@@ -7,16 +7,62 @@ import scrapy
 
 class GenericSpider(scrapy.Spider):
     name = "generic_source_spider"
+    PERMANENT_HTTP_STATUSES = {404, 410}
 
-    def __init__(self, task, crawler_config, storage, records, *args, **kwargs):
+    def __init__(self, task, crawler_config, storage, records, expected_details=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.task = task
         self.config = crawler_config
         self.storage = storage
         self.records = records
+        self.expected_details = [] if expected_details is None else expected_details
+        self._expected_by_id = {}
 
     async def start(self):
+        if self.task.detail_items:
+            for request in self._detail_item_requests():
+                yield request
+            return
+
         yield scrapy.Request(url=self._build_start_url(), callback=self.parse, dont_filter=True)
+
+    def _expect_detail(self, record_id, detail_url, list_data):
+        item = {"record_id": record_id, "detail_url": detail_url, "list_data": dict(list_data)}
+        self.expected_details.append(item)
+        self._expected_by_id[str(record_id)] = item
+
+    def _detail_item_requests(self):
+        """Request only the given detail pages, e.g. those missing from an earlier crawl."""
+        for item in self.task.detail_items:
+            cb_kwargs = {
+                "list_data": dict(item.get("list_data") or {}),
+                "record_id": item["record_id"],
+                "detail_url": item["detail_url"],
+            }
+            self._expect_detail(cb_kwargs["record_id"], cb_kwargs["detail_url"], cb_kwargs["list_data"])
+            yield scrapy.Request(
+                url=item["detail_url"],
+                callback=self.parse_detail,
+                errback=self.detail_failed,
+                cb_kwargs=cb_kwargs,
+                dont_filter=True,
+            )
+
+    def detail_failed(self, failure):
+        """Note why a detail page failed; 404/410 and redirect loops are broken on the source."""
+        request = failure.request
+        status = getattr(getattr(failure.value, "response", None), "status", None)
+        message = failure.getErrorMessage()
+        item = self._expected_by_id.get(str(request.cb_kwargs.get("record_id")))
+
+        if item is not None:
+            item["error"] = f"HTTP {status}" if status else message
+            item["permanent"] = (
+                status in self.PERMANENT_HTTP_STATUSES
+                or "max redirections" in message.lower()
+            )
+
+        self.logger.error("Detail page failed. url=%s error=%s", request.url, message)
 
     def parse(self, response):
         self.current_url = response.url
@@ -49,9 +95,12 @@ class GenericSpider(scrapy.Spider):
             if not record_id:
                 continue
 
+            self._expect_detail(record_id, detail_url, list_data)
+
             yield scrapy.Request(
                 url=detail_url,
                 callback=self.parse_detail,
+                errback=self.detail_failed,
                 cb_kwargs={
                     "list_data": list_data,
                     "record_id": record_id,

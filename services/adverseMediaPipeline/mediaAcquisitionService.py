@@ -41,6 +41,10 @@ from services.adverseMediaPipeline.mediaFileService import (
     MediaFileService,
 )
 
+from services.adverseMediaPipeline import (
+    mediaTodoService,
+)
+
 from services.adverseMediaPipeline.mediaFileStorageService import (
     MediaRawService,
 )
@@ -127,10 +131,11 @@ class MediaAcquisitionService:
         if mode not in {
             "INITIAL",
             "INCREMENTAL",
+            "RETRY",
         }:
             raise ValueError(
                 "Media acquisition mode must be "
-                "INITIAL or INCREMENTAL."
+                "INITIAL, INCREMENTAL or RETRY."
             )
 
         # =================================================
@@ -252,17 +257,25 @@ class MediaAcquisitionService:
         # 4. Acquire source files
         # =================================================
 
-        source_result = (
-            self._acquire_source(
-                source_config=source_config,
-                acquisition_type=acquisition_type,
-                source_id=source_id,
-                dataset_id=dataset_id,
-                mode=mode,
-                discovery_policy=discovery_policy,
-                known_threshold=known_threshold,
+        if mode == "RETRY":
+            source_result = (
+                self._acquire_todo_items(
+                    source_config=source_config,
+                )
             )
-        )
+
+        else:
+            source_result = (
+                self._acquire_source(
+                    source_config=source_config,
+                    acquisition_type=acquisition_type,
+                    source_id=source_id,
+                    dataset_id=dataset_id,
+                    mode=mode,
+                    discovery_policy=discovery_policy,
+                    known_threshold=known_threshold,
+                )
+            )
 
         acquired_records = source_result.records
 
@@ -592,6 +605,73 @@ class MediaAcquisitionService:
         raise ValueError(
             "Unsupported Media acquisition type: "
             f"{acquisition_type}"
+        )
+
+    @staticmethod
+    def _acquire_todo_items(
+        source_config: dict[str, Any],
+    ) -> MediaSourceAcquisitionResult:
+        """Rebuild records for to-do items: saved files as-is, failed pages fetched again."""
+
+        dataset_name = source_config["dataset_name"]
+        items = mediaTodoService.load_items(dataset_name)
+
+        records = [
+            {
+                "record_key": item.get("record_key"),
+                "is_known": False,
+                "extracted": item.get("extracted"),
+                "detail_file_path": item["detail_file_path"],
+            }
+            for item in items
+            if item["kind"] == "process"
+        ]
+
+        fetch_items = [
+            item
+            for item in items
+            if item["kind"] == "fetch"
+        ]
+
+        if fetch_items:
+            fetch_strategy = str(
+                source_config.get(
+                    "acquisition",
+                    {},
+                ).get(
+                    "fetch_strategy",
+                    "direct",
+                )
+            ).strip().lower()
+
+            crawl_result = crawl(
+                task=CrawlerTask(
+                    url=source_config["url"],
+                    source_name=source_config["source_name"],
+                    list_name=dataset_name,
+                    source_config=source_config,
+                    fetch_strategy=fetch_strategy,
+                    download_dir=str(
+                        ROOT_DIR
+                        / "data"
+                        / "downloads"
+                    ),
+                    detail_items=fetch_items,
+                ),
+            )
+
+            records.extend(
+                crawl_result.records
+            )
+
+        return MediaSourceAcquisitionResult(
+            records=records,
+            discovered_count=len(items),
+            new_count=len(items),
+            selected_detail_count=len(records),
+            reached_source_end=True,
+            stop_reason="TODO_RETRY",
+            completed_safely=True,
         )
 
     @staticmethod
