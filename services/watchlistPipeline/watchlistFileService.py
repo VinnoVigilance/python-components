@@ -87,10 +87,6 @@ class CrawlOnHold(Exception):
         )
 
 
-def _broken_on_source(missing: list[dict]) -> list[dict]:
-    return [item for item in missing if item.get("permanent")]
-
-
 def hold_incomplete_crawl(
     config: dict[str, Any],
     crawl_result: Any,
@@ -99,11 +95,10 @@ def hold_incomplete_crawl(
     """Hold a crawl that missed pages for temporary reasons; return pages broken on the source."""
 
     watchlist_name = config["list_name"]
-    broken = _broken_on_source(crawl_result.missing_details)
 
-    if len(broken) == crawl_result.missing_detail_count:
+    if not crawl_result.missing_details:
         jobStateRepository.delete_state(WATCHLIST_HOLD_KIND, watchlist_name)
-        return broken
+        return crawl_result.broken_details
 
     now = datetime.now(timezone.utc).isoformat()
     jobStateRepository.save_state(
@@ -118,6 +113,7 @@ def hold_incomplete_crawl(
             "expected_count": crawl_result.selected_detail_count,
             "records": crawl_result.records,
             "missing": crawl_result.missing_details,
+            "broken": crawl_result.broken_details,
         },
     )
 
@@ -154,18 +150,17 @@ def retry_held_crawl(config: dict[str, Any]) -> AcquisitionResult | None:
         last_tried_at=datetime.now(timezone.utc).isoformat(),
         records=held["records"] + crawl_result.records,
         missing=crawl_result.missing_details,
+        broken=held.get("broken", []) + crawl_result.broken_details,
     )
 
-    broken = _broken_on_source(crawl_result.missing_details)
-
-    if len(broken) < crawl_result.missing_detail_count:
+    if crawl_result.missing_details:
         jobStateRepository.save_state(WATCHLIST_HOLD_KIND, watchlist_name, held)
         raise CrawlOnHold(watchlist_name, held["expected_count"], held["missing"])
 
     return AcquisitionResult(
         source_file_path=Path(held["source_file_path"]),
         records=held["records"],
-        broken_details=broken,
+        broken_details=held["broken"],
     )
 
 

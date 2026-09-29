@@ -749,98 +749,6 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
-    "INTERPOL-RED-NOTICES": {
-        "source_name": "INTERPOL",
-        "list_name": "INTERPOL-RED-NOTICES",
-        "date_order": "DMY",
-        "download_method": "API",
-        "url": "https://ws-public.interpol.int/notices/v1/red",
-        "file_type": "jsonl",
-        "external_id_path": "source_record_id",
-        "schedule": "daily",
-        "versioning_strategy": "continuous",
-        "preprocessing": [
-            {
-                "handler": "enrich_from_attachment",
-                "level": "record",
-                "relative_path_fields": ["attachments_dir"],
-                "config": {
-                    "attachments_dir": "attachments/members",
-                    "key_field": "entity_id",
-                },
-            },
-            {
-                "handler": "generate_composite_id",
-                "level": "record",
-                "config": {
-                    "fields": [
-                        "source_record_id",
-                        "list.name",
-                        "list.forename",
-                        "detail.date_of_birth",
-                    ],
-                    "output_field": "source_record_id",
-                    "prefix": "INTERPOL",
-                },
-            },
-        ],
-        "api_config": {
-            "transport": "browser",
-            "bypass_config": {
-                "headless": False,
-                "warmup_url": "https://www.interpol.int/How-we-work/Notices/Red-Notices/View-Red-Notices",
-                "timeout_seconds": 90,
-                "min_request_interval": 0.2,
-                "fetch_retries": 6,
-                "fetch_retry_delay": 1.0,
-                "fetch_backoff": 2.0,
-                "fetch_max_delay": 30.0,
-            },
-            "pagination": {
-                "type": "page",
-                "page_param": "page",
-                "size_param": "resultPerPage",
-                "page_size": 160,
-                "start_page": 1,
-            },
-            "faceting": {
-                "enabled": True,
-                "cap": 160,
-                "total_path": "total",
-                "facets": [
-                    {"type": "enum", "param": "sexId", "values": ["M", "F", "U"]},
-                    {
-                        "type": "range",
-                        "min_param": "ageMin",
-                        "max_param": "ageMax",
-                        "low": 0,
-                        "high": 120,
-                    },
-                    {"type": "substring", "param": "name", "max_depth": 1},
-                    {"type": "substring", "param": "forename", "max_depth": 1},
-                    {
-                        "type": "enum",
-                        "param": "arrestWarrantCountryId",
-                        "values_ref": "country_codes",
-                        "disjoint": False,
-                    },
-                    {
-                        "type": "enum",
-                        "param": "nationality",
-                        "values_ref": "country_codes",
-                        "disjoint": False,
-                        "complete": False,
-                    },
-                ],
-            },
-            "items_path": "_embedded.notices",
-            "detail": {"url_path": "_links.self.href"},
-            "record_shape": {"id_path": "entity_id"},
-            "dedup_path": "source_record_id",
-            "throttle_delay": 0.3,
-            "write_mode": "list_detail",
-        },
-    },
 "COMELEC-2025-SENATORS": {
         "source_name": "COMELEC",
         "list_name": "COMELEC-2025-SENATORS",
@@ -930,121 +838,6 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
-    "PH-HOUSE-MEMBERS": {
-        "source_name": "CONGRESS-PH",
-        "date_order": "MDY",
-        "list_name": "PH-HOUSE-MEMBERS",
-        "download_method": "BYPASS",
-        "extraction_method": "SAVED_HTML_SPIDER",
-        "url": (
-            "https://www.congress.gov.ph/"
-            "house-members"
-        ),
-        "file_type": "html",
-        "external_id_path": "source_record_id",
-        "schedule": "daily",
-        "versioning_strategy": "continuous",
-        "source_config": (
-            "config/watchlistSources/"
-            "ph_house_members.yaml"
-        ),
-        "minimum_record_count": 250,
-        "bypass_config": {
-            "challenge": "cloudflare",
-            "headless": False,
-            "timeout_seconds": 120,
-            "success_criteria": [
-                "House Members",
-            ],
-            "actions": [
-                {
-                    "action": "wait",
-                    "type": "selector",
-                    "selector": (
-                        "a[href*='/house-members/view/']"
-                    ),
-                    "timeout": 90,
-                },
-                {
-                    "action": "save_html",
-                    "filename_pattern": (
-                        "{source}_{list}_"
-                        "{timestamp}.html"
-                    ),
-                },
-            ],
-            "validation": {
-                "required_content": [
-                    "Full Name",
-                    "Representing",
-                    "/house-members/view/",
-                ],
-                "min_size_bytes": 10000,
-            },
-        },
-        "preprocessing": [
-            {
-                "handler": "set_constant_field",
-                "level": "record",
-                "config": {
-                    "output_field": "entity_type",
-                    "value": "Individual",
-                },
-            },
-            {
-                "handler": "set_constant_field",
-                "level": "record",
-                "config": {
-                    "output_field": (
-                        "jurisdiction_country"
-                    ),
-                    "value": "Philippines",
-                },
-            },
-            {
-                "handler": "set_constant_field",
-                "level": "record",
-                "config": {
-                    "output_field": (
-                        "jurisdiction_code"
-                    ),
-                    "value": "PH",
-                },
-            },
-            {
-                "handler": "set_constant_field",
-                "level": "record",
-                "config": {
-                    "output_field": "congress",
-                    "value": "20th Congress",
-                },
-            },
-            {
-                "handler": "build_url_from_template",
-                "level": "record",
-                "config": {
-                    "output_field": "source_url",
-                    "template": (
-                        "https://www.congress.gov.ph/"
-                        "house-members/view/"
-                        "{source_record_id}"
-                    ),
-                },
-            },
-            {
-                "handler": "split_field_regex",
-                "level": "record",
-                "config": {
-                    "input_field": "detail.profile_name",
-                    "pattern": r'^(?P<last_name>[^,]+),(?P<_pre>[^"]*)("(?P<nickname>[^"]+)")?.*$',
-                    "outputs": {
-                        "last_name": "last_name",
-                        "nickname": "nickname",
-                    },
-                },
-            },
-        ],
-    },
 
     "US-MARSHALS-PROFILED-FUGITIVES": {
         "source_name": "US-MARSHALS",
@@ -1449,4 +1242,214 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
+     "INTERPOL-RED-NOTICES": {
+            "source_name": "INTERPOL",
+            "list_name": "INTERPOL-RED-NOTICES",
+            "date_order": "DMY",
+            "download_method": "API",
+            "url": "https://ws-public.interpol.int/notices/v1/red",
+            "file_type": "jsonl",
+            "external_id_path": "source_record_id",
+            "schedule": "daily",
+            "versioning_strategy": "continuous",
+            "preprocessing": [
+                {
+                    "handler": "enrich_from_attachment",
+                    "level": "record",
+                    "relative_path_fields": ["attachments_dir"],
+                    "config": {
+                        "attachments_dir": "attachments/members",
+                        "key_field": "entity_id",
+                    },
+                },
+                {
+                    "handler": "generate_composite_id",
+                    "level": "record",
+                    "config": {
+                        "fields": [
+                            "source_record_id",
+                            "list.name",
+                            "list.forename",
+                            "detail.date_of_birth",
+                        ],
+                        "output_field": "source_record_id",
+                        "prefix": "INTERPOL",
+                    },
+                },
+            ],
+            "api_config": {
+                "transport": "browser",
+                "bypass_config": {
+                    "headless": False,
+                    "warmup_url": "https://www.interpol.int/How-we-work/Notices/Red-Notices/View-Red-Notices",
+                    "timeout_seconds": 90,
+                    "min_request_interval": 0.2,
+                    "fetch_retries": 6,
+                    "fetch_retry_delay": 1.0,
+                    "fetch_backoff": 2.0,
+                    "fetch_max_delay": 30.0,
+                },
+                "pagination": {
+                    "type": "page",
+                    "page_param": "page",
+                    "size_param": "resultPerPage",
+                    "page_size": 160,
+                    "start_page": 1,
+                },
+                "faceting": {
+                    "enabled": True,
+                    "cap": 160,
+                    "total_path": "total",
+                    "facets": [
+                        {"type": "enum", "param": "sexId", "values": ["M", "F", "U"]},
+                        {
+                            "type": "range",
+                            "min_param": "ageMin",
+                            "max_param": "ageMax",
+                            "low": 0,
+                            "high": 120,
+                        },
+                        {"type": "substring", "param": "name", "max_depth": 1},
+                        {"type": "substring", "param": "forename", "max_depth": 1},
+                        {
+                            "type": "enum",
+                            "param": "arrestWarrantCountryId",
+                            "values_ref": "country_codes",
+                            "disjoint": False,
+                        },
+                        {
+                            "type": "enum",
+                            "param": "nationality",
+                            "values_ref": "country_codes",
+                            "disjoint": False,
+                            "complete": False,
+                        },
+                    ],
+                },
+                "items_path": "_embedded.notices",
+                "detail": {"url_path": "_links.self.href"},
+                "record_shape": {"id_path": "entity_id"},
+                "dedup_path": "source_record_id",
+                "throttle_delay": 0.3,
+                "write_mode": "list_detail",
+            },
+        },
+
+    "PH-HOUSE-MEMBERS": {
+        "source_name": "CONGRESS-PH",
+        "date_order": "MDY",
+        "list_name": "PH-HOUSE-MEMBERS",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.congress.gov.ph/"
+            "house-members"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "ph_house_members.yaml"
+        ),
+        "minimum_record_count": 250,
+        "bypass_config": {
+            "challenge": "cloudflare",
+            "headless": False,
+            "timeout_seconds": 120,
+            "success_criteria": [
+                "House Members",
+            ],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "a[href*='/house-members/view/']"
+                    ),
+                    "timeout": 90,
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": (
+                        "{source}_{list}_"
+                        "{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "Full Name",
+                    "Representing",
+                    "/house-members/view/",
+                ],
+                "min_size_bytes": 10000,
+            },
+        },
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": (
+                        "jurisdiction_country"
+                    ),
+                    "value": "Philippines",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": (
+                        "jurisdiction_code"
+                    ),
+                    "value": "PH",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "congress",
+                    "value": "20th Congress",
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "output_field": "source_url",
+                    "template": (
+                        "https://www.congress.gov.ph/"
+                        "house-members/view/"
+                        "{source_record_id}"
+                    ),
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "detail.profile_name",
+                    "pattern": r'^(?P<last_name>[^,]+),(?P<_pre>[^"]*)("(?P<nickname>[^"]+)")?.*$',
+                    "outputs": {
+                        "last_name": "last_name",
+                        "nickname": "nickname",
+                    },
+                },
+            },
+        ],
+    },
+
 }
