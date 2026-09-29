@@ -1,3 +1,5 @@
+import logging
+
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import (
     get_project_settings,
@@ -25,6 +27,9 @@ from ingestion.crawler.spiders.savedHtmlMediaSpider import (
 from ingestion.crawler.spiders.savedHtmlSpider import (
     SavedHtmlSpider,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def _finalize_media_completion(
@@ -89,6 +94,44 @@ def _find_missing_details(
             if record_id not in produced
         ],
     )
+
+
+def _keep_broken_as_list_only(
+    expected_details: list[dict],
+    records: list[dict],
+) -> list[dict]:
+    """Add a list-only record for each detail page broken on the source; return those pages."""
+
+    produced = {
+        str(record.get("source_record_id"))
+        for record in records
+    }
+
+    broken = [
+        item
+        for item in expected_details
+        if item.get("permanent")
+        and str(item["record_id"]) not in produced
+    ]
+
+    for item in broken:
+        logger.warning(
+            "Detail page broken on source, keeping list data only. url=%s error=%s",
+            item["detail_url"],
+            item.get("error"),
+        )
+        records.append(
+            {
+                "source_record_id": item["record_id"],
+                "list": dict(item.get("list_data") or {}),
+                "detail": {},
+                "attachments": [],
+                "detail_url": item["detail_url"],
+                "detail_error": item.get("error"),
+            }
+        )
+
+    return broken
 
 
 def crawl_source(
@@ -540,8 +583,14 @@ def crawl_source(
     )
 
     missing_details = []
+    broken_details = []
 
     if not is_media:
+        broken_details = _keep_broken_as_list_only(
+            expected_details=expected_details,
+            records=records,
+        )
+
         (
             selected_detail_count,
             missing_details,
@@ -599,4 +648,5 @@ def crawl_source(
         stop_reason=stop_reason,
         completed_safely=completed_safely,
         missing_details=missing_details,
+        broken_details=broken_details,
     )

@@ -92,7 +92,7 @@ class GenericSpider(scrapy.Spider):
 
             record_id = self._extract_record_id(detail_url, list_data)
 
-            if not record_id:
+            if not record_id or str(record_id) in self._expected_by_id:
                 continue
 
             self._expect_detail(record_id, detail_url, list_data)
@@ -106,6 +106,7 @@ class GenericSpider(scrapy.Spider):
                     "record_id": record_id,
                     "detail_url": detail_url,
                 },
+                dont_filter=True,
             )
 
     def parse_detail(self, response, list_data, record_id, detail_url):

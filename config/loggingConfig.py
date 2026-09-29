@@ -47,6 +47,7 @@ def attach_child_job_logs(full_path: str, error_path: str, source: str) -> None:
     for handler in root.handlers:
         if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
             handler.setStream(stream)
+            handler.setLevel(logging.INFO)
     errors = logging.FileHandler(error_path, encoding="utf-8")
     errors.setLevel(logging.WARNING)
     errors.setFormatter(logging.Formatter(

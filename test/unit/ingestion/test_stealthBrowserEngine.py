@@ -1,5 +1,6 @@
 """Unit tests for StealthBrowserEngine's Cloudflare challenge indicators."""
 
+import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -45,3 +46,18 @@ def test_engine_installs_indicators_on_the_bot():
 
     assert bot.CHALLENGE_INDICATORS == CHALLENGE_INDICATORS
     bot.__enter__.assert_called_once()
+
+
+def test_exit_replaces_an_event_loop_closed_by_the_browser():
+    closed = asyncio.new_event_loop()
+    asyncio.set_event_loop(closed)
+    closed.close()
+    engine = StealthBrowserEngine()
+    engine._bot = MagicMock()
+
+    engine.__exit__(None, None, None)
+
+    loop = asyncio.get_event_loop_policy().get_event_loop()
+    assert loop is not closed and not loop.is_closed()
+    loop.close()
+    asyncio.set_event_loop(None)
