@@ -1,0 +1,35 @@
+fetch_strategy: saved_html
+
+record_mode: listing_only
+
+discovery:
+  selector_type: xpath
+  row_selector: >-
+    //table[@id='tablepress-31']//tbody/tr[
+      normalize-space(string(.//td[contains(@class, 'column-1')]))
+    ]
+
+list_fields:
+  name:
+    selector_type: xpath
+    selector: ".//td[contains(@class, 'column-1')]//text()"
+    value: text
+    join: " "
+
+  category:
+    selector_type: xpath
+    selector: ".//td[contains(@class, 'column-2')]//text()"
+    value: text
+    join: " "
+
+  atc_resolution_no:
+    selector_type: xpath
+    selector: ".//td[contains(@class, 'column-3')]//text()"
+    value: text
+    join: " "
+
+  date_issued:
+    selector_type: xpath
+    selector: ".//td[contains(@class, 'column-4')]//text()"
+    value: text
+    join: " "

@@ -136,7 +136,11 @@ class GenericSpider(scrapy.Spider):
             "list": list_data,
             "detail": detail_data,
             "attachments": attachments,
+            "detail_url": detail_url,
         }
+
+        if detail_file_path:
+            record["detail_file_path"] = detail_file_path
 
         self.records.append(record)
         yield record

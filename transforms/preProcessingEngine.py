@@ -6,7 +6,6 @@ from string import Formatter
 from urllib.parse import unquote, urlparse
 
 from nameparser import HumanName
-from scrapy import Selector
 
 
 # "NA" is intentionally excluded: it is Namibia's ISO country code, not a
@@ -192,93 +191,6 @@ class PreProcessingEngine:
                     merged[field].append(value)
 
         return list(grouped.values())
-
-    def enrich_atc_profile_data(self, record, config):
-        profile_dir = config.get(
-            "profile_dir",
-            "downloads/profiles",
-        )
-
-        images_dir = config.get(
-            "images_dir",
-            "downloads/images",
-        )
-
-        detail_url = str(
-            record.get("detail_url", "")
-        ).strip()
-
-        if not detail_url:
-            return record
-
-        slug = detail_url.rstrip("/").split("/")[-1]
-        file_base_name = slug.replace("-", " ").upper()
-
-        profile_file_name = (
-            f"{file_base_name} _ Anti-Terrorism Council.html"
-        )
-
-        profile_file = os.path.join(
-            profile_dir,
-            profile_file_name,
-        )
-
-        if not os.path.exists(profile_file):
-            return record
-
-        with open(
-            profile_file,
-            "r",
-            encoding="utf-8",
-        ) as file:
-            html = file.read()
-
-        selector = Selector(text=html)
-        profile_fields = {}
-
-        rows = selector.xpath("//article//table//tr")
-
-        for row in rows:
-            key = row.xpath("./td[1]//text()").getall()
-            value = row.xpath("./td[2]//text()").getall()
-
-            key = " ".join(key).strip()
-            value = " ".join(value).strip()
-
-            if not key:
-                continue
-
-            profile_fields[key] = value
-
-        image_urls = selector.xpath(
-            "//article//img/@src"
-        ).getall()
-
-        local_images = []
-
-        if os.path.exists(images_dir):
-            for file_name in os.listdir(images_dir):
-                image_name = os.path.splitext(
-                    file_name
-                )[0].lower()
-
-                if image_name == slug.lower():
-                    local_images.append(
-                        os.path.join(
-                            images_dir,
-                            file_name,
-                        )
-                    )
-
-        record["profile_data"] = {
-            "profile_file": profile_file,
-            "profile_slug": slug,
-            "profile_fields": profile_fields,
-            "image_urls": image_urls,
-            "local_images": local_images,
-        }
-
-        return record
 
     def enrich_from_attachment(self, record, config):
         """Load a per-record detail file (keyed off a stub field) and return the
@@ -473,9 +385,11 @@ class PreProcessingEngine:
 
         prefix = config.get("prefix", "ATC")
 
-        name = str(record.get(name_field, "")).strip()
+        name = str(
+            self._resolve_field(record, name_field, "")
+        ).strip()
         resolution_text = str(
-            record.get(resolution_field, "")
+            self._resolve_field(record, resolution_field, "")
         ).strip()
 
         match = re.search(
@@ -531,7 +445,7 @@ class PreProcessingEngine:
     ):
         input_field = config.get(
             "input_field",
-            "profile_data.profile_fields.Date and Place of Birth",
+            "detail.date_and_place_of_birth",
         )
 
         date_output_field = config.get(
@@ -580,28 +494,6 @@ class PreProcessingEngine:
 
         return record
 
-    def clean_atc_profile_name_fields(
-        self,
-        record,
-        config,
-    ):
-        fields = config.get("fields", [])
-
-        profile_fields = (
-            record.get("profile_data", {})
-            .get("profile_fields", {})
-        )
-
-        for field in fields:
-            value = str(
-                profile_fields.get(field, "")
-            ).strip()
-
-            if value.upper() in EMPTY_VALUES:
-                profile_fields[field] = ""
-
-        return record
-    
     def filter_missing_required_field(self, records, config):
         required_field = config["field"]
 
@@ -847,3 +739,40 @@ class PreProcessingEngine:
             record[output_field] = (chosen or {}).get(item_subfield, default)
 
         return record
+
+    def normalize_empty_fields(self, record, config):
+        """Normalize source empty markers in flat or dotted fields."""
+
+        for field_path in config.get("fields", []):
+            parts = field_path.split(".")
+            parent = record
+
+            for part in parts[:-1]:
+                if not isinstance(parent, dict):
+                    parent = None
+                    break
+
+                parent = parent.get(part)
+
+            if not isinstance(parent, dict) or parts[-1] not in parent:
+                continue
+
+            value = parent.get(parts[-1])
+            normalized = "" if value is None else str(value).strip()
+
+            if normalized.upper() in EMPTY_VALUES:
+                parent[parts[-1]] = ""
+
+        return record
+
+    @staticmethod
+    def _resolve_field(record, field_path, default=None):
+        value = record
+
+        for part in str(field_path).split("."):
+            if not isinstance(value, dict):
+                return default
+
+            value = value.get(part, default)
+
+        return value
