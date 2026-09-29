@@ -102,9 +102,15 @@ WATCHLIST_CONFIGS = {
             "ATC-DESIGNATED-TERRORIST-INDIVIDUALS"
         ),
         "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
         "url": "https://atc.gov.ph/individuals/",
         "file_type": "html",
+        "source_config": (
+            "config/watchlistSources/"
+            "atc_designated_terrorist_individuals.yaml"
+        ),
         "external_id_path": "unique_id",
+        "minimum_record_count": 50,
         "schedule": "daily",
         "versioning_strategy": "continuous",
         "bypass_config": {
@@ -124,6 +130,47 @@ WATCHLIST_CONFIGS = {
                     "timeout": 60
                 },
                 {
+                    "action": "execute_js",
+                    "await": True,
+                    "script": """(async () => {
+  const tableId = 'tablepress-33';
+  const table = document.getElementById(tableId);
+  if (!table) return 0;
+
+  const api = window.DT_TP && window.DT_TP['33'];
+  if (api && api.page && api.page.len) {
+    api.page.len(-1).draw();
+  } else {
+    const select = document.querySelector(
+      `select[aria-controls="${tableId}"]`
+    );
+    if (select) {
+      if (![...select.options].some(o => o.value === '-1')) {
+        select.add(new Option('All', '-1'));
+      }
+      select.value = '-1';
+      select.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const count = table.querySelectorAll('tbody tr').length;
+    if (count >= 50) return count;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return table.querySelectorAll('tbody tr').length;
+})()""",
+                },
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "#tablepress-33 tbody "
+                        "tr:nth-child(50)"
+                    ),
+                    "timeout": 15,
+                },
+                {
                     "action": "save_html",
                     "filename_pattern": "{source}_{list}_{timestamp}.html"
                 }
@@ -137,46 +184,31 @@ WATCHLIST_CONFIGS = {
                 "min_size_bytes": 10000
             }
         },
-        "profile_dir": "data/downloads/profiles",
         "attachments": [
             {
                 "scope": "member",
                 "attachment_type": "DOCUMENT",
-                "local_path_field": (
-                    "profile_data.profile_file"
-                ),
+                "local_path_field": "detail_file_path",
                 "source_url_field": "detail_url",
-            },
-            {
-                "scope": "member",
-                "attachment_type": "PHOTO",
-                "local_path_field": (
-                    "profile_data.local_images"
-                ),
-                "source_url_field": (
-                    "profile_data.image_urls"
-                ),
             },
         ],
         "preprocessing": [
-           {
-                "handler": "enrich_atc_profile_data",
+            {
+                "handler": "set_constant_field",
                 "level": "record",
-                "relative_path_fields": [
-                    "profile_dir",
-                    "images_dir",
-                ],
                 "config": {
-                    "profile_dir": "attachments/profiles",
-                    "images_dir": "attachments/images",
+                    "output_field": "entity_type",
+                    "value": "Individual",
                 },
             },
             {
                 "handler": "generate_atc_unique_id",
                 "level": "record",
                 "config": {
-                    "name_field": "name",
-                    "resolution_field": "atc_resolution_no",
+                    "name_field": "list.name",
+                    "resolution_field": (
+                        "list.atc_resolution_no"
+                    ),
                     "output_field": "unique_id",
                     "prefix": "ATC",
                 },
@@ -188,20 +220,19 @@ WATCHLIST_CONFIGS = {
                 "level": "record",
                 "config": {
                     "input_field": (
-                        "profile_data.profile_fields."
-                        "Date and Place of Birth"
+                        "detail.date_and_place_of_birth"
                     ),
                     "date_output_field": "atc_birth_date",
                     "place_output_field": "atc_birth_place",
                 },
             },
             {
-                "handler": "clean_atc_profile_name_fields",
+                "handler": "normalize_empty_fields",
                 "level": "record",
                 "config": {
                     "fields": [
-                        "Variant/s",
-                        "Alias/es",
+                        "detail.variants",
+                        "detail.aliases",
                     ],
                 },
             },
@@ -221,10 +252,16 @@ WATCHLIST_CONFIGS = {
         "date_order": "DMY",
         "list_name": "ATC-DESIGNATED-TERRORIST-GROUPS",
         "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
         "versioning_strategy": "continuous",
         "url": "https://atc.gov.ph/groups/",
         "file_type": "html",
+        "source_config": (
+            "config/watchlistSources/"
+            "atc_designated_terrorist_groups.yaml"
+        ),
         "external_id_path": "unique_id",
+        "minimum_record_count": 25,
         "schedule": "daily",
         "bypass_config": {
             "challenge": "cloudflare",
@@ -243,6 +280,47 @@ WATCHLIST_CONFIGS = {
                     "timeout": 60
                 },
                 {
+                    "action": "execute_js",
+                    "await": True,
+                    "script": """(async () => {
+  const tableId = 'tablepress-31';
+  const table = document.getElementById(tableId);
+  if (!table) return 0;
+
+  const api = window.DT_TP && window.DT_TP['31'];
+  if (api && api.page && api.page.len) {
+    api.page.len(-1).draw();
+  } else {
+    const select = document.querySelector(
+      `select[aria-controls="${tableId}"]`
+    );
+    if (select) {
+      if (![...select.options].some(o => o.value === '-1')) {
+        select.add(new Option('All', '-1'));
+      }
+      select.value = '-1';
+      select.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const count = table.querySelectorAll('tbody tr').length;
+    if (count >= 25) return count;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return table.querySelectorAll('tbody tr').length;
+})()""",
+                },
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "#tablepress-31 tbody "
+                        "tr:nth-child(25)"
+                    ),
+                    "timeout": 15,
+                },
+                {
                     "action": "save_html",
                     "filename_pattern": "{source}_{list}_{timestamp}.html"
                 }
@@ -258,11 +336,21 @@ WATCHLIST_CONFIGS = {
         },
         "preprocessing": [
             {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
                 "handler": "generate_atc_unique_id",
                 "level": "record",
                 "config": {
-                    "name_field": "name",
-                    "resolution_field": "atc_resolution_no",
+                    "name_field": "list.name",
+                    "resolution_field": (
+                        "list.atc_resolution_no"
+                    ),
                     "output_field": "unique_id",
                     "prefix": "ATC",
                 },

@@ -1,0 +1,150 @@
+fetch_strategy: saved_html
+
+record_mode: list_optional_detail
+
+detail_fetch_strategy: browser
+
+detail_browser:
+  headless: false
+  wait_selector: "article table"
+  timeout_seconds: 90
+  success_criteria:
+    - "Anti-Terrorism Council"
+
+storage:
+  save_detail_pages: true
+  reuse_saved_detail_pages: true
+  minimum_detail_size_bytes: 1000
+  detail_directory: "attachments/members"
+
+discovery:
+  selector_type: xpath
+  row_selector: >-
+    //table[@id='tablepress-33']//tbody/tr[
+      normalize-space(string(.//td[contains(@class, 'column-1')]))
+    ]
+  detail_link_selector_type: xpath
+  detail_link_selector: >-
+    .//td[contains(@class, 'column-1')]//a[@href][1]
+  detail_link_attribute: href
+
+list_fields:
+  name:
+    selector_type: xpath
+    selector: ".//td[contains(@class, 'column-1')]//text()"
+    value: text
+    join: " "
+
+  category:
+    selector_type: xpath
+    selector: ".//td[contains(@class, 'column-2')]//text()"
+    value: text
+    join: " "
+
+  atc_resolution_no:
+    selector_type: xpath
+    selector: ".//td[contains(@class, 'column-3')]//text()"
+    value: text
+    join: " "
+
+  date_issued:
+    selector_type: xpath
+    selector: ".//td[contains(@class, 'column-4')]//text()"
+    value: text
+    join: " "
+
+detail_fields:
+  name:
+    selector_type: xpath
+    selector: >-
+      //article//table//tr[
+        normalize-space(string(./td[1])) = 'Name'
+      ]/td[2]//text()
+    value: text
+    join: " "
+
+  variants:
+    selector_type: xpath
+    selector: >-
+      //article//table//tr[
+        normalize-space(string(./td[1])) = 'Variant/s'
+      ]/td[2]//text()
+    value: text
+    join: " "
+
+  aliases:
+    selector_type: xpath
+    selector: >-
+      //article//table//tr[
+        normalize-space(string(./td[1])) = 'Alias/es'
+      ]/td[2]//text()
+    value: text
+    join: " "
+
+  gender:
+    selector_type: xpath
+    selector: >-
+      //article//table//tr[
+        normalize-space(string(./td[1])) = 'Gender'
+      ]/td[2]//text()
+    value: text
+    join: " "
+
+  date_and_place_of_birth:
+    selector_type: xpath
+    selector: >-
+      //article//table//tr[
+        normalize-space(string(./td[1])) = 'Date and Place of Birth'
+      ]/td[2]//text()
+    value: text
+    join: " "
+
+  group_affiliation:
+    selector_type: xpath
+    selector: >-
+      //article//table//tr[
+        normalize-space(string(./td[1])) = 'Group Affiliation'
+      ]/td[2]//text()
+    value: text
+    join: " "
+
+  last_known_addresses:
+    selector_type: xpath
+    selector: >-
+      //article//table//tr[
+        normalize-space(string(./td[1])) = 'Last Known Address/es'
+      ]/td[2]//text()
+    value: text
+    join: " "
+
+  cases_filed:
+    selector_type: xpath
+    selector: >-
+      //article//table//tr[
+        normalize-space(string(./td[1])) = 'Case/s Filed'
+      ]/td[2]//text()
+    value: text
+    join: " "
+
+  status:
+    selector_type: xpath
+    selector: >-
+      //article//table//tr[
+        normalize-space(string(./td[1])) = 'Status'
+      ]/td[2]//text()
+    value: text
+    join: " "
+
+attachments:
+  - type: DETAIL_PAGE
+    role: detail_page
+
+  - type: PHOTO
+    selector: "article img"
+    attribute: src
+    multiple: true
+
+record_id:
+  strategy: url_regex
+  source: detail_url
+  pattern: "/([^/?#]+)/?$"

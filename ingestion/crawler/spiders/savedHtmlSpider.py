@@ -1,6 +1,8 @@
 import asyncio
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import scrapy
 from scrapy.http import HtmlResponse
@@ -125,6 +127,7 @@ class SavedHtmlSpider(GenericSpider):
         if record_mode not in {
             "listing_only",
             "list_detail",
+            "list_optional_detail",
         }:
             raise ValueError(
                 f"Unsupported record_mode: {record_mode}"
@@ -194,6 +197,12 @@ class SavedHtmlSpider(GenericSpider):
                 continue
 
             if not detail_url:
+                if record_mode == "list_optional_detail":
+                    record = self._build_optional_detail_record(
+                        list_data=list_data,
+                    )
+                    self.records.append(record)
+                    yield record
                 continue
 
             record_id = self._extract_record_id(
@@ -201,6 +210,13 @@ class SavedHtmlSpider(GenericSpider):
             )
 
             if not record_id:
+                if record_mode == "list_optional_detail":
+                    record = self._build_optional_detail_record(
+                        list_data=list_data,
+                        detail_url=detail_url,
+                    )
+                    self.records.append(record)
+                    yield record
                 continue
 
             if record_id in seen_record_ids:
@@ -220,13 +236,19 @@ class SavedHtmlSpider(GenericSpider):
                 }
             )
 
-        if record_mode != "list_detail":
+        if record_mode not in {
+            "list_detail",
+            "list_optional_detail",
+        }:
             return
 
         self.logger.info(
             "Unique detail pages queued: %s",
             len(pending_details),
         )
+
+        if not pending_details and record_mode == "list_optional_detail":
+            return
 
         if not pending_details:
             raise ValueError(
@@ -246,6 +268,11 @@ class SavedHtmlSpider(GenericSpider):
                 yield scrapy.Request(
                     url=item["detail_url"],
                     callback=self.parse_detail,
+                    errback=(
+                        self._handle_optional_detail_failure
+                        if record_mode == "list_optional_detail"
+                        else None
+                    ),
                     cb_kwargs=item,
                 )
 
@@ -270,8 +297,8 @@ class SavedHtmlSpider(GenericSpider):
         Fetch Watchlist detail pages through the
         shared browser fetcher.
 
-        Watchlist record extraction and output format
-        remain unchanged.
+        Successful responses use the shared crawler record shape. Optional
+        detail mode falls back to the listing record when a fetch fails.
         """
 
         if self.storage is None:
@@ -320,18 +347,101 @@ class SavedHtmlSpider(GenericSpider):
         ) in fetcher.fetch(
             pending_details
         ):
-            # GenericSpider.parse_detail keeps the exact
-            # existing Watchlist output contract:
+            if detail_response is None:
+                if self._is_optional_detail_mode():
+                    record = self._build_optional_detail_record(
+                        list_data=item.get("list_data", {}),
+                        record_id=item.get("record_id"),
+                        detail_url=item.get("detail_url"),
+                        fetch_error=item.get("fetch_error"),
+                        fetch_error_type=item.get("fetch_error_type"),
+                    )
+                    self.records.append(record)
+                    yield record
+
+                continue
+
+            # GenericSpider.parse_detail builds the shared Watchlist record:
             #
             # source_record_id
             # list
             # detail
             # attachments
+            # detail_url
+            # detail_file_path (when the page is saved)
             yield from super().parse_detail(
                 response=detail_response,
-                **item,
+                list_data=item["list_data"],
+                record_id=item["record_id"],
+                detail_url=item["detail_url"],
             )
 
+    def _handle_optional_detail_failure(self, failure):
+        """Return the listing record when a direct detail request fails."""
+
+        item = dict(
+            getattr(failure.request, "cb_kwargs", {})
+        )
+        record = self._build_optional_detail_record(
+            list_data=item.get("list_data", {}),
+            record_id=item.get("record_id"),
+            detail_url=item.get("detail_url"),
+            fetch_error=str(failure.value),
+            fetch_error_type=type(failure.value).__name__,
+        )
+        self.records.append(record)
+        yield record
+
+    def _is_optional_detail_mode(self):
+        return str(
+            self.config.get("record_mode", "")
+        ).strip().lower() == "list_optional_detail"
+
+    def _build_optional_detail_record(
+        self,
+        list_data,
+        record_id=None,
+        detail_url=None,
+        fetch_error=None,
+        fetch_error_type=None,
+    ):
+        attachments = []
+
+        if detail_url:
+            detail_type = "DETAIL_PAGE"
+
+            for config in self.config.get("attachments", []):
+                if (
+                    config.get("role") == "detail_page"
+                    or config.get("type") == "DETAIL_PAGE"
+                ):
+                    detail_type = config.get("type", "DETAIL_PAGE")
+                    break
+
+            attachments.append(
+                {
+                    "type": detail_type,
+                    "url": detail_url,
+                }
+            )
+
+        record = {
+            "source_record_id": record_id,
+            "list": list_data,
+            "detail": {},
+            "attachments": attachments,
+        }
+
+        if detail_url:
+            record["detail_url"] = detail_url
+
+        if fetch_error:
+            record["fetch_error"] = fetch_error
+
+        if fetch_error_type:
+            record["fetch_error_type"] = fetch_error_type
+
+        return record
 
     def _extract_saved_detail_url(
         self,
@@ -370,11 +480,26 @@ class SavedHtmlSpider(GenericSpider):
             else None
         )
 
-        return (
-            response.urljoin(href)
-            if href
-            else None
-        )
+        if not href:
+            return None
+
+        href = href.strip()
+
+        # Some sources accidentally prefix a valid absolute URL with broken
+        # text (ATC currently has ``http://: https://...``). Prefer the last
+        # valid embedded absolute URL before falling back to normal urljoin.
+        for candidate in reversed(
+            re.findall(r"https?://[^\s\"']+", href)
+        ):
+            try:
+                parts = urlsplit(candidate)
+            except ValueError:
+                continue
+
+            if parts.scheme in {"http", "https"} and parts.netloc:
+                return candidate
+
+        return response.urljoin(href)
 
     @staticmethod
     def _select_nodes(
