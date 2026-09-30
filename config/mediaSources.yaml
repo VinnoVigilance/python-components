@@ -16,7 +16,7 @@ sources:
 
     source_name: NBI
     dataset_name: NBI_PRESS_RELEASES
-    dataset_category: PRESS_RELEASE
+    dataset_category: Media
 
     schedule: daily
 
@@ -111,7 +111,7 @@ sources:
 
     source_name: AMLC
     dataset_name: AMLC_NEWS_AND_ANNOUNCEMENTS
-    dataset_category: PRESS_RELEASE
+    dataset_category: Media
 
     schedule: daily
     date_order: YMD
@@ -174,7 +174,7 @@ sources:
 
     source_name: PCIJ
     dataset_name: PCIJ_CORRUPTION_WATCH
-    dataset_category: News Article
+    dataset_category: Media
 
     schedule: daily
 
@@ -309,7 +309,7 @@ sources:
 
     source_name: PCIJ
     dataset_name: PCIJ_INVESTIGATIVE_REPORTS
-    dataset_category: News Article
+    dataset_category: Media
 
     schedule: daily
 
@@ -444,7 +444,7 @@ sources:
 
     source_name: DOJ_PH
     dataset_name: DOJ_PH_NEWS
-    dataset_category: PRESS_RELEASE
+    dataset_category: Media
 
     schedule: daily
 
@@ -570,7 +570,7 @@ sources:
 
     source_name: UK_GOV
     dataset_name: UK_GOV_NEWS_COMMUNICATIONS
-    dataset_category: News Article
+    dataset_category: Media
 
     schedule: daily
     date_order: YMD
@@ -646,7 +646,7 @@ sources:
 
     source_name: DTI_PH
     dataset_name: DTI_PH_FAIR_TRADE_PRESS_RELEASES
-    dataset_category: PRESS_RELEASE
+    dataset_category: Media
 
     schedule: daily
     date_order: DMY
@@ -706,7 +706,7 @@ sources:
 
     source_name: PTV
     dataset_name: PTV_NEWS
-    dataset_category: News Article
+    dataset_category: Media
 
     schedule: daily
     date_order: YMD
@@ -766,7 +766,7 @@ sources:
 
     source_name: SEC_PH
     dataset_name: SEC_PH_ADVISORIES
-    dataset_category: PRESS_RELEASE
+    dataset_category: Regulatory
 
     schedule: daily
 
@@ -931,7 +931,7 @@ sources:
 
     source_name: ADB
     dataset_name: ADB_CASE_SUMMARIES
-    dataset_category: PRESS_RELEASE
+    dataset_category: Regulatory
 
     schedule: daily
 

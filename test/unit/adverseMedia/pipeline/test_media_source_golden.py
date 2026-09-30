@@ -57,48 +57,48 @@ SAMPLES = {
 # data/rules/mediaMapping.xlsx.
 GOLDEN = {
     "NBI_PRESS_RELEASES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "NBI_PRESS_RELEASES", "SourceName": "NBI",
         "PublisherName": "NBI",
     },
     "AMLC_NEWS_AND_ANNOUNCEMENTS": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "AMLC_NEWS_AND_ANNOUNCEMENTS", "SourceName": "AMLC",
         "PublisherName": "AMLC",
     },
     "PCIJ_CORRUPTION_WATCH": {
-        "SourceType": "Media", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "Media",
         "DatasetName": "PCIJ_CORRUPTION_WATCH", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
     "PCIJ_INVESTIGATIVE_REPORTS": {
-        "SourceType": "Media", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "Media",
         "DatasetName": "PCIJ_INVESTIGATIVE_REPORTS", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
     # UK_GOV's Publisher.Name is a per-record `path` (the publishing org), not a
     # dataset constant, so it is not pinned here.
     "UK_GOV_NEWS_COMMUNICATIONS": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "Media",
         "DatasetName": "UK_GOV_NEWS_COMMUNICATIONS", "SourceName": "UK_GOV",
     },
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "DTI_PH_FAIR_TRADE_PRESS_RELEASES", "SourceName": "DTI_PH",
         "PublisherName": "Department of Trade and Industry (Philippines)",
     },
     "ADB_CASE_SUMMARIES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
         "DatasetName": "ADB_CASE_SUMMARIES", "SourceName": "ADB",
         "PublisherName": "Asian Development Bank",
     },
     "SEC_PH_ADVISORIES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
         "DatasetName": "SEC_PH_ADVISORIES", "SourceName": "SEC_PH",
         "PublisherName": "Securities and Exchange Commission (Philippines)",
     },
     "PTV_NEWS": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "PTV_NEWS", "SourceName": "PTV",
         "PublisherName": "People's Television Network (Philippines)",
     },
