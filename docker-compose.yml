@@ -16,6 +16,8 @@ services:
     volumes:
       # Mounts the current directory (python-components) to /app
       - .:/app
+      # Mounts the root .git repository metadata into the container (read-only)
+      - ../.git:/app/.git:ro
     env_file:
       - ../.env
     environment:
