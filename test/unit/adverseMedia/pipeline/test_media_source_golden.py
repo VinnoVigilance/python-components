@@ -47,6 +47,7 @@ SAMPLES = {
     "PCIJ_INVESTIGATIVE_REPORTS": "PCIJ_INVESTIGATIVE_REPORTS_extracted_sample.jsonl",
     "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": "DTI_PH_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
+    "DTI_PH_FAIR_TRADE_UPDATES": "DTI_PH_FAIR_TRADE_UPDATES_extracted_sample.jsonl",
     "ADB_CASE_SUMMARIES": "ADB_CASE_SUMMARIES_extracted_sample.jsonl",
     "SEC_PH_ADVISORIES": "SEC_PH_ADVISORIES_extracted_sample.jsonl",
     "PTV_NEWS": "PTV_NEWS_extracted_sample.jsonl",
@@ -85,6 +86,11 @@ GOLDEN = {
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": {
         "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "DTI_PH_FAIR_TRADE_PRESS_RELEASES", "SourceName": "DTI_PH",
+        "PublisherName": "Department of Trade and Industry (Philippines)",
+    },
+    "DTI_PH_FAIR_TRADE_UPDATES": {
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
+        "DatasetName": "DTI_PH_FAIR_TRADE_UPDATES", "SourceName": "DTI_PH",
         "PublisherName": "Department of Trade and Industry (Philippines)",
     },
     "ADB_CASE_SUMMARIES": {
@@ -279,6 +285,27 @@ class TestDtiAttachments:
         for rec in _canonical_records("DTI_PH_FAIR_TRADE_PRESS_RELEASES"):
             for a in rec.get("Attachments") or []:
                 assert "fteb-staging" not in (a.get("URL") or ""), a
+
+
+class TestDtiUpdatesAttachments:
+    """A PDF-only update post keeps its PDF as a Document; a Drive link yields none."""
+
+    def _attachments(self, record_id):
+        for rec in _canonical_records("DTI_PH_FAIR_TRADE_UPDATES"):
+            if rec["Sources"][0]["SourceRecordId"] == record_id:
+                return rec["Attachments"]
+        raise AssertionError(f"no DTI update sample record with id {record_id!r}")
+
+    def test_body_pdf_becomes_document_attachment(self):
+        docs = [a["URL"] for a in self._attachments(5200) if a["Type"] == "Document"]
+        assert len(docs) == 1 and docs[0].endswith(".pdf"), docs
+
+    def test_body_images_become_images(self):
+        assert all(a["Type"] == "Image" for a in self._attachments(5435))
+        assert len(self._attachments(5435)) == 12
+
+    def test_drive_link_is_not_an_attachment(self):
+        assert self._attachments(3388) == []
 
 
 class TestAdbCaseSummaries:
