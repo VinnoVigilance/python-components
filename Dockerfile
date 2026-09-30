@@ -5,9 +5,10 @@ WORKDIR /app
 # Set display environment variable for Xvfb
 ENV DISPLAY=:99
 
-# Install system dependencies, X11 helper tools, and Google Chrome
+# Install system dependencies, X11 helper tools, Google Chrome, and Git
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    git \
     libpq-dev \
     libxml2-dev \
     libxslt1-dev \
@@ -41,10 +42,8 @@ RUN sbase get uc_driver
 # Copy application source code
 COPY . .
 
-
 # Keeps container running quietly without executing any code on startup
 CMD ["tail", "-f", "/dev/null"]
-
 
 # Passive status check entrypoint
 #CMD ["python", "-c", "print('Container ready. Service is waiting for execution.')"]
