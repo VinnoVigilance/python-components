@@ -604,7 +604,7 @@ WATCHLIST_CONFIGS = {
     sel.dispatchEvent(new Event('change', {bubbles: true}));
   }
   const count = () => document.querySelectorAll(
-    'a[href*="/foreign-governments/"]').length;
+    'a.inline-link[href*="/foreign-governments/"], a.inline-link[href*="/historical-data/"]').length;
   for (let i = 0; i < 60; i++) {
     if (count() >= 190) break;
     await new Promise(r => setTimeout(r, 500));
@@ -637,10 +637,20 @@ WATCHLIST_CONFIGS = {
                 },
             },
             {
+                "handler": "disambiguate_duplicate_keys",
+                "level": "dataset",
+                "config": {
+                    "key_fields": ["country", "position"],
+                    "base_field": "position",
+                    "tiebreak_fields": ["name"],
+                    "output_field": "seat_key",
+                },
+            },
+            {
                 "handler": "generate_composite_id",
                 "level": "record",
                 "config": {
-                    "fields": ["country", "position"],
+                    "fields": ["country", "seat_key"],
                     "output_field": "external_id",
                     "prefix": "CIA-WORLD-LEADERS-HISTORICAL",
                 },
