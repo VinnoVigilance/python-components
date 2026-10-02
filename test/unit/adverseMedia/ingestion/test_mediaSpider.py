@@ -324,6 +324,90 @@ def test_empty_first_listing_is_marked_incomplete():
     discovery_service.mark_source_end.assert_not_called()
 
 
+def _paged_spider(pagination):
+    discovery_service = MagicMock()
+    discovery_service.build_record_key.return_value = "SRC|DATA|1"
+    discovery_service.check_record_key.return_value = (False, False)
+
+    spider = MediaSpider(
+        task=None,
+        source_config={
+            "discovery": {
+                "policy": "full_scan",
+                "start_page": 1,
+                "pagination": pagination,
+                "article": {"link_selector": "a.news"},
+            },
+        },
+        storage=None,
+        records=[],
+        discovery_service=discovery_service,
+    )
+    return spider, discovery_service
+
+
+PAGE_NUMBER = {
+    "type": "page_number",
+    "url_pattern": "https://example.test/news/page/{page}/",
+}
+
+
+def _next_page_request(spider):
+    response = HtmlResponse(
+        url="https://example.test/news/",
+        body=b'<a class="news" href="/a/">A</a>',
+        encoding="utf-8",
+    )
+    return [
+        output
+        for output in spider.parse_listing(response, page_number=1)
+        if output.callback == spider.parse_listing
+    ][0]
+
+
+class TestPaginationEndStatus:
+    """A source that declares pagination.end_status treats that status past page 1 as the source end."""
+
+    def test_end_status_page_marks_source_end(self):
+        spider, discovery_service = _paged_spider(
+            {**PAGE_NUMBER, "end_status": 404}
+        )
+        response = HtmlResponse(
+            url="https://example.test/news/page/4/",
+            status=404,
+            body=b"<html>Not found</html>",
+            encoding="utf-8",
+        )
+
+        assert list(spider.parse_listing(response, page_number=4)) == []
+        discovery_service.mark_source_end.assert_called_once()
+        discovery_service.mark_discovery_failure.assert_not_called()
+
+    def test_next_page_request_lets_end_status_through(self):
+        spider, _ = _paged_spider({**PAGE_NUMBER, "end_status": 404})
+
+        request = _next_page_request(spider)
+
+        assert request.url == "https://example.test/news/page/2/"
+        assert request.meta["handle_httpstatus_list"] == [404]
+
+    def test_without_end_status_next_page_request_is_unchanged(self):
+        spider, _ = _paged_spider(PAGE_NUMBER)
+
+        request = _next_page_request(spider)
+
+        assert "handle_httpstatus_list" not in request.meta
+
+    @pytest.mark.parametrize(
+        "dataset_name",
+        ["PCIJ_CORRUPTION_WATCH", "PCIJ_INVESTIGATIVE_REPORTS"],
+    )
+    def test_pcij_config_declares_404_as_end(self, dataset_name):
+        pagination = _pcij_source_config(dataset_name)["discovery"]["pagination"]
+
+        assert pagination["end_status"] == 404
+
+
 def _stable_doj_listing_spider():
     discovery_service = MagicMock()
     discovery_service.check_record_key.return_value = (

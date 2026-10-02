@@ -215,6 +215,7 @@ sources:
       pagination:
         type: page_number
         url_pattern: "https://pcij.org/category/corruption-watch/page/{page}/"
+        end_status: 404
 
       article:
         link_selector: "#main h2.entry-title a"
@@ -350,6 +351,7 @@ sources:
       pagination:
         type: page_number
         url_pattern: "https://pcij.org/tag/investigative-reports/page/{page}/"
+        end_status: 404
 
       article:
         link_selector: "#main h2.entry-title a"
