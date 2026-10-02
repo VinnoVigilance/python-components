@@ -606,7 +606,7 @@ sources:
       items_path: results
 
       write_mode: record_files
-      record_id_path: link
+      record_id_path: content_id
 
       transport: requests
       timeout: 30
