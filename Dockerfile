@@ -39,6 +39,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 3. Pre-download SeleniumBase uc_driver during build so no internet is needed at runtime
 RUN sbase get uc_driver
 
+# Ensure runtime directories exist in the image filesystem base
+RUN mkdir -p /app/data /app/downloaded_files /app/logs /app/debug_screenshots
+
 # Copy application source code
 COPY . .
 
