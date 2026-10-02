@@ -8,10 +8,12 @@ that disappear are tombstoned. Parsing lives here because the directory
 layout is CIA-specific and one-time; the DB load reuses the watchlist
 pipeline services (which read the DB connection from ``.env``).
 
-Two era formats are handled and chosen by year:
+Two PDF era formats are handled and detected from the file:
   * 2001-2013  "dot-leader":  ``Position .......... Name``
-  * 2014-onward "columnar":   ``Position`` and ``Name`` in fixed x-columns,
+  * 2014-2019  "columnar":    ``Position`` and ``Name`` in fixed x-columns,
                               with a per-country ``Last Updated:`` line.
+From 2020 the archive is HTML (``historical-data/<year>-<month>/``) and is
+crawled with the live CIA config, pointed at that month's index.
 
 Usage:
   python -m scripts.watchlist.backfill_cia_world_leaders --dry-run          # parse only
@@ -22,9 +24,12 @@ Usage:
 import argparse
 import json
 import logging
+import multiprocessing
 import re
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
+from datetime import date
 from pathlib import Path
 from statistics import median
 from time import perf_counter, sleep
@@ -37,6 +42,8 @@ import requests
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
+from ingestion.crawler.interface import crawl
+from ingestion.crawler.models import CrawlerTask
 from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
 from services.watchlistPipeline import (
     watchlistCoreService,
@@ -61,9 +68,19 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/126.0.0.0 Safari/537.36"
 )
+ARCHIVE_INDEX_URL = (
+    "https://www.cia.gov/resources/world-leaders/historical-data/"
+    "{year}-{month}/"
+)
+LAST_PDF_YEAR = 2019
 DOWNLOAD_DIR = ROOT_DIR / "data" / "downloads" / "CIA" / "historical_pdfs"
 
 MAX_DOWNLOAD_ATTEMPTS = 3
+MAX_MONTH_ATTEMPTS = 3
+MONTH_RETRY_SECONDS = 60
+RESUME_STATUSES = {"RESUME_PROCESSING", "RESUME_NORMALIZATION"}
+MIN_EDITION_SEATS = 5000
+ABSENT = object()
 RETRY_BACKOFF_SECONDS = 3
 DOT_LEADER_MIN_LINES = 20
 HEADER_MIN_SIZE = 9.6
@@ -73,6 +90,9 @@ LAST_UPDATED_RE = re.compile(r"Last\s+Updated:\s*(.+)", re.IGNORECASE)
 PAGE_FOOTER_RE = re.compile(r"^(Page\s+\d+\s+of\s+\d+|\d+)$", re.IGNORECASE)
 CONTINUED_RE = re.compile(r"\s*\(continued\)\s*$", re.IGNORECASE)
 ALPHA_PREFIX_RE = re.compile(r"^[A-Z]\s+(?=[A-Z])")
+NDE_SUFFIX_RE = re.compile(r"\s*[-–—]\s*NDE$")
+COUNTRY_SMALL_WORDS = {"of", "the", "and"}
+WORD_GAP_TOLERANCE = 1.5
 SECTION_STOPWORDS = {
     "PREFACE", "ABBREVIATIONS", "CONTENTS", "TABLE OF CONTENTS",
     "INTRODUCTION", "NOTE", "NOTES", "INDEX", "APPENDIX",
@@ -152,6 +172,7 @@ def _iter_page_lines(page: "pdfplumber.page.Page") -> list[Line]:
     words = page.extract_words(
         extra_attrs=["fontname", "size"],
         use_text_flow=False,
+        x_tolerance=WORD_GAP_TOLERANCE,
     )
 
     if not words:
@@ -189,7 +210,31 @@ def _is_header(line: Line) -> bool:
 def _clean_country(text: str) -> str:
     text = CONTINUED_RE.sub("", text)
     text = ALPHA_PREFIX_RE.sub("", text)
-    return text.strip()
+    text = NDE_SUFFIX_RE.sub(" - NDE", text).strip()
+
+    if text.isupper():
+        text = _title_case_country(text)
+
+    return text
+
+
+def _title_case_country(text: str) -> str:
+    """ALL-CAPS country -> the live site's casing ('Congo, Republic of the')."""
+
+    def fix_word(match: re.Match) -> str:
+        word = match.group(0).lower()
+        before = text[: match.start()].rstrip()
+        next_char = text[match.end(): match.end() + 1]
+
+        if word == "nde":
+            return "NDE"
+        if word in COUNTRY_SMALL_WORDS and before and not before.endswith(","):
+            return word
+        if word == "d" and next_char in ("'", "’"):
+            return word
+        return word.capitalize()
+
+    return re.sub(r"[A-Za-z]+", fix_word, text)
 
 
 def _is_content_page(lines: list[Line]) -> bool:
@@ -453,6 +498,69 @@ def build_month_config() -> dict[str, Any]:
     return config
 
 
+# --------------------------------------------------------------------------
+# HTML archive months (2020 onward)
+# --------------------------------------------------------------------------
+def archive_index_url(year: int, month: str) -> str:
+    return ARCHIVE_INDEX_URL.format(year=year, month=month.lower())
+
+
+def build_archive_config(year: int, month: str) -> dict[str, Any]:
+    config = deepcopy(WATCHLIST_CONFIGS[CIA_KEY])
+    config["url"] = archive_index_url(year, month)
+    config.pop("attachments", None)
+    return config
+
+
+def archive_month_exists(year: int, month: str) -> bool:
+    response = requests.get(
+        archive_index_url(year, month),
+        headers={"User-Agent": USER_AGENT},
+        timeout=60,
+    )
+
+    if response.status_code == 404:
+        return False
+
+    response.raise_for_status()
+    return True
+
+
+def crawl_archive_month(config: dict[str, Any]) -> tuple[list[dict[str, Any]], Path]:
+    """Render the month's index in the browser, then crawl every country page."""
+
+    index_path = watchlistFileService.acquire_source_file(config=config, downloader=None)
+
+    crawl_result = crawl(
+        CrawlerTask(
+            url=config["url"],
+            source_name=config["source_name"],
+            list_name=config["list_name"],
+            source_config_path=str((ROOT_DIR / config["source_config"]).resolve()),
+            source_file_path=str(index_path),
+            download_dir=str(ROOT_DIR / "data" / "downloads"),
+        )
+    )
+
+    if crawl_result.missing_details:
+        raise RuntimeError(
+            f"{config['url']}: {len(crawl_result.missing_details)} country pages "
+            f"failed; stopping so months stay in order."
+        )
+
+    return list(crawl_result.records), index_path
+
+
+def _crawl_in_fresh_process(config: dict[str, Any]) -> tuple[list[dict[str, Any]], Path]:
+    """Scrapy's reactor starts once per process, so each month crawls in its own."""
+
+    with ProcessPoolExecutor(
+        max_workers=1,
+        mp_context=multiprocessing.get_context("spawn"),
+    ) as executor:
+        return executor.submit(crawl_archive_month, config).result()
+
+
 def load_month(
     base_config: dict[str, Any],
     records: list[dict[str, Any]],
@@ -478,33 +586,39 @@ def load_month(
     if status == "DUPLICATE_COMPLETED":
         return {"status": "SKIPPED_DUPLICATE"}
 
-    file_version = watchlistFileService.determine_file_version(
-        config=config,
-        duplicate_status=status,
-        source_id=source_id,
-        list_type_id=list_type_id,
-    )
+    if status in RESUME_STATUSES:
+        watchlist_file_id = duplicate["watchlist_file_id"]
+    else:
+        file_version = watchlistFileService.determine_file_version(
+            config=config,
+            duplicate_status=status,
+            source_id=source_id,
+            list_type_id=list_type_id,
+        )
 
-    storage_path = watchlistFileService.store_source_file(
-        config=config,
-        file_path=pdf_path,
-    )
+        storage_path = watchlistFileService.store_source_file(
+            config=config,
+            file_path=pdf_path,
+        )
 
-    watchlist_file_id = watchlistFileService.insert_watchlist_file(
-        config=config,
-        file_metadata=file_metadata,
-        source_id=source_id,
-        list_type_id=list_type_id,
-        storage_path=storage_path,
-        file_version=file_version,
-    )
+        watchlist_file_id = watchlistFileService.insert_watchlist_file(
+            config=config,
+            file_metadata=file_metadata,
+            source_id=source_id,
+            list_type_id=list_type_id,
+            storage_path=storage_path,
+            file_version=file_version,
+        )
 
-    raw_result = watchlistRawService.process_records(
-        records=records,
-        file_path=pdf_path,
-        config=config,
-        watchlist_file_id=watchlist_file_id,
-    )
+    raw_record_count = None
+
+    if status != "RESUME_NORMALIZATION":
+        raw_record_count = watchlistRawService.process_records(
+            records=records,
+            file_path=pdf_path,
+            config=config,
+            watchlist_file_id=watchlist_file_id,
+        )["raw_record_count"]
 
     core_result = watchlistCoreService.process_watchlist_file(
         watchlist_file_id=watchlist_file_id,
@@ -514,9 +628,9 @@ def load_month(
     )
 
     return {
-        "status": "LOADED",
+        "status": "RESUMED" if status in RESUME_STATUSES else "LOADED",
         "watchlist_file_id": watchlist_file_id,
-        "raw_record_count": raw_result["raw_record_count"],
+        "raw_record_count": raw_record_count,
         "new": core_result["new_count"],
         "updated": core_result["updated_count"],
         "deleted": core_result["deleted_count"],
@@ -546,7 +660,11 @@ def iter_editions(start: tuple[int, int], end: tuple[int, int]):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Backfill CIA World Leaders history.")
     parser.add_argument("--start", default="2001-01", help="First edition, YYYY-MM.")
-    parser.add_argument("--end", default="2021-12", help="Last edition, YYYY-MM.")
+    parser.add_argument(
+        "--end",
+        default=date.today().strftime("%Y-%m"),
+        help="Last edition, YYYY-MM (default: this month).",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -572,33 +690,80 @@ def main() -> None:
 
     for year, month in iter_editions(start, end):
         started_at = perf_counter()
-        pdf_path = download_edition(year, month, DOWNLOAD_DIR)
+        fetched = None
 
-        if pdf_path is None:
-            logger.info("%s %s: absent (skipped)", month, year)
-            continue
+        for attempt in range(1, MAX_MONTH_ATTEMPTS + 1):
+            try:
+                if fetched is None:
+                    fetched = fetch_edition(year, month, base_config)
 
-        records = parse_pdf(pdf_path)
-        seat_count = sum(len(r["detail"]["leaders"]) for r in records)
+                if fetched is ABSENT:
+                    logger.info("%s %s: absent (skipped)", month, year)
+                    break
 
-        if args.dry_run:
-            out = jsonl_dir / f"{year}-{month}.jsonl"
-            with out.open("w", encoding="utf-8") as handle:
-                for record in records:
-                    handle.write(json.dumps(record, ensure_ascii=False) + "\n")
-            logger.info(
-                "%s %s: %d countries, %d seats -> %s (%.1fs)",
-                month, year, len(records), seat_count, out.name,
-                perf_counter() - started_at,
-            )
-            continue
+                result = run_edition(year, month, fetched, args.dry_run, jsonl_dir)
+                logger.info(
+                    "%s %s: %d countries, %d seats -> %s (%.1fs)",
+                    month, year, len(fetched[1]), fetched[3], result,
+                    perf_counter() - started_at,
+                )
+                break
+            except Exception:
+                logger.exception(
+                    "%s %s: attempt %d/%d failed", month, year, attempt, MAX_MONTH_ATTEMPTS
+                )
 
-        result = load_month(base_config, records, pdf_path)
-        logger.info(
-            "%s %s: %d countries, %d seats -> %s (%.1fs)",
-            month, year, len(records), seat_count, result,
-            perf_counter() - started_at,
+                if attempt == MAX_MONTH_ATTEMPTS:
+                    logger.error(
+                        "STOPPED at %s %s. Nothing after it was loaded. Fix the issue, "
+                        "then rerun with: --start %d-%02d",
+                        month, year, year, MONTHS.index(month) + 1,
+                    )
+                    sys.exit(1)
+
+                sleep(MONTH_RETRY_SECONDS * attempt)
+
+
+def fetch_edition(year: int, month: str, base_config: Optional[dict[str, Any]]):
+    """Fully fetch and parse one edition before anything is loaded."""
+
+    if year <= LAST_PDF_YEAR:
+        source_path = download_edition(year, month, DOWNLOAD_DIR)
+
+        if source_path is None:
+            return ABSENT
+
+        month_config = base_config
+        records = parse_pdf(source_path)
+    else:
+        if not archive_month_exists(year, month):
+            return ABSENT
+
+        month_config = build_archive_config(year, month)
+        records, source_path = _crawl_in_fresh_process(month_config)
+
+    seat_count = sum(len(r["detail"]["leaders"]) for r in records)
+
+    if seat_count < MIN_EDITION_SEATS:
+        raise ValueError(
+            f"Only {seat_count} seats parsed (expected >= {MIN_EDITION_SEATS}); "
+            "refusing to load a partial edition."
         )
+
+    return month_config, records, source_path, seat_count
+
+
+def run_edition(year: int, month: str, fetched: tuple, dry_run: bool, jsonl_dir: Path):
+    month_config, records, source_path, _ = fetched
+
+    if dry_run:
+        out = jsonl_dir / f"{year}-{month}.jsonl"
+        with out.open("w", encoding="utf-8") as handle:
+            for record in records:
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        return out.name
+
+    return load_month(month_config, records, source_path)
 
 
 if __name__ == "__main__":

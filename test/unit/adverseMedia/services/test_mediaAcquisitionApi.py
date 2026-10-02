@@ -403,3 +403,22 @@ class TestBuildApiStopCheck:
             discovery_service.check_record_key.call_count
             == 10
         )
+
+
+def test_uk_gov_record_files_are_named_by_content_id():
+    """Raw files use the short unique content_id; long links overflowed the 255-byte file-name limit."""
+
+    import yaml
+    from pathlib import Path
+
+    config_path = (
+        Path(__file__).resolve().parents[4]
+        / "config"
+        / "mediaSources.yaml"
+    )
+    source = yaml.safe_load(
+        config_path.read_text(encoding="utf-8")
+    )["sources"]["UK_GOV_NEWS_COMMUNICATIONS"]
+
+    assert source["api_config"]["record_id_path"] == "content_id"
+    assert source["identity"]["external_id"]["field"] == "content_id"

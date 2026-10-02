@@ -16,6 +16,8 @@ leader and give each a stable seat key, so this pins that wiring:
                       than leaving the old holder wrongly current
 """
 
+import hashlib
+
 import pytest
 
 from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
@@ -107,6 +109,35 @@ def test_seat_key_is_country_plus_position_not_person(rules, raw_records):
     ]
     successor_id = _run(rules, successor)[0]["external_id"]
     assert ghani["external_id"] == successor_id
+
+
+def test_repeated_title_in_a_country_gets_one_id_per_holder(rules):
+    records = [
+        {
+            "detail": {
+                "country": "Turkey",
+                "last_updated": None,
+                "note": None,
+                "leaders": [
+                    {"position": "President", "name": "Ahmed SEZER"},
+                    {"position": "Min. of State", "name": "Faruk BAL"},
+                    {"position": "Min. of State", "name": "Abdulhaluk CAY"},
+                ],
+            }
+        }
+    ]
+    out = _run(rules, records)
+    ids = {r["name"]: r["external_id"] for r in out}
+
+    assert len(set(ids.values())) == 3
+    assert ids["Faruk BAL"] != ids["Abdulhaluk CAY"]
+
+
+def test_unique_title_id_is_unchanged_by_disambiguation(rules, raw_records):
+    out = _run(rules, raw_records)
+    ghani = next(r for r in out if r["name"] == "Ashraf GHANI")
+    expected = hashlib.sha256("AFGHANISTAN|PRES.".encode("utf-8")).hexdigest()
+    assert ghani["external_id"] == f"{LIST_NAME}-{expected}"
 
 
 def test_vacant_seat_is_retained_with_a_valid_id(rules, raw_records):

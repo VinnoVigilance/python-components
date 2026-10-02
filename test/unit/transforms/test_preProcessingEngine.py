@@ -255,6 +255,56 @@ class TestSetConstantField:
         assert record["entity_type"] == "Entity"
 
 
+class TestDisambiguateDuplicateKeys:
+    CONFIG = {
+        "key_fields": ["country", "position"],
+        "base_field": "position",
+        "tiebreak_fields": ["name"],
+        "output_field": "seat_key",
+    }
+
+    def test_unique_key_keeps_base_value(self, engine):
+        records = engine.disambiguate_duplicate_keys(
+            [{"country": "Turkey", "position": "President", "name": "A"}],
+            self.CONFIG,
+        )
+        assert records[0]["seat_key"] == "President"
+
+    def test_repeated_key_appends_tiebreak(self, engine):
+        records = engine.disambiguate_duplicate_keys(
+            [
+                {"country": "Turkey", "position": "Min. of State", "name": "Bal, Faruk"},
+                {"country": "TURKEY ", "position": "min. of state", "name": "Cay, A"},
+                {"country": "Greece", "position": "Min. of State", "name": "X"},
+            ],
+            self.CONFIG,
+        )
+        assert [r["seat_key"] for r in records] == [
+            "Min. of State|Bal, Faruk",
+            "min. of state|Cay, A",
+            "Min. of State",
+        ]
+
+    def test_nested_paths_multiple_tiebreaks_and_separator(self, engine):
+        records = engine.disambiguate_duplicate_keys(
+            [
+                {"p": {"name": "John Smith"}, "dob": "1970", "nat": "US"},
+                {"p": {"name": "John Smith"}, "dob": "1982", "nat": "UK"},
+            ],
+            {
+                "key_fields": ["p.name"],
+                "base_field": "p.name",
+                "tiebreak_fields": ["dob", "nat"],
+                "output_field": "uid_basis",
+                "separator": "#",
+            },
+        )
+        assert [r["uid_basis"] for r in records] == [
+            "John Smith#1970#US",
+            "John Smith#1982#UK",
+        ]
+
+
 class TestPreprocessOrchestrator:
     def test_runs_record_level_handler(self, engine):
         rules = [{

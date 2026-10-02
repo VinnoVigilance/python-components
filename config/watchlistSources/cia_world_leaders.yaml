@@ -5,7 +5,7 @@ record_mode: list_detail
 detail_fetch_strategy: direct
 
 discovery:
-  row_selector: "a.inline-link[href*='/foreign-governments/']"
+  row_selector: "a.inline-link[href*='/foreign-governments/'], a.inline-link[href*='/historical-data/']"
   detail_link_selector_type: xpath
   detail_link_selector: "self::a"
   detail_link_attribute: href
@@ -47,7 +47,7 @@ attachments:
 record_id:
   strategy: url_regex
   source: detail_url
-  pattern: "/foreign-governments/([a-z-]+)"
+  pattern: "/([a-z-]+)/?$"
 
 pagination:
   type: none
