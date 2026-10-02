@@ -17,7 +17,12 @@ services:
       # Mounts the current directory (python-components) to /app
       - .:/app
       # Mounts the root .git repository metadata into the container (read-only)
-      - ../.git:/app/.git:ro
+      - ./.git:/app/.git:ro
+      # Explicit persistent storage definitions
+      - ./data:/app/data
+      - ./downloaded_files:/app/downloaded_files
+      - ./logs:/app/logs
+      - ./debug_screenshots:/app/debug_screenshots
     env_file:
       - ../.env
     environment:

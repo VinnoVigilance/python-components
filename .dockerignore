@@ -1,0 +1,32 @@
+# Version Control & CI/CD
+.git
+.github
+
+# Virtual Environments & IDE
+.venv
+venv
+ENV/
+.vscode/
+.idea/
+
+# Python Bytecode & Caches
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+
+# Large Dynamic Data & Downloads
+data/
+downloaded_files/
+debug_screenshots/
+
+# Runtime Logs
+logs/
+*.log
+*.logs
+
+# OS Metadata
+.DS_Store
+Thumbs.db
