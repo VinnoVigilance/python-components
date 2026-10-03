@@ -48,6 +48,48 @@ def test_engine_installs_indicators_on_the_bot():
     bot.__enter__.assert_called_once()
 
 
+ENGINE_TIME = "ingestion.bypassCollector.engines.stealthBrowserEngine.time"
+
+
+@pytest.mark.parametrize("settle, expected_sleeps", [(None, [5]), (0, [])])
+def test_navigate_sleeps_only_when_asked(settle, expected_sleeps):
+    engine = StealthBrowserEngine()
+    engine._bot = MagicMock()
+
+    with patch(ENGINE_TIME) as fake_time:
+        ok = engine.navigate("https://x") if settle is None else engine.navigate("https://x", settle_seconds=settle)
+
+    assert ok
+    engine._bot.safe_get.assert_called_once_with("https://x")
+    assert [c.args[0] for c in fake_time.sleep.call_args_list] == expected_sleeps
+
+
+@pytest.mark.parametrize("states, expected", [
+    (["loading", "loading", "interactive"], True),
+    (["complete"], True),
+])
+def test_wait_for_page_load_returns_once_scripts_have_run(states, expected):
+    engine = StealthBrowserEngine()
+    engine.sb = MagicMock()
+    engine.sb.execute_script.side_effect = states
+
+    with patch(ENGINE_TIME) as fake_time:
+        fake_time.time.return_value = 0
+        assert engine.waitForPageLoad(timeout=30) is expected
+
+    assert engine.sb.execute_script.call_count == len(states)
+
+
+def test_wait_for_page_load_gives_up_after_timeout():
+    engine = StealthBrowserEngine()
+    engine.sb = MagicMock()
+    engine.sb.execute_script.return_value = "loading"
+
+    with patch(ENGINE_TIME) as fake_time:
+        fake_time.time.side_effect = [0, 0, 31]
+        assert engine.waitForPageLoad(timeout=30) is False
+
+
 def test_exit_replaces_an_event_loop_closed_by_the_browser():
     closed = asyncio.new_event_loop()
     asyncio.set_event_loop(closed)

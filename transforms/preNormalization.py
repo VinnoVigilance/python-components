@@ -520,6 +520,14 @@ class PreNormalizationEngine:
             self._build_source_entity_field_map()
         )
 
+        self.rules_by_source = {}
+
+        for _, rule in self.prenorm_df.iterrows():
+
+            self.rules_by_source.setdefault(
+                rule["source"], []
+            ).append(rule)
+
     # -----------------------------------------------------
     # Build source -> entity_field map
     # -----------------------------------------------------
@@ -563,22 +571,19 @@ class PreNormalizationEngine:
 
         raw_entity_value = matches[0][2]
 
-        rules = self.prenorm_df[
-            (self.prenorm_df["source"] == source)
-            &
-            (self.prenorm_df["field"] == entity_field)
-            &
+        rule_row = next(
             (
-                self.prenorm_df["normalization_type"]
-                == "enum"
-            )
-        ]
+                rule
+                for rule in self.rules_by_source.get(source, [])
+                if rule["field"] == entity_field
+                and rule["normalization_type"] == "enum"
+            ),
+            None,
+        )
 
-        if rules.empty:
+        if rule_row is None:
 
             return raw_entity_value
-
-        rule_row = rules.iloc[0]
 
         handler = HANDLERS["enum"]
 
@@ -644,27 +649,17 @@ class PreNormalizationEngine:
         # Load Rules
         # ---------------------------------------------
 
-        rules = self.prenorm_df[
-            (self.prenorm_df["source"] == source)
-            &
-            (
-                (
-                    self.prenorm_df["entity_type"]
-                    == entity_type
-                )
-                |
-                (
-                    self.prenorm_df["entity_type"]
-                    == "*"
-                )
-            )
+        rules = [
+            rule
+            for rule in self.rules_by_source.get(source, [])
+            if rule["entity_type"] in (entity_type, "*")
         ]
 
         # ---------------------------------------------
         # Apply Rules
         # ---------------------------------------------
 
-        for _, rule in rules.iterrows():
+        for rule in rules:
 
             field = str(rule["field"]).strip()
 

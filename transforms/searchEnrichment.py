@@ -22,6 +22,7 @@ abjad, not a defect here.
 
 import re
 import unicodedata
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
@@ -322,8 +323,9 @@ def _clean_country_name(name: str) -> str:
     return cleaned
 
 
+@lru_cache(maxsize=None)
 def _pycountry_iso2(name: str):
-    """Exact lookup first, then fuzzy; None if pycountry can't decide."""
+    """Exact lookup first, then fuzzy; None if pycountry can't decide (cached per name)."""
     if not name:
         return None
 
