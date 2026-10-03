@@ -495,7 +495,9 @@ def test_media_details_are_saved_as_individual_files(
             "StealthBrowserEngine"
         ),
         return_value=engine,
-    ) as engine_class:
+    ) as engine_class, patch(
+        "ingestion.crawler.browserDetailFetcher.time"
+    ) as fake_time:
 
         results = list(
             spider._fetch_and_parse_details(
@@ -516,12 +518,14 @@ def test_media_details_are_saved_as_individual_files(
 
     engine.navigate.assert_has_calls(
         [
-            call(first_url),
-            call(second_url),
+            call(first_url, settle_seconds=0),
+            call(second_url, settle_seconds=0),
         ]
     )
 
     assert engine.navigate.call_count == 2
+    assert engine.waitForPageLoad.call_count == 2
+    assert fake_time.sleep.call_count == 1
 
     # One physical file for each news article.
     first_file = (
