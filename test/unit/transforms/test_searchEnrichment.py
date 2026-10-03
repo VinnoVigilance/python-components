@@ -13,6 +13,7 @@ needing the pickLists.xlsx file at all.
 import pytest
 
 from transforms.searchEnrichment import (
+    _pycountry_iso2,
     canonicalize_script,
     country_to_iso2,
     detect_script,
@@ -166,3 +167,14 @@ class TestCountryToIso2:
     def test_none_and_blank_return_empty(self):
         assert country_to_iso2(None, self.VALID) == ""
         assert country_to_iso2("   ", self.VALID) == ""
+
+    def test_repeated_name_is_looked_up_once(self):
+        _pycountry_iso2.cache_clear()
+
+        first = country_to_iso2("Islamic Republic of Iran", self.VALID)
+        misses = _pycountry_iso2.cache_info().misses
+        assert misses > 0
+        second = country_to_iso2("Islamic Republic of Iran", self.VALID)
+
+        assert first == second == "IR"
+        assert _pycountry_iso2.cache_info().misses == misses

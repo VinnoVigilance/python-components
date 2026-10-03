@@ -597,6 +597,7 @@ class PostNormalizationEngine:
 
     def __init__(self, rules_df: pd.DataFrame, config: dict):
         self.rules_df = rules_df
+        self.rules = [rule for _, rule in rules_df.iterrows()]
 
         # Carries per source settings such as date_order, so a handler
         # can read a date the way the list that published it writes them.
@@ -607,7 +608,7 @@ class PostNormalizationEngine:
     def post_normalize_record(self, record):
         entity = deepcopy(record)
 
-        for _, rule in self.rules_df.iterrows():
+        for rule in self.rules:
             rule_type = rule["rule_type"]
             handler = HANDLERS.get(rule_type)
 
