@@ -650,6 +650,37 @@ class PreProcessingEngine:
 
         return exploded
 
+    def disambiguate_duplicate_keys(self, records, config):
+        """Copy base_field to output_field; when the key_fields combination repeats
+        in the dataset, append tiebreak_fields (joined by separator) to keep ids unique."""
+        key_fields = config["key_fields"]
+        base_field = config["base_field"]
+        tiebreak_fields = config["tiebreak_fields"]
+        output_field = config["output_field"]
+        separator = config.get("separator", "|")
+
+        def text(record, field_path):
+            return str(self._resolve_field(record, field_path) or "").strip()
+
+        def key_of(record):
+            return tuple(text(record, field).upper() for field in key_fields)
+
+        counts = {}
+
+        for record in records:
+            key = key_of(record)
+            counts[key] = counts.get(key, 0) + 1
+
+        for record in records:
+            parts = [text(record, base_field)]
+
+            if counts[key_of(record)] > 1:
+                parts.extend(text(record, field) for field in tiebreak_fields)
+
+            record[output_field] = separator.join(parts)
+
+        return records
+
     def split_field_regex(self, record, config):
         """
         Split one field into several sibling fields via a named-group regex.

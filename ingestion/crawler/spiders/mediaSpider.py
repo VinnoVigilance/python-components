@@ -119,6 +119,17 @@ class MediaSpider(scrapy.Spider):
         - whether discovery should stop
         """
 
+        end_status = self._pagination_end_status()
+
+        if end_status and response.status == end_status:
+            self.logger.info(
+                "Listing page %s returned %s; source end reached.",
+                page_number,
+                response.status,
+            )
+            self.discovery_service.mark_source_end()
+            return
+
         article_config = self.discovery_config.get(
             "article",
             {},
@@ -318,12 +329,19 @@ class MediaSpider(scrapy.Spider):
             self.discovery_service.mark_source_end()
             return
 
+        end_status = self._pagination_end_status()
+
         yield scrapy.Request(
             url=next_url,
             callback=self.parse_listing,
             cb_kwargs={
                 "page_number": page_number + 1,
             },
+            meta=(
+                {"handle_httpstatus_list": [end_status]}
+                if end_status
+                else {}
+            ),
         )
 
     def parse_list_rows(
@@ -977,6 +995,18 @@ class MediaSpider(scrapy.Spider):
             f"Unsupported extraction strategy: "
             f"{strategy}"
         )
+
+    def _pagination_end_status(
+        self,
+    ) -> int | None:
+        """Return the HTTP status that marks the end of pages, if the source declares one."""
+
+        end_status = self.discovery_config.get(
+            "pagination",
+            {},
+        ).get("end_status")
+
+        return int(end_status) if end_status else None
 
     def _build_next_page_url(
         self,
