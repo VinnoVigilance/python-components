@@ -63,6 +63,7 @@ SAMPLES = {
     "CIA-WORLD-LEADERS-HISTORICAL": "CIA-WORLD-LEADERS-HISTORICAL_raw_sample.jsonl",
     "ADB-DEBARMENT-SUSPENSION": "ADB-DEBARMENT-SUSPENSION_raw_sample.jsonl",
     "AFDB-DEBARRED-ENTITIES": "AFDB-DEBARRED-ENTITIES_raw_sample.jsonl",
+    "CANADA_CONSOLIDATED_SANCTIONS": "CANADA_CONSOLIDATED_SANCTIONS_raw_sample.jsonl",
 }
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
@@ -109,7 +110,7 @@ GOLDEN = {
         "ListName": "UN-SANCTIONS", "SourceName": "UN",
     },
     "ATC-DESIGNATED-TERRORIST-INDIVIDUALS": {
-        "SourceType": "Official", "DatasetCategory": {"Crime", "Sanctions"},
+        "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS", "SourceName": "ATC",
     },
     "ATC-DESIGNATED-TERRORIST-GROUPS": {
@@ -137,11 +138,11 @@ GOLDEN = {
         "ListName": "GPPB-BLACKLISTED-ENTITIES", "SourceName": "GPPB",
     },
     "COMELEC-2025-SENATORS": {
-        "SourceType": "Official", "DatasetCategory": "PEP (Politically Exposed Person)",
+        "SourceType": "Official", "DatasetCategory": "PEP",
         "ListName": "COMELEC-2025-SENATORS", "SourceName": "COMELEC",
     },
     "DILG-LOCAL-OFFICIALS": {
-        "SourceType": "Official", "DatasetCategory": "PEP (Politically Exposed Person)",
+        "SourceType": "Official", "DatasetCategory": "PEP",
         "ListName": "DILG-LOCAL-OFFICIALS", "SourceName": "DILG",
     },
     "SECO-SANCTIONS": {
@@ -157,7 +158,7 @@ GOLDEN = {
         "ListName": "US-MARSHALS-PROFILED-FUGITIVES", "SourceName": "US-MARSHALS",
     },
     "US-STATE-TERRORIST-EXCLUSION": {
-        "SourceType": "Official", "DatasetCategory": {"Crime", "Sanctions"},
+        "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "US-STATE-TERRORIST-EXCLUSION", "SourceName": "US-STATE",
     },
     "EU-MOST-WANTED": {
@@ -169,11 +170,11 @@ GOLDEN = {
         "ListName": "WORLD-BANK-OTHER-SANCTIONS", "SourceName": "WORLD-BANK",
     },
     "PH-HOUSE-MEMBERS": {
-        "SourceType": "Official", "DatasetCategory": "PEP (Politically Exposed Person)",
+        "SourceType": "Official", "DatasetCategory": "PEP",
         "ListName": "PH-HOUSE-MEMBERS", "SourceName": "CONGRESS-PH",
     },
     "CIA-WORLD-LEADERS-HISTORICAL": {
-        "SourceType": "Official", "DatasetCategory": "PEP (Politically Exposed Person)",
+        "SourceType": "Official", "DatasetCategory": "PEP",
         "ListName": "CIA-WORLD-LEADERS-HISTORICAL", "SourceName": "CIA",
     },
     "ADB-DEBARMENT-SUSPENSION": {
@@ -183,6 +184,10 @@ GOLDEN = {
     "AFDB-DEBARRED-ENTITIES": {
         "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "AFDB-DEBARRED-ENTITIES", "SourceName": "AFDB",
+    },
+    "CANADA_CONSOLIDATED_SANCTIONS": {
+        "SourceType": "Official", "DatasetCategory": "Sanctions",
+        "ListName": "CANADA_CONSOLIDATED_SANCTIONS", "SourceName": "GAC",
     },
 }
 
