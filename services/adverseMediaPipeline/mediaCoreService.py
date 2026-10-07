@@ -70,11 +70,8 @@ class MediaCoreService:
         New logical record:
             Create version 1 with change_type NEW.
 
-        Same content and same pipeline:
-            Skip.
-
-        Same content but different pipeline:
-            Create a REPROCESSED version.
+        Same content:
+            Skip, regardless of pipeline_version.
 
         Different content:
             Close the previous version and create
@@ -123,10 +120,6 @@ class MediaCoreService:
                         == core_record[
                             "content_hash"
                         ]
-                        and current_record[
-                            "pipeline_version"
-                        ]
-                        == pipeline_version
                     ):
                         (
                             mediaRepository

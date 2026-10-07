@@ -109,25 +109,26 @@ class StealthBrowserEngine(BaseEngine):
                 logger.error(f"Error closing StealthBot: {type(e).__name__}: {e}")
         _reset_closed_event_loop()
 
-    def navigate(self, url: str) -> bool:
+    def navigate(self, url: str, settle_seconds: float = 5) -> bool:
         """
-        Navigate to URL using safe_get.
-        
+        Navigate to URL using safe_get, then pause settle_seconds for the page to initialize.
+
         Args:
             url: Destination URL
-            
+            settle_seconds: Fixed pause after loading; 0 when the caller waits for an element
+
         Returns:
             True if navigation succeeded
         """
         logger.info(f"Navigating to: {url}")
-        
+
         try:
             self._bot.safe_get(url)
             logger.info("Navigation completed successfully")
-            
-            # Give page time to initialize
-            time.sleep(5)
-            
+
+            if settle_seconds > 0:
+                time.sleep(settle_seconds)
+
             return True
         except Exception as e:
             logger.error(f"Navigation failed: {type(e).__name__}: {e}")
@@ -254,7 +255,8 @@ class StealthBrowserEngine(BaseEngine):
         logger.info(f"Waiting for element: {selector}")
         
         start = time.time()
-        
+        next_log = 5
+
         while time.time() - start < timeout:
             try:
                 if self.sb.is_element_present(selector):
@@ -262,14 +264,32 @@ class StealthBrowserEngine(BaseEngine):
                     return True
             except Exception:
                 pass
-            
-            time.sleep(2)
+
+            time.sleep(0.5)
             elapsed = int(time.time() - start)
-            logger.warning(f"Still waiting... {elapsed}/{timeout}s")
-        
+            if elapsed >= next_log:
+                logger.warning(f"Still waiting... {elapsed}/{timeout}s")
+                next_log += 5
+
         logger.error(f"Element not found after {timeout}s: {selector}")
         return False
     
+    def waitForPageLoad(self, timeout: int = 30) -> bool:
+        """Wait until the page HTML is parsed and its scripts have run (images may still load)."""
+        start = time.time()
+
+        while time.time() - start < timeout:
+            try:
+                if self.sb.execute_script("return document.readyState;") in ("interactive", "complete"):
+                    return True
+            except Exception:
+                pass
+
+            time.sleep(0.25)
+
+        logger.warning(f"Page still loading after {timeout}s")
+        return False
+
     def waitForText(
         self,
         text: str,

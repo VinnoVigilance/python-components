@@ -1,4 +1,6 @@
 import logging
+import random
+import time
 
 from collections.abc import (
     Callable,
@@ -15,6 +17,8 @@ from ingestion.bypassCollector.engines.stealthBrowserEngine import (
 
 
 logger = logging.getLogger(__name__)
+
+PAGE_GAP_SECONDS = (2.0, 4.0)
 
 
 class BrowserDetailFetcher:
@@ -166,10 +170,18 @@ class BrowserDetailFetcher:
 
                         continue
 
+                    if wait_selector and self._engine is not None:
+                        time.sleep(
+                            random.uniform(*PAGE_GAP_SECONDS)
+                        )
+
                     engine = self._ensure_engine()
 
                     if not engine.navigate(
-                        detail_url
+                        detail_url,
+                        settle_seconds=(
+                            0 if wait_selector else 5
+                        ),
                     ):
                         raise RuntimeError(
                             "Could not open detail page: "
@@ -186,6 +198,11 @@ class BrowserDetailFetcher:
                         raise RuntimeError(
                             "Detail page did not become "
                             f"ready: {detail_url}"
+                        )
+
+                    if wait_selector:
+                        engine.waitForPageLoad(
+                            timeout_seconds
                         )
 
                     html = engine.getHtml()

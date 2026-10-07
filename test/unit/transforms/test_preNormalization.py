@@ -282,6 +282,38 @@ class TestPreNormalizationEngineEndToEnd:
         assert raw == {"type": "person", "name": "John (alias):"}  # deepcopied
 
 
+class TestRuleSelectionAcrossRecords:
+    """Rules grouped once per source still pick per-record by entity type."""
+
+    def _engine(self):
+        source_config_df = pd.DataFrame([{"source": "EU", "entity_field": "kind"}])
+        prenorm_df = pd.DataFrame([
+            {"source": "EU", "field": "kind", "entity_type": "*",
+             "normalization_type": "enum", "normalization_rule": "P=Individual|E=Entity"},
+            {"source": "EU", "field": "name", "entity_type": "Individual",
+             "normalization_type": "before_parenthesis", "normalization_rule": ""},
+            {"source": "OTHER", "field": "name", "entity_type": "*",
+             "normalization_type": "before_parenthesis", "normalization_rule": ""},
+        ])
+        return PreNormalizationEngine(prenorm_df, source_config_df)
+
+    def test_type_specific_rule_applies_only_to_its_type(self):
+        engine = self._engine()
+
+        person = engine.pre_normalize_record("EU", {"kind": "P", "name": "Ann (x)"})
+        company = engine.pre_normalize_record("EU", {"kind": "E", "name": "Acme (y)"})
+        person_again = engine.pre_normalize_record("EU", {"kind": "P", "name": "Bob (z)"})
+
+        assert (person["entity_type"], person["name"]) == ("Individual", "Ann")
+        assert (company["entity_type"], company["name"]) == ("Entity", "Acme (y)")
+        assert person_again["name"] == "Bob"
+
+    def test_unknown_source_gets_no_rules(self):
+        engine = self._engine()
+
+        assert engine.pre_normalize_record("NONE", {"name": "Ann (x)"}) == {"name": "Ann (x)"}
+
+
 class TestAliasDequoteEndToEnd:
     """The FBI-WANTED alias-dequote setup, driven end-to-end via regex_extract.
 

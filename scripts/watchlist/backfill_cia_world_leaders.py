@@ -80,7 +80,8 @@ MAX_MONTH_ATTEMPTS = 3
 MONTH_RETRY_SECONDS = 60
 RESUME_STATUSES = {"RESUME_PROCESSING", "RESUME_NORMALIZATION"}
 MIN_EDITION_SEATS = 5000
-ABSENT = object()
+ABSENT = "ABSENT"
+PREFETCH_MONTHS = 2
 RETRY_BACKOFF_SECONDS = 3
 DOT_LEADER_MIN_LINES = 20
 HEADER_MIN_SIZE = 9.6
@@ -688,40 +689,70 @@ def main() -> None:
     if args.dry_run:
         jsonl_dir.mkdir(parents=True, exist_ok=True)
 
-    for year, month in iter_editions(start, end):
-        started_at = perf_counter()
-        fetched = None
+    editions = list(iter_editions(start, end))
 
-        for attempt in range(1, MAX_MONTH_ATTEMPTS + 1):
-            try:
-                if fetched is None:
-                    fetched = fetch_edition(year, month, base_config)
+    with ProcessPoolExecutor(
+        max_workers=PREFETCH_MONTHS,
+        mp_context=multiprocessing.get_context("spawn"),
+        max_tasks_per_child=1,
+    ) as executor:
+        prefetched = {}
 
-                if fetched is ABSENT:
-                    logger.info("%s %s: absent (skipped)", month, year)
-                    break
-
-                result = run_edition(year, month, fetched, args.dry_run, jsonl_dir)
-                logger.info(
-                    "%s %s: %d countries, %d seats -> %s (%.1fs)",
-                    month, year, len(fetched[1]), fetched[3], result,
-                    perf_counter() - started_at,
-                )
-                break
-            except Exception:
-                logger.exception(
-                    "%s %s: attempt %d/%d failed", month, year, attempt, MAX_MONTH_ATTEMPTS
+        def schedule(index: int) -> None:
+            if index < len(editions):
+                prefetched[index] = executor.submit(
+                    fetch_edition, *editions[index], base_config
                 )
 
-                if attempt == MAX_MONTH_ATTEMPTS:
-                    logger.error(
-                        "STOPPED at %s %s. Nothing after it was loaded. Fix the issue, "
-                        "then rerun with: --start %d-%02d",
-                        month, year, year, MONTHS.index(month) + 1,
-                    )
-                    sys.exit(1)
+        for index in range(PREFETCH_MONTHS):
+            schedule(index)
 
-                sleep(MONTH_RETRY_SECONDS * attempt)
+        for index, (year, month) in enumerate(editions):
+            future = prefetched.pop(index)
+            schedule(index + PREFETCH_MONTHS)
+            load_edition(year, month, future, base_config, args.dry_run, jsonl_dir)
+
+
+def load_edition(year, month, future, base_config, dry_run: bool, jsonl_dir: Path) -> None:
+    """Load one edition in order: prefetched data first, then retry the fetch here."""
+
+    started_at = perf_counter()
+    fetched = None
+
+    for attempt in range(1, MAX_MONTH_ATTEMPTS + 1):
+        try:
+            if fetched is None:
+                fetched = (
+                    future.result()
+                    if attempt == 1
+                    else fetch_edition(year, month, base_config)
+                )
+
+            if fetched == ABSENT:
+                logger.info("%s %s: absent (skipped)", month, year)
+                return
+
+            result = run_edition(year, month, fetched, dry_run, jsonl_dir)
+            logger.info(
+                "%s %s: %d countries, %d seats -> %s (%.1fs)",
+                month, year, len(fetched[1]), fetched[3], result,
+                perf_counter() - started_at,
+            )
+            return
+        except Exception:
+            logger.exception(
+                "%s %s: attempt %d/%d failed", month, year, attempt, MAX_MONTH_ATTEMPTS
+            )
+
+            if attempt == MAX_MONTH_ATTEMPTS:
+                logger.error(
+                    "STOPPED at %s %s. Nothing after it was loaded. Fix the issue, "
+                    "then rerun with: --start %d-%02d",
+                    month, year, year, MONTHS.index(month) + 1,
+                )
+                sys.exit(1)
+
+            sleep(MONTH_RETRY_SECONDS * attempt)
 
 
 def fetch_edition(year: int, month: str, base_config: Optional[dict[str, Any]]):

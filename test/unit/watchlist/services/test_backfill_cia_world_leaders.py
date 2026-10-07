@@ -1,5 +1,8 @@
 """Unit tests for the CIA World Leaders backfill script (no DB, no network)."""
 
+import pickle
+from concurrent.futures import Future
+
 import pytest
 
 from scripts.watchlist import backfill_cia_world_leaders as backfill
@@ -91,6 +94,62 @@ def test_resume_normalization_skips_raw_insert(fake_services):
     assert result["status"] == "RESUMED"
     assert result["raw_record_count"] is None
     assert calls == [("core", 7)]
+
+
+def _future(result=None, error=None):
+    future = Future()
+    if error:
+        future.set_exception(error)
+    else:
+        future.set_result(result)
+    return future
+
+
+@pytest.fixture()
+def fake_edition(monkeypatch):
+    """Record run_edition / fetch_edition calls and skip the retry waits."""
+    calls = []
+    monkeypatch.setattr(backfill, "sleep", lambda seconds: None)
+    monkeypatch.setattr(
+        backfill, "run_edition",
+        lambda year, month, fetched, dry_run, jsonl_dir: calls.append(("run", fetched)) or "ok",
+    )
+    monkeypatch.setattr(
+        backfill, "fetch_edition",
+        lambda year, month, config: calls.append(("fetch", month)) or ({}, [{}], "f.pdf", 6000),
+    )
+    return calls
+
+
+def test_absent_marker_survives_a_process_boundary():
+    assert pickle.loads(pickle.dumps(backfill.ABSENT)) == backfill.ABSENT
+
+
+def test_load_edition_uses_the_prefetched_month(fake_edition):
+    fetched = ({}, [{}], "f.pdf", 6000)
+
+    backfill.load_edition(2012, "June", _future(fetched), None, True, None)
+
+    assert fake_edition == [("run", fetched)]
+
+
+def test_failed_prefetch_is_retried_in_the_main_process(fake_edition):
+    backfill.load_edition(2012, "June", _future(error=RuntimeError("network")), None, True, None)
+
+    assert fake_edition == [("fetch", "June"), ("run", ({}, [{}], "f.pdf", 6000))]
+
+
+def test_absent_prefetched_month_is_skipped(fake_edition):
+    backfill.load_edition(2019, "March", _future(backfill.ABSENT), None, True, None)
+
+    assert fake_edition == []
+
+
+def test_month_stops_the_run_after_three_failures(fake_edition, monkeypatch):
+    monkeypatch.setattr(backfill, "fetch_edition", lambda *args: (_ for _ in ()).throw(RuntimeError("down")))
+
+    with pytest.raises(SystemExit):
+        backfill.load_edition(2012, "June", _future(error=RuntimeError("down")), None, True, None)
 
 
 def test_completed_month_is_skipped(fake_services):
