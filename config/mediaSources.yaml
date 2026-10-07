@@ -746,8 +746,10 @@ sources:
 
       transport: requests
       timeout: 180
-      retry: 3
-      throttle_delay: 0.5
+      retry: 8
+      retry_delay_seconds: 10
+      retry_max_delay_seconds: 120
+      throttle_delay: 1
 
     parser:
       type: json
