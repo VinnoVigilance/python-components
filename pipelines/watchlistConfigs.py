@@ -111,7 +111,7 @@ WATCHLIST_CONFIGS = {
         ),
         "external_id_path": "unique_id",
         "minimum_record_count": 50,
-        "schedule": "daily",
+        "schedule": "weekly",
         "versioning_strategy": "continuous",
         "bypass_config": {
             "challenge": "cloudflare",
@@ -262,7 +262,7 @@ WATCHLIST_CONFIGS = {
         ),
         "external_id_path": "unique_id",
         "minimum_record_count": 25,
-        "schedule": "daily",
+        "schedule": "weekly",
         "bypass_config": {
             "challenge": "cloudflare",
             "headless": False,
@@ -489,7 +489,7 @@ WATCHLIST_CONFIGS = {
         },
         "file_type": "pdf",
         "external_id_path": "unique_id",
-        "schedule": "daily",
+        "schedule": "monthly",
         "versioning_strategy": "continuous",
         "parser_config": {
             "expected_headers": [
@@ -527,7 +527,7 @@ WATCHLIST_CONFIGS = {
         "url": "https://www.cftc.gov/LearnAndProtect/Resources/Check/redlist.htm",
         "file_type": "html",
         "external_id_path": "source_record_id",
-        "schedule": "daily",
+        "schedule": "weekly",
         "versioning_strategy": "continuous",
         "source_config": "config/watchlistSources/cftc_red_list.yaml",
         "attachments": [
@@ -558,7 +558,7 @@ WATCHLIST_CONFIGS = {
         "url": "https://eumostwanted.eu/",
         "file_type": "html",
         "external_id_path": "source_record_id",
-        "schedule": "daily",
+        "schedule": "weekly",
         "versioning_strategy": "continuous",
         "source_config": "config/watchlistSources/eu_most_wanted.yaml",
         "attachments": [
@@ -580,7 +580,7 @@ WATCHLIST_CONFIGS = {
         "url": "https://www.cia.gov/resources/world-leaders/foreign-governments/",
         "file_type": "html",
         "external_id_path": "external_id",
-        "schedule": "daily",
+        "schedule": "monthly",
         "versioning_strategy": "continuous",
         "source_config": "config/watchlistSources/cia_world_leaders.yaml",
         "bypass_config": {
@@ -666,7 +666,7 @@ WATCHLIST_CONFIGS = {
         "url": "https://onlineblacklistingportal.gppb.gov.ph/obp-backend/cbr/cbr_public/",
         "file_type": "jsonl",
         "external_id_path": "unique_id",
-        "schedule": "daily",
+        "schedule": "weekly",
         "versioning_strategy": "continuous",
         "api_config": {
             "pagination": {
@@ -714,7 +714,7 @@ WATCHLIST_CONFIGS = {
         "url": "https://master-api.dmw.gov.ph/api/v1/public/licensed-agencies",
         "file_type": "jsonl",
         "external_id_path": "unique_id",
-        "schedule": "daily",
+        "schedule": "weekly",
         "versioning_strategy": "continuous",
         "api_config": {
             "pagination": {
@@ -768,7 +768,7 @@ WATCHLIST_CONFIGS = {
         "file_type": "json",
         "items_path": "national",
         "external_id_path": "ballot_number",
-        "schedule": "daily",
+        "schedule": "every_3_months",
         "versioning_strategy": "continuous",
         "bypass_config": {
             "challenge": "cloudflare",
@@ -861,7 +861,7 @@ WATCHLIST_CONFIGS = {
         ),
         "file_type": "html",
         "external_id_path": "source_record_id",
-        "schedule": "daily",
+        "schedule": "monthly",
         "versioning_strategy": "continuous",
         "source_config": (
             "config/watchlistSources/"
@@ -925,7 +925,7 @@ WATCHLIST_CONFIGS = {
         ),
         "file_type": "html",
         "external_id_path": "source_record_id",
-        "schedule": "daily",
+        "schedule": "every_3_months",
         "versioning_strategy": "continuous",
         "source_config": (
             "config/watchlistSources/"
@@ -995,7 +995,7 @@ WATCHLIST_CONFIGS = {
         ),
         "file_type": "html",
         "external_id_path": "source_record_id",
-        "schedule": "daily",
+        "schedule": "weekly",
         "versioning_strategy": "continuous",
         "source_config": "config/watchlistSources/nca_most_wanted.yaml",
         "attachments": [
@@ -1112,7 +1112,7 @@ WATCHLIST_CONFIGS = {
         ),
         "file_type": "html",
         "external_id_path": "source_record_id",
-        "schedule": "daily",
+        "schedule": "monthly",
         "versioning_strategy": "continuous",
         "source_config": (
             "config/watchlistSources/world_bank_other_sanctions.yaml"
@@ -1207,7 +1207,7 @@ WATCHLIST_CONFIGS = {
         "url": "https://www.afdb.org/en/debarred-entities-json-feed",
         "file_type": "json",
         "external_id_path": "unique_id",
-        "schedule": "daily",
+        "schedule": "weekly",
         "versioning_strategy": "continuous",
         "bypass_config": {
             "challenge": "cloudflare",
@@ -1261,7 +1261,7 @@ WATCHLIST_CONFIGS = {
             "url": "https://ws-public.interpol.int/notices/v1/red",
             "file_type": "jsonl",
             "external_id_path": "source_record_id",
-            "schedule": "daily",
+            "schedule": "weekly",
             "versioning_strategy": "continuous",
             "preprocessing": [
                 {
@@ -1358,7 +1358,7 @@ WATCHLIST_CONFIGS = {
         ),
         "file_type": "html",
         "external_id_path": "source_record_id",
-        "schedule": "daily",
+        "schedule": "monthly",
         "versioning_strategy": "continuous",
         "source_config": (
             "config/watchlistSources/"
