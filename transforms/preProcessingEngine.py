@@ -290,9 +290,16 @@ class PreProcessingEngine:
         return record
 
     def set_constant_field(self, record, config):
+        """Stamp a fixed value; with `when_field`, only if that field matches `when_pattern` (default: non-blank)."""
         output_field = config["output_field"]
         value = config["value"]
         overwrite = config.get("overwrite", False)
+
+        when_field = config.get("when_field")
+        if when_field:
+            condition_value = str(self._resolve_field(record, when_field) or "")
+            if not re.search(config.get("when_pattern", r"\S"), condition_value):
+                return record
 
         current_value = record.get(output_field)
 
