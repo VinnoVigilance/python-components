@@ -47,6 +47,7 @@ SAMPLES = {
     "PCIJ_INVESTIGATIVE_REPORTS": "PCIJ_INVESTIGATIVE_REPORTS_extracted_sample.jsonl",
     "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": "DTI_PH_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
+    "DTI_PH_FAIR_TRADE_UPDATES": "DTI_PH_FAIR_TRADE_UPDATES_extracted_sample.jsonl",
     "ADB_CASE_SUMMARIES": "ADB_CASE_SUMMARIES_extracted_sample.jsonl",
     "SEC_PH_ADVISORIES": "SEC_PH_ADVISORIES_extracted_sample.jsonl",
     "PTV_NEWS": "PTV_NEWS_extracted_sample.jsonl",
@@ -57,48 +58,53 @@ SAMPLES = {
 # data/rules/mediaMapping.xlsx.
 GOLDEN = {
     "NBI_PRESS_RELEASES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "NBI_PRESS_RELEASES", "SourceName": "NBI",
         "PublisherName": "NBI",
     },
     "AMLC_NEWS_AND_ANNOUNCEMENTS": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "AMLC_NEWS_AND_ANNOUNCEMENTS", "SourceName": "AMLC",
         "PublisherName": "AMLC",
     },
     "PCIJ_CORRUPTION_WATCH": {
-        "SourceType": "Media", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "Media",
         "DatasetName": "PCIJ_CORRUPTION_WATCH", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
     "PCIJ_INVESTIGATIVE_REPORTS": {
-        "SourceType": "Media", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "Media",
         "DatasetName": "PCIJ_INVESTIGATIVE_REPORTS", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
     # UK_GOV's Publisher.Name is a per-record `path` (the publishing org), not a
     # dataset constant, so it is not pinned here.
     "UK_GOV_NEWS_COMMUNICATIONS": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "Media",
         "DatasetName": "UK_GOV_NEWS_COMMUNICATIONS", "SourceName": "UK_GOV",
     },
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "DTI_PH_FAIR_TRADE_PRESS_RELEASES", "SourceName": "DTI_PH",
         "PublisherName": "Department of Trade and Industry (Philippines)",
     },
+    "DTI_PH_FAIR_TRADE_UPDATES": {
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
+        "DatasetName": "DTI_PH_FAIR_TRADE_UPDATES", "SourceName": "DTI_PH",
+        "PublisherName": "Department of Trade and Industry (Philippines)",
+    },
     "ADB_CASE_SUMMARIES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
         "DatasetName": "ADB_CASE_SUMMARIES", "SourceName": "ADB",
         "PublisherName": "Asian Development Bank",
     },
     "SEC_PH_ADVISORIES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
         "DatasetName": "SEC_PH_ADVISORIES", "SourceName": "SEC_PH",
         "PublisherName": "Securities and Exchange Commission (Philippines)",
     },
     "PTV_NEWS": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "PTV_NEWS", "SourceName": "PTV",
         "PublisherName": "People's Television Network (Philippines)",
     },
@@ -279,6 +285,27 @@ class TestDtiAttachments:
         for rec in _canonical_records("DTI_PH_FAIR_TRADE_PRESS_RELEASES"):
             for a in rec.get("Attachments") or []:
                 assert "fteb-staging" not in (a.get("URL") or ""), a
+
+
+class TestDtiUpdatesAttachments:
+    """A PDF-only update post keeps its PDF as a Document; a Drive link yields none."""
+
+    def _attachments(self, record_id):
+        for rec in _canonical_records("DTI_PH_FAIR_TRADE_UPDATES"):
+            if rec["Sources"][0]["SourceRecordId"] == record_id:
+                return rec["Attachments"]
+        raise AssertionError(f"no DTI update sample record with id {record_id!r}")
+
+    def test_body_pdf_becomes_document_attachment(self):
+        docs = [a["URL"] for a in self._attachments(5200) if a["Type"] == "Document"]
+        assert len(docs) == 1 and docs[0].endswith(".pdf"), docs
+
+    def test_body_images_become_images(self):
+        assert all(a["Type"] == "Image" for a in self._attachments(5435))
+        assert len(self._attachments(5435)) == 12
+
+    def test_drive_link_is_not_an_attachment(self):
+        assert self._attachments(3388) == []
 
 
 class TestAdbCaseSummaries:
