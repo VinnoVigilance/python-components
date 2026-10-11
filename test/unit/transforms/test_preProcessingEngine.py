@@ -12,6 +12,7 @@ fixture-based test later.
 
 import pytest
 
+from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
 from transforms.preProcessingEngine import PreProcessingEngine
 
 pytestmark = pytest.mark.unit
@@ -253,6 +254,49 @@ class TestSetConstantField:
             {"output_field": "entity_type", "value": "Entity", "overwrite": True},
         )
         assert record["entity_type"] == "Entity"
+
+    def test_when_field_non_blank_stamps(self, engine):
+        record = engine.set_constant_field(
+            {"org_name": "Bremino Group"},
+            {"output_field": "entity_type", "value": "Entity", "when_field": "org_name"},
+        )
+        assert record["entity_type"] == "Entity"
+
+    def test_when_field_blank_or_missing_skips(self, engine):
+        config = {"output_field": "entity_type", "value": "Entity", "when_field": "org_name"}
+        assert "entity_type" not in engine.set_constant_field({"org_name": " "}, config)
+        assert "entity_type" not in engine.set_constant_field({}, config)
+
+    def test_when_pattern_must_match(self, engine):
+        config = {
+            "output_field": "entity_type",
+            "value": "Vessel",
+            "when_field": "imo",
+            "when_pattern": r"^\d{7}$",
+        }
+        assert engine.set_constant_field({"imo": "7612448"}, config)["entity_type"] == "Vessel"
+        assert "entity_type" not in engine.set_constant_field({"imo": "مجتبی خامنه‌ای"}, config)
+
+
+class TestCanadaEntityTypeStamps:
+    """Canada's config stamps Vessel / Entity / Individual from which columns are filled."""
+
+    RULES = WATCHLIST_CONFIGS["CANADA_CONSOLIDATED_SANCTIONS"]["preprocessing"]
+    IMO = "ShipIMONumber-NumeroOMIDuNavire"
+    ENT = "EntityOrShip-EntiteOuNavire"
+
+    def _types(self, records):
+        base = {"Country-Pays": "Russia / Russie", "Schedule-Annexe": "1", "Item-NumeroDarticle": "1"}
+        processed = PreProcessingEngine().preprocess([{**base, **r} for r in records], self.RULES)
+        return [r["entity_type"] for r in processed]
+
+    def test_types_from_filled_columns(self):
+        assert self._types([
+            {"GivenName-Prenom": "Dmitry", "LastName-NomDeFamille": "Balaba"},
+            {self.ENT: "Bremino Group"},
+            {self.ENT: "Balitiyskiy III", self.IMO: "7612448"},
+            {"LastName-NomDeFamille": "Davoud Moazami", self.IMO: "مجتبی خامنه‌ای"},
+        ]) == ["Individual", "Entity", "Vessel", "Individual"]
 
 
 class TestDisambiguateDuplicateKeys:

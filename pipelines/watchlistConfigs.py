@@ -448,6 +448,64 @@ WATCHLIST_CONFIGS = {
         "versioning_strategy": "continuous",
     },
 
+    "CANADA_CONSOLIDATED_SANCTIONS": {
+        "source_name": "GAC",
+        "list_name": "CANADA_CONSOLIDATED_SANCTIONS",
+        "date_order": "DMY",
+        "download_method": "HTTPS",
+        "versioning_strategy": "continuous",
+        "url": (
+            "https://www.international.gc.ca/world-monde/assets/office_docs/"
+            "international_relations-relations_internationales/sanctions/sema-lmes.xml"
+        ),
+        "file_type": "xml",
+        "root_tags": ["record"],
+        "external_id_path": "unique_id",
+        "schedule": "daily",
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "Country-Pays",
+                        "Schedule-Annexe",
+                        "Item-NumeroDarticle",
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "GAC",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Vessel",
+                    "when_field": "ShipIMONumber-NumeroOMIDuNavire",
+                    "when_pattern": r"^\d{7}$",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                    "when_field": "EntityOrShip-EntiteOuNavire",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+        ],
+    },
+
     "FBI-WANTED": {
         "source_name": "FBI",
         "list_name": "FBI-WANTED",
