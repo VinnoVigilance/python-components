@@ -157,9 +157,9 @@ def crawl_source(
         saved_html
             -> SavedHtmlMediaSpider
 
-    Media-specific crawler settings are applied
-    only to Media spiders. Existing Watchlist
-    behaviour remains unchanged.
+    Optional crawler_settings (throttle/retry) come from
+    the source config; the Media retry backoff middleware
+    applies only to Media spiders.
     """
 
     # =====================================================
@@ -350,22 +350,14 @@ def crawl_source(
     )
 
     # =====================================================
-    # 7. MEDIA-SPECIFIC HTTP SETTINGS
-    # =====================================================
-    #
-    # These settings are applied only to Media.
-    # Existing Watchlist Scrapy settings remain
-    # unchanged.
+    # 7. PER-SOURCE HTTP SETTINGS
     # =====================================================
 
-    if is_media:
+    crawler_settings = (
+        acquisition_config if is_media else crawler_config
+    ).get("crawler_settings", {})
 
-        media_crawler_settings = (
-            acquisition_config.get(
-                "crawler_settings",
-                {},
-            )
-        )
+    if crawler_settings:
 
         # ---------------------------------------------
         # Concurrent requests
@@ -373,12 +365,12 @@ def crawl_source(
 
         if (
             "concurrent_requests_per_domain"
-            in media_crawler_settings
+            in crawler_settings
         ):
             settings.set(
                 "CONCURRENT_REQUESTS_PER_DOMAIN",
                 int(
-                    media_crawler_settings[
+                    crawler_settings[
                         "concurrent_requests_per_domain"
                     ]
                 ),
@@ -390,12 +382,12 @@ def crawl_source(
 
         if (
             "download_delay"
-            in media_crawler_settings
+            in crawler_settings
         ):
             settings.set(
                 "DOWNLOAD_DELAY",
                 float(
-                    media_crawler_settings[
+                    crawler_settings[
                         "download_delay"
                     ]
                 ),
@@ -407,12 +399,12 @@ def crawl_source(
 
         if (
             "randomize_download_delay"
-            in media_crawler_settings
+            in crawler_settings
         ):
             settings.set(
                 "RANDOMIZE_DOWNLOAD_DELAY",
                 bool(
-                    media_crawler_settings[
+                    crawler_settings[
                         "randomize_download_delay"
                     ]
                 ),
@@ -422,21 +414,19 @@ def crawl_source(
         # Retry
         # ---------------------------------------------
 
-        if media_crawler_settings:
-
-            settings.set(
-                "RETRY_ENABLED",
-                True,
-            )
+        settings.set(
+            "RETRY_ENABLED",
+            True,
+        )
 
         if (
             "retry_times"
-            in media_crawler_settings
+            in crawler_settings
         ):
             settings.set(
                 "RETRY_TIMES",
                 int(
-                    media_crawler_settings[
+                    crawler_settings[
                         "retry_times"
                     ]
                 ),
@@ -444,20 +434,22 @@ def crawl_source(
 
         if (
             "retry_http_codes"
-            in media_crawler_settings
+            in crawler_settings
         ):
             settings.set(
                 "RETRY_HTTP_CODES",
                 list(
-                    media_crawler_settings[
+                    crawler_settings[
                         "retry_http_codes"
                     ]
                 ),
             )
 
-        # ---------------------------------------------
-        # Media retry backoff
-        # ---------------------------------------------
+    # ---------------------------------------------
+    # Media retry backoff
+    # ---------------------------------------------
+
+    if is_media:
 
         settings.set(
             "DOWNLOADER_MIDDLEWARES",
