@@ -1636,4 +1636,43 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
+    "BIS_MILITARY_END_USER_LIST": {
+        "source_name": "BIS",
+        "list_name": "BIS_MILITARY_END_USER_LIST",
+        "date_order": "MDY",
+        "download_method": "HTTPS",
+        "url": (
+            "https://media.bis.gov/sites/default/files/"
+            "documents/military-end-user-list.csv"
+        ),
+        "file_type": "csv",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "Country",
+                        "Name",
+                        "Effective Date",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "BIS_MILITARY_END_USER_LIST",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                    "overwrite": True,
+                },
+            },
+        ],
+    },
 }
