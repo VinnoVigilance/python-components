@@ -14,6 +14,7 @@ from ingestion.bypassCollector import BypassCollector
 from repositories import jobStateRepository
 from repositories import watchlistFileLogRepository
 from repositories import watchlistFileRepository
+from ingestion.urlResolver.interface import resolve_url
 from utils.hashing import calculate_file_hash
 
 
@@ -293,10 +294,12 @@ def _download_source_file(
     config: dict[str, Any],
     downloader: Any,
 ) -> Path:
-    """Download a source file using the configured downloader."""
+    """Resolve the download URL and download the source file."""
+
+    download_url = resolve_url(config)
 
     download_task = DownloadTask(
-        url=config["url"],
+        url=download_url,
         source_name=config["source_name"],
         list_name=config.get("list_name", config["source_name"]),
         file_type=config.get("file_type"),
@@ -311,7 +314,6 @@ def _download_source_file(
         )
 
     return source_file_path
-
 
 def store_source_file(
     config: dict[str, Any],

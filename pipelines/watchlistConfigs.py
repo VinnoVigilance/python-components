@@ -1520,4 +1520,93 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "BIS-DPL": {
+        "source_name": "BIS",
+        "list_name": "BIS-DPL",
+        "date_order": "MDY",
+        "download_method": "HTTPS",
+        "url": (
+            "https://www.bis.gov/licensing/"
+            "end-user-guidance/denied-persons-list-dpl"
+        ),
+        "url_resolver": {
+            "type": "link_text",
+            "source_page_url": (
+                "https://www.bis.gov/licensing/"
+                "end-user-guidance/denied-persons-list-dpl"
+            ),
+            "value": "Export as CSV",
+        },
+        "file_type": "csv",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "Name_and_Address",
+                        "Effective_Date",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "BIS-DPL",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "Name_and_Address",
+                    "pattern": (
+                        r"(?i)^(?P<name>[^,]+"
+                        r"(?:,\s*(?:"
+                        r"INC(?:ORPORATED)?\.?|"
+                        r"CORP(?:ORATION)?\.?|"
+                        r"CO\.?|LTD\.?|LIMITED|"
+                        r"LLC|L\.L\.C\.|"
+                        r"JR\.?|SR\.?|"
+                        r"(?:II|III|IV|V|VI)\.?"
+                        r"))*"
+                        r")\s*,\s*(?P<full_address>.*)$"
+                    ),
+                    "outputs": {
+                        "name": "name",
+                        "full_address": "full_address",
+                    },
+                },
+            },
+
+            {
+                "handler": "detect_entity_type",
+                "level": "record",
+                "config": {
+                    "input_field": "name",
+                    "output_field": "entity_type",
+                    "organization_pattern": (
+                        r"(?i)(?:"
+                        r"\b(?:"
+                        r"INC(?:ORPORATED)?|CORP(?:ORATION)?|"
+                        r"CO|COMPANY|LLC|LTD|LIMITED|"
+                        r"GMBH|AG|AB|JSC|PJSC|PTE|FZC|"
+                        r"AIR|AIRLINES|AIRWAYS|AVIATION|"
+                        r"TRADING|TECHNOLOGY|TECHNIK|SYSTEMS|"
+                        r"INTERNATIONAL|COMMUNICATIONS|"
+                        r"VERTRIEBS|ANSTALT|GROUP|"
+                        r"SERVICES|ASSOCIATES"
+                        r")\b|"
+                        r"\b(?:A\.G\.|S\.A\.)(?=\s|$)|"
+                        r"\.NET\b|"
+                        r"\bAVIASTAR\b"
+                        r")"
+                    ),
+                    "individual_pattern": (
+                        r"(?i)^(?:COLONEL|CAPTAIN)\s+\S"
+                    ),
+                },
+            },
+        ],
+    },
+
 }
