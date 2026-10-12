@@ -241,45 +241,51 @@ class PreProcessingEngine:
             "detected_entity_type",
         )
 
-        name = str(record.get(input_field, "")).strip()
-        name_upper = name.upper()
+        name = str(record.get(input_field) or "").strip()
 
-        org_keywords = [
-            "INC", "CORP", "COMPANY", "CO.", "LLC", "LTD",
-            "OPC", "SERVICES", "FIRM", "OFFICE", "ASSOCIATES",
-            "PARTNERS", "CPA", "CPAS", "ACCOUNTING",
-            "BOOKKEEPING", "AUDITING", "CONSULTANCY",
-            "CONSTRUCTION", "BUSINESS", "GROUP", "TRADING",
-            "STORE", "SHOP", "REALTY", "BROKERAGE",
-        ]
-
-        organization_pattern = config.get(
-            "organization_pattern"
+        organization_pattern = (
+            r"(?i)(?:"
+            r"\b(?:"
+            r"INC|INCORPORATED|INCORPORATION|"
+            r"CORP|CORPORATIONS?|CORPORATIION|"
+            r"COMPANY|COMPANIES|LLC|LLP|LTD|LIMITED|OPC|"
+            r"GMBH|AG|AB|JSC|PJSC|PTE|PVT|"
+            r"OY|OU|TMI|FZE|FZC|SDN|BHD|"
+            r"UNIVERSITY|INSTITUTE|ACADEMY|"
+            r"FIRMS?|OFFICES?|LAW|LAWFIRM|ASSOCIATES|PARTNERS|"
+            r"CPA|CPAS|ACCOUNTING|BOOKKEEPING|"
+            r"AUDITING|CONSULTANCY|"
+            r"CONSTRUCTION|BUSINESS|GROUP|GRUP|"
+            r"TRADING|TRADE|STORES?|SHOPS?|SHOPPES?|"
+            r"PAWNSHOP|WORKSHOP|JEWELRY|JEWELLERY|"
+            r"JEWELS|MERCHANDISE|MDSE|REALTY|"
+            r"BROKERAGE|SERVICES|SYSTEMS|"
+            r"AIR|AIRLINES|AIRWAYS|AVIATION|AIRCRAFT|"
+            r"TECHNOLOGY|TECHNOLOGIES|TECHNIK|"
+            r"TECHNOLOGIC|TECH|"
+            r"INTERNATIONAL|COMMUNICATION|"
+            r"COMMUNICATIONS|TELECOM|"
+            r"ELECTRONICS|ELECTRONIC|"
+            r"INDUSTRY|INDUSTRIES|INDUSTRIAL|"
+            r"MANUFACTURER|ENGINEERING|"
+            r"LOGISTICS|CARGO|TRANSPORT|"
+            r"TRANSPORTATION|FORWARDING|"
+            r"COURIER|SHIPPING|"
+            r"EQUIPMENT|MACHINERY|AUTOMATION|"
+            r"COMPUTERS|LAB|LABS|PHOTONICS|"
+            r"HARDWARE|SUPPLY|"
+            r"EXPORTERS|IMPORTERS|"
+            r"VERTRIEBS|ANSTALT"
+            r")\b|"
+            r"\b(?:L\.L\.C\.?|S\.R\.O\.?|"
+            r"A\.G\.|S\.A\.|e\.K\.)(?=\W|$)|"
+            r"\bCO\.(?=\W|$)|"
+            r"\.NET\b"
+            r")"
         )
 
-        if organization_pattern:
-            is_organization = bool(
-                re.search(organization_pattern, name)
-            )
-        else:
-            is_organization = any(
-                keyword in name_upper
-                for keyword in org_keywords
-            )
-
-        if is_organization:
+        if re.search(organization_pattern, name):
             record[output_field] = "Entity"
-            return record
-
-        individual_pattern = config.get(
-            "individual_pattern"
-        )
-
-        if individual_pattern and re.search(
-            individual_pattern,
-            name,
-        ):
-            record[output_field] = "Individual"
             return record
 
         parsed_name = HumanName(name)
@@ -289,18 +295,17 @@ class PreProcessingEngine:
         )
 
         has_title_and_name = bool(
-            organization_pattern
-            and parsed_name.title
+            parsed_name.title
             and (parsed_name.first or parsed_name.last)
         )
 
-        if has_person_name or has_title_and_name:
-            record[output_field] = "Individual"
-        else:
-            record[output_field] = "Entity"
+        record[output_field] = (
+            "Individual"
+            if has_person_name or has_title_and_name
+            else "Entity"
+        )
 
         return record
-
 
     def set_constant_field(self, record, config):
         """Stamp a fixed value; with `when_field`, only if that field matches `when_pattern` (default: non-blank)."""

@@ -1577,36 +1577,63 @@ WATCHLIST_CONFIGS = {
                     },
                 },
             },
-
             {
                 "handler": "detect_entity_type",
                 "level": "record",
                 "config": {
                     "input_field": "name",
                     "output_field": "entity_type",
-                    "organization_pattern": (
-                        r"(?i)(?:"
-                        r"\b(?:"
-                        r"INC(?:ORPORATED)?|CORP(?:ORATION)?|"
-                        r"CO|COMPANY|LLC|LTD|LIMITED|"
-                        r"GMBH|AG|AB|JSC|PJSC|PTE|FZC|"
-                        r"AIR|AIRLINES|AIRWAYS|AVIATION|"
-                        r"TRADING|TECHNOLOGY|TECHNIK|SYSTEMS|"
-                        r"INTERNATIONAL|COMMUNICATIONS|"
-                        r"VERTRIEBS|ANSTALT|GROUP|"
-                        r"SERVICES|ASSOCIATES"
-                        r")\b|"
-                        r"\b(?:A\.G\.|S\.A\.)(?=\s|$)|"
-                        r"\.NET\b|"
-                        r"\bAVIASTAR\b"
-                        r")"
-                    ),
-                    "individual_pattern": (
-                        r"(?i)^(?:COLONEL|CAPTAIN)\s+\S"
+                },
+            },
+
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                    "overwrite": True,
+                    "when_field": "name",
+                    "when_pattern": (
+                        r"(?i)^\s*AVIASTAR\s*-\s*TU\s*$"
                     ),
                 },
             },
         ],
     },
 
+    "BIS_UNVERIFIED_LIST": {
+        "source_name": "BIS",
+        "list_name": "BIS_UNVERIFIED_LIST",
+        "download_method": "HTTPS",
+        "date_order": "MDY",
+        "url": (
+            "https://media.bis.gov/sites/default/files/"
+            "documents/unverified-list.csv"
+        ),
+        "file_type": "csv",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["COUNTRY", "NAME", "ADDRESS"],
+                    "output_field": "source_record_id",
+                    "prefix": "BIS_UNVERIFIED_LIST",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                    "overwrite": True,
+                },
+            },
+        ],
+    },
 }

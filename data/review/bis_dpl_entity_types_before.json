@@ -1,0 +1,2555 @@
+{
+  "input_file": "C:\\Users\\Hajibashi.Saba\\Desktop\\python-components\\data\\downloads\\BIS\\BIS-DPL\\year=2026\\month=10\\day=12\\BIS-DPL_20261012_114827.csv",
+  "records": [
+    {
+      "source_record_id": "BIS-DPL-32b7248a624dfe1872380e561caff09f128b23cbe7162247a43d3226bafaf4cd",
+      "name": "ADT ANALOG AND DIGITAL TECHNIK",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-08ed6cd05f7f51f009d6e2f5eb12c8b16afd6e319ed2299821539670b5bed9b9",
+      "name": "ANDREE AGNESE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5f08293eeec2f2baa20a646adb51e5c30ef534a6b0cb9490d86f776162127669",
+      "name": "HELENE AGNESE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c1a9641e2a25f21250f11b74a7be5eeea6530c63f1c91c588ca2367e8d24e927",
+      "name": "SABA AGNESE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-14bd30710083dd905b498fb3b318bb6a42310bc334c91bf849a8975ba353e461",
+      "name": "ROBERT ALMORI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-35feff15bf60b040a86b3c854441faa9b2a87f50b269f73c661a4c5ff45f44b9",
+      "name": "SABA AMBAYE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-32ea4f16ee206cfa6253529528ebcde3cd815df7a8585d4acff00b3434ef1182",
+      "name": "MARCEL LEFEBVRE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6734cacf69672a4788581fff97a8f0b7cf3bdb29ad2431a2863dc1a500c4130a",
+      "name": "MARCEL GOLDFARB",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-437319720743be9cd7773fa872c65804d1190b698bc59397317252523af919ae",
+      "name": "MICROCIRCUIT TECHNOLOGY",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-32e18c854a0abf5f4f1f59375076d1f54cae7ddc0f61fed2b94a0a16d5a67dfe",
+      "name": "NAJMEDDIN A. ELYAZGI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4da7334a533eeebe12a809b95e618bed793909def2a384570eca4be138fc415c",
+      "name": "COLONEL ELYAZGI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-bcb3f075b55af16bff1f1c826c5c3da9cf60fe0bb0e47b557ec57a73aee9f1c1",
+      "name": "CAPTAIN ELYAZGI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2d60bf5dca2ff030d68ffcac03205ffc8bcc6507426de6d7d53a082582abc826",
+      "name": "NEDIM SULYAK",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-36da336b07f98d165eda0ecd27e5ee7de46719a1675da2cef0a113a1dea8c396",
+      "name": "PHOTOMASKING SERVICES LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-ed39bc216cc1275638f45ae8c17f47f1cb5aa9d7aa11850009c1f6852c9bb90a",
+      "name": "PHOTOMASKING SERVICES LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-4bf8d10e33b57168471743449cdc221e3f304863dac2fa4b90abc148ce623db3",
+      "name": "JOHN B. PRIDMORE-SMITH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-06058a19f6ee0658eb27de4e0b293c72283515c44e0d044813b5031de38a81ec",
+      "name": "BRAMWELL J. PRIDMORE-SMITH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-97bbf7a3f4cd1dd445ab9eace8136d5d39ee2c82f74c00ab815512f33c7c4572",
+      "name": "PIERRE ANDRE RANDIN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a8917bc2420bde84860d1aca3f1b02a40e0fd8b96d439814d23fd65526b20fa5",
+      "name": "REXFORD LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-84cc670ac7621a5a91d15763970819068e0ac0a11c107e8abfb511cdaae26df0",
+      "name": "ANNEXFIELD , LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-92395527c68a5d7d716831af35e1e72d6d2ddffd5ff63009001e7e78c5b7dd6a",
+      "name": "APPLIED SYSTEMS METHODS AND TECHNOLOGY (ASMAT)",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-4be3e8098af4f60a3cb1696698810a5340e61ca41d305aa9ff8c238e45b80cb8",
+      "name": "AVOMAIR LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-32b7192c2d854f6bb39bf71ebf889c675672b31e78d5baaacc6f4a0de515cfd2",
+      "name": "SHUTTLE LONG CO, LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-d2e4764ea80ab9f87cc1c3ec90eefcf2af054fadd95ca90c4bd42742eb7be064",
+      "name": "WYSH DATA SYSTEMS, LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-072b334063084587a93de293926b22e240bd3089aa48362d9559a8fe3ab1d188",
+      "name": "WERNER J. BRUCHHAUSEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-96642d9c1d55a88ec215c8b4267165c91360aa7866fea77e3053f0e627a41a0c",
+      "name": "ANTHONY CHAN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a19a5587d9763c4ab681b3a6769325daec98ba7dfd051458ce33f1c06a760651",
+      "name": "CHAN SUM-TAI ANTHONY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9fa1e8775741845eb114932cae7776cd0706796295639146d49fd8d6082f2e80",
+      "name": "TECHMA GMBH",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-ecb22c49f465bd2c45dcaa53017c1308abf5f589437bdb87bb009b5d0ec148ed",
+      "name": "THANE-COAT, INC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-f57a1d787c10025573f0cdc0469f05d34967dfcc1249963b5a399971948c7c27",
+      "name": "SABINA DORN TITTEL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a0cfc3ff38b4f0e7f6f1868ad97b456f8112b73b8f3e08915d1f035e9295099a",
+      "name": "SABINA DORN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5d8eb0e0b281dc714c24573ccece34b87d76d49b0921dcdd7a99d6cc817da042",
+      "name": "UNITED AFRICAN AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-06135d2794193ba3f55f470fdbf544d033e41d060d50c8bf09097cb8a768e516",
+      "name": "UNITED AFRICAN AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-2602366c4a7c65558fb94762389515f33d2d6542f5db5a9015dd8ae7acc5178a",
+      "name": "UNITED AFRICAN AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-4656c723057898ab3610d164e213836eefe5c2a995be93859f3b45726fa15be6",
+      "name": "COTRICOM S.A.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-f8e774eab83caccdd3dd3b3a1ff78b3028435be42c080bdc5660ecc8c07f3a7a",
+      "name": "DATASAAB CONTRACTING AB",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-365a33fda68b841588e8171b46898dd716ee0e770f6d408fded0120f1136afbb",
+      "name": "JEAN-MICHEL DIDAT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4396888a48ad3476adf2eb8333fb7f164ac50526d44f4ac24bc0ffae8bfae70a",
+      "name": "DRAYWORTH ELECTRONICS LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-586e5a2007b0e13a0bedf68e7ceb022407fadfc54c4fea4f20e0daad9725837c",
+      "name": "ELECTRONIC ELEKTRONISCHE BAUELEMENTE GMBH",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-5f172827185e93750fa205439327aeb40884c4eaff74e0f80a0e5e3d04a0e51f",
+      "name": "ELMONT AG",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-68f1882dc688db2823e1be895ddaae8b95b2a798d59d5c083b89aefdb5ffe4e5",
+      "name": "DIETER ENDERLEIN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-314528d718988543dd4daa21c83893254f2aacd3ed8c7b9a16f350f3ba7d49b5",
+      "name": "PRESTON JOHN ENGEBRETSON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9a067ca1e8095601f720e6d87a867a5c22ff340324952169718f432e96582267",
+      "name": "PRESTON JOHN ENGEBRETSON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-57eb686b09698ddff5958a072882bd815b7e0896f4379504818c5734752b8f3d",
+      "name": "YARRA ANSTALT A.G.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-93e1213c5ab665a32bc0ce1879cb8d358a6b2a86f474789c5b7218700a878698",
+      "name": "JERRY VERNON FORD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a423eaf687f53e2e5fdcabe638b076872e4a20ff12b8744af175c979c41f81ef",
+      "name": "JERRY VERNON FORD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d219d4f071fdf874e50d74bb30da1654cbbb1a8901ddd62e1ba1b2a7e31d6add",
+      "name": "GREENLINE AVIATION",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-99b6a64bd5bd2f285cf9b1d33db6dde4ca81674111f390d0f1ab2b7426efa0e7",
+      "name": "MUHAMMED ALI HIJAZI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3d575e9430a59b6bf0d2c5a198c7a7950e5d358231f78385770a32d0390fa707",
+      "name": "ALI M HIJAZI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e8e3aaf7aa4a11ee507ed08f90359ce40a909a9925df81a8c8bd0cf83f142e7d",
+      "name": "ALI M HIJAZI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-070ad29a4f1c9e0fff9aefed6151083f6453160d0d60dc99b66ccf26519a2359",
+      "name": "MUHAMMED ALI HIJAZI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d59c79352ac8952521235be56531403a18e1728f639a91fb29e88017b31957ff",
+      "name": "ING. DIETMAR ULRICHSHOFER VERTRIEBS",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-b38d9a50746b4962f18ac6ab6b640bc7307209f1f613d437db7a5e2f27fcf18e",
+      "name": "ING. DIETMAR ULRICHSHOFER VERTRIEBS",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-06b90433a0f99f976dc8064f6d24dd6438871a30843eb3d052bbb7c08ea6cd88",
+      "name": "INTERCIRCUIT LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-cedeb92c9be3158a5174b514c24368bf18049caaf76fc8f90983b2dc3b9189ab",
+      "name": "ASMAT (APPLIED SYSTEMS METHODS AND TECHNOLOGY)",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-a2279257b70a2e6dce269ab95438754e3bebe69b7dfb03221ac0d336f9d4d187",
+      "name": "ELMONT INTERNATIONAL",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-36d9a536930ae97406270264f61c9ff54d6490dcf90643dd0526b44a575d738a",
+      "name": "TETRABAL CORPORATION, INC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-78a2a55efab6435f50f860a7970b1ab2e127689da89ad8feaf03ac9e8d989a16",
+      "name": "IHSAN MEDHAT ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d3f3ba41e8edf06bdd2d091717976b17d436c7f9dbab53df28a2bccb09e2f084",
+      "name": "SAMMY (IHSAN MEDHAT) ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-927da8d7d8161108610a90f8bf62bab46d64ecccfb9db2aa6a47e6893b793e42",
+      "name": "GHASSAN ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-02bc039b4bddfa687b8ed9eb378651f1dee95dc64a4726c05bcf571d65c83842",
+      "name": "FADWA ELAFRANGI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f4a1d25984afd6f021726b07d57041eb5d7dba28bd591afab17e06efe83f49d2",
+      "name": "INFOCOM CORPORATION, INC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-f9cd255f798f64f070a2e2704b790fab34f49c98b70980da6a3b44a7452558d6",
+      "name": "IHSAN MEDHAT \"SAMMY\" ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f21008085a4c3de240ad3b3ad240ef89f61caf8d17e6c2bc1c4ef48214b92dc4",
+      "name": "IHSAN MEDHAT \"SAMMY\" ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-54a128cb23e66cad451d517375d792c49be9d4458d49ccefd8d3ddb992e05706",
+      "name": "MYNET.NET CORP",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-e7ca1f46b951aeb6386d90b7466a2096ea0c85553fbd086c8e47361b6e9bca2d",
+      "name": "MYNET.NET CORP",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-7b0041a0f6886e584ba962cf59ab6071789a659ce6c78c1a3780762b9b4e6ffa",
+      "name": "I. ASH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2dfe90a93c5d847c33596b68158548c18135d767c390ab6f2ca49e3b4ec23b82",
+      "name": "I. ASH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1aedfa75388abf2b352a14841904e2bd6f2cb021c70a3e95b9719ae76804950f",
+      "name": "TETRABAL CORPORATION, INC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-1640561a99d0f1de38f1f3900fdb2c7b02a625204752ac14a4ff35877aaa9b2d",
+      "name": "TETRABAL CORPORATION, INC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-b746167d06dd42649e05ea0afa42f488f247eb476ce9099820ec472a201114f2",
+      "name": "ABDULAH AL NASSER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-fa83fbfc0eb39f21790970dbdfddc21b039784819cbf647f5a133ca9a338ec27",
+      "name": "ABDULAH AL NASSER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-66d25a178f72ff2d84444fd71a5eb897a5d41caa85028937d6ea3d3e070722da",
+      "name": "MAYSOON AL KAYALI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-09abf023dd84a522b9349c46d0bc06ebb829e8c7543131f8555a2ac46bbb38b6",
+      "name": "MAYSOON AL KAYALI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8573910fa4cbd57775fd850397a0ca1232b05cbc1e49d3beff0c4da08459520f",
+      "name": "HAYDEE HERRERA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-472e155254027b34f7141bed4b09af5691a3efb3ec52385500f3a1d1a9540407",
+      "name": "HAYDEE HERRERA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-048585fa217a314847fde1f532a5d3f1bfd8cfb0e616e356ed97b71dffc23dda",
+      "name": "IHSAN ELASHYI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0e0df0176487f5d00fea13d055cc6328798e62aa469a8e9b50616c455a88ec89",
+      "name": "IHSAN ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ded79c14c15e794ff7ce8ec8dcab99b41dc9eae679c90f523fe7ae2e09b4220a",
+      "name": "SAMMY ELASHYI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e9e79ab14769c80e7bfe3b4749146f6826c2b9063a19162b2c231bd998e778c8",
+      "name": "IHSAN ELASHYI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-383f42acee94572e75b274ae2ae2aa58c9ee5a15c0d24ef849fff38e6b47b812",
+      "name": "IHSAN ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e2e8cf26f4d1c803f9dcf7a46863dfb265a3fd38ed05f0d730baff32b30dab09",
+      "name": "SAMMY ELASHYI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-67dc5a6e9f1768ac3c735fd8d5e0b7749f61b1a8906931fb44c74ce8a4efeac9",
+      "name": "AL KAYALI CORPORATION",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-71dde80d1e9098bc6997069f834efedc20f1e308a986ce55369157537886c9ab",
+      "name": "SAMER SUWWAN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2b43a64aaa2ca03f7670c2703872355ccc63f82181bd5817389fe05fc57f664d",
+      "name": "DAQING ZHOU",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c95cd787e2486293cef5ee7ffff8938868f2bf28a6e43e1355087a9a5022c5f6",
+      "name": "DAVID ZHOU",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2b43a64aaa2ca03f7670c2703872355ccc63f82181bd5817389fe05fc57f664d",
+      "name": "DAQING ZHOU",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2a04089ca0efffcb7c8746b58daa759be08a1fd7c847ac60fe09dac4979cf78f",
+      "name": "I. ASH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7b52c497c093356549e669c0f2573d420621832d5732153275f908b9b34e86a5",
+      "name": "HAYDEE HERRERA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7e43dd4c4a212d2147b20482d8a4d47859bf042a3c04af92aba60008b1fb964c",
+      "name": "ABDULLAH AL NASSER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-b0f43bced585c763a6975fc69cd7a40a9ee98458626b0ed7964fad748b6d7eda",
+      "name": "INFOCOM CORPORATION, INC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-a4b117f45985ef9c2c3cbd33db23490ac1536eeb9eff29bd0c04e638b31b7546",
+      "name": "SYNAPTIX.NET",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-48f253421dcc485c72b6db60e607a1d7e14c6e35727943d64a28972e0663207b",
+      "name": "HAZIM ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3f823681ae0aacbc7b721fb05736091928ab87f6d9bb853170cdeb77ec5286b7",
+      "name": "BAYAN ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-da708dadc672053cff4bf2892a32c4eedbe27894c5e52b8f1ddb12cab39b7aca",
+      "name": "BASMAN ELASHI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-259cb0a2874b9aab08e28e30ad4dd1f122ff2389108403c9d1c8783f0d684048",
+      "name": "MAJIDA SALEM",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-26c53c3440f0f5883f3ee2d5fc701fb47c76a90ff5bb9b7726ec9ef0c6d2c2a5",
+      "name": "NORMAN SPECTOR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6f753b47e679bd119a3b5bfac2f6d5dc3f22484310b5d5b3230239184fd3a2a5",
+      "name": "SPECTOR INTERNATIONAL, INC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-9bbc3850466b366e99e1c5e38b602c16850f1255ed0de1473647960d1aedd606",
+      "name": "NORSAL EXPORT LIMITED",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-7024eaae7e4fcadfed0648ad71e1406319e015ca2c7da20055fad3262bf505f4",
+      "name": "ALI AGAR MANZARPOUR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1e8f79022b9de0fa889ce562e26351618daed57cbf64abd514e117ef758d11c5",
+      "name": "ALI AGAR MANZARPOUR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c06cb9b7a8e619c5666fb2a39db0308729fc2200d1c52fdfb452877cf8fd9e25",
+      "name": "MAHAN AIRWAYS",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-7fd2ab16e192fe73816111e5b5aeacba72a5bef98335958b210cca4e50439f4f",
+      "name": "WELL BEING ENTERPRISE CO., LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-2fb5948351cf11d3de4a4a4e99a3c34dfe279ab826e1b445981a5d3f1db58bfa",
+      "name": "ELECMAT, INC.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-9a68a5367d7000d889c99bad04ef456580c674f813fd022142d3ffbff6e79b9e",
+      "name": "HUI-FEN CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5e566b5625ffea3e1c493344d607baaba6a978f0c1418ef90271537d61f5df5a",
+      "name": "ANGELA CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a7cc9b2de39b9a9f56ccf2e88e8de62d135bc07b3930d69d4b88de864a85dbca",
+      "name": "YURI I. MONTGOMERY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c138d44ab8245873fc8d97ce7f6a2a3c1a4d6735f089726bc7d1921c2882be4a",
+      "name": "PEJMAN MAHMOOD KOSARAYANIFARD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cfdc44b8872db81b4fb52793f11b62bb7fe39ce2d31e4dfba8fb4725c0dc1531",
+      "name": "KOSARIAN FARD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0b2fe691134457c819c24d73544d152d39ef56e7939e88ccc77d837759e05fd8",
+      "name": "MAHMOUD AMINI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ed363ba1134dbfa0fb3a02b550ce53856fc00e182fb9c526407a285157feabdb",
+      "name": "MAHMOUD AMINI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-49b95228987973f64c8592dbb8d877057b641f16e2c36980ac1d1c7edf843d4b",
+      "name": "MAHMOUD AMINI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9030ca2a330c26453a8c3ccbcc2da80401e41694b7620a55e8ae528e0615e339",
+      "name": "JIANWEI DING",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-749e1baf5cbca69e43fa2f6a43d9f83589381c1bfed3e3ef66d5d83ef4599704",
+      "name": "JIANWEI DING",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-91ff6dc8ba4b6738cf98e05cbdb1e69aa5d315320fea45145d57d84ec93d9f43",
+      "name": "KERMAN AVIATION",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-06a478203e9e0fc94ba2f318fb2b3f3bd09859e0f0727758935c3efc7f40624a",
+      "name": "SIRJANCO TRADING LLC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-e49c10cef1ebbc198246dbb6c3b330e4028d07a72b20df1b822f2171d8eb7166",
+      "name": "GIE KERMAN AVIATION",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-62086d02cb02dfabf42521fca2ca797e9adec3ffebcbd1297575ad8453de01a6",
+      "name": "MAHAN AIR GENERAL TRADING LLC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-267129f43515a299eab8a96952b6e16f840ce67ff35534a88cda97d2d948623d",
+      "name": "MEHDI BAHRAMI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d280e88e5d1396338e136771c3783a1c79fbb63640b66fa4816ddc87b87f8c38",
+      "name": "HAROLD HANSON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-29a190c10fe4e58f095863a9049f5f52f67ce00ad13d65a3f9d2e2f97ceb5bbb",
+      "name": "YAMING NINA QI HANSON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0b4f591e257a2055c7e83f844d27ad1256f97165992750dbcab2f8fd57fc2557",
+      "name": "YAVUZ CIZMECI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7c26cf94f00cc4a7a5271f77871c4fd5ed17603b9c5ff48659ba4352b2a42bf4",
+      "name": "AL NASER AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-45cb2509750e2d5dbefe5012a2fe44c3349cdf85b16e899f49fccc0ba94ede44",
+      "name": "AL-NASER  AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-e07871bc9cfa282966c3339d4a4850c5cc03574e311fd29110982ddfa6e8fc2d",
+      "name": "ALNASER AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-23a1f0dd761680d06d6bf512ff6d86cde29ff752197fb4c09499d70ae649b1be",
+      "name": "AIR FREIGHT LTD",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-b726455ed5082142720fa09344300ec31d977bfa6425abc831a8e170df7243bb",
+      "name": "AL NASER AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-5b9b01b2917e30e8fe003dc2c470736353b45a343f62d6931c546d6d1c0dca29",
+      "name": "AL-NASER  AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-79941576d323a62d962b8a863224dfcf64a91d23253fe3f22481bac0f4c86cb0",
+      "name": "ALNASER AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-afbbfd3e03339f71b8d9da2b0a0f889b95c00eb54587e8fffcb0db34a64fa6e9",
+      "name": "AIR FREIGHT LTD",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-2f7a16038fde9f60a555ce5c32cbbd8ed37388e09a6dfa448c2d8de3cb400368",
+      "name": "AL NASER AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-b0875e42a07355369c69244a7ce63c5701f179a24af6a89301f6b55b36023737",
+      "name": "AL-NASER  AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-f4000c4e7c39d1439a44bca38caadeae3bf563cbe010137ec0db7004c603c4a4",
+      "name": "ALNASER AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-4a78dfe65abe7eff26f825e84c99ca017acfe6ab08248743cafce81d7fb53520",
+      "name": "AIR FREIGHT LTD",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-175d16754a888dfa983ae6bbd4f3248da1d3f15378cac8e6b25bd68effe7119d",
+      "name": "AL NASER AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-5b3291a57a06107a0a79606403c463a62025559a2ad5c01b41f9829a5186cb7d",
+      "name": "AL-NASER  AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-78af0b4f6bcbd5192e9159e14f39725505305b5b53659238e601ccd41fc70d9b",
+      "name": "ALNASER AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-d0a033b102d98536774a25ffd2a2eb6c057596ca9c8cdceda7ad700bcca018cc",
+      "name": "AIR FREIGHT LTD",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-bc57471bd8d3a762af83d37dc1bda562f3710611bed3389a7bdcc6f3cfad4cca",
+      "name": "ALI ABDULLAH ALHAY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e24652e070f0e396c6a45cbe57a3fe0735d688afe2badd0326f4144be7224ac7",
+      "name": "ALI ALHAY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-db30bdea9b77259c7b8df8b7b821839ad4a5b5d51f0b52685b4636cbe04a9467",
+      "name": "ALI ABDULLAH AHMED ALHAY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cc7e91c910985cad015e4ae2256b0114bbb817a81219a7a705ddd5011a22d976",
+      "name": "ALI ABDULLAH ALHAY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-fe21c77c224e15f989fa42d28479effbe58c625b49c7d4231483f6e41c98ccfe",
+      "name": "ALI ALHAY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-35b44e8d41ba959ab5b0ca5ed4fe415aa4de538534bc54c1467662266555eab5",
+      "name": "ALI ABDULLAH AHMED ALHAY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2521bab228c606c5413d745d70794aa71496cc3c5eae90e73a6b8d1af97f9258",
+      "name": "BAHAR SAFWA GENERAL TRADING",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-0084fd9c21b6ee31c72aad8457b4dc0b319f670b32e258bd48b169a43696ae95",
+      "name": "BAHAR SAFWA GENERAL TRADING",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-fa85e5fbe30a552531101cb34d21114e967b05a5dd5ba1bd102abac8634dc304",
+      "name": "SKY BLUE BIRD GROUP",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-c8fb36b556ef478858d5fbcc748e79abe0005e2ce8b8864c60aaf36c7b1c2dcb",
+      "name": "SKY BLUE BIRD AVIATION",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-c925307246b45d8edcc18592f14ee4c715d379720c4ecd4e3bbd43da2c786c35",
+      "name": "SKY BLUE BIRD LTD",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-5792290e0191bcfbf6df015683ca6b9c4b4b0093974c8d96a28143f2859cd88f",
+      "name": "SKY BLUE BIRD FZC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-b0061d8dad0e9cf0e219f428d59749ec7dc80aa06a7024d7efb045c5d8badc37",
+      "name": "ISSAM SHAMMOUT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d5dee8bfbeb5ed4a8c95c2f3e3b612d7a6548ed02103df3e4c881acf59b3a94b",
+      "name": "ISSAM SHAMMOUT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2fe7bd5b9952d9ecea3115db4499beb69ee15416f86c7dae41340b804df0ecef",
+      "name": "ISSAM SHAMMOUT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0185b8dc3ab029a924fa5c4f2a8c3611f25d7f4a2aba731af68ec27addee08c7",
+      "name": "ISSAM SHAMMOUT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f3eacdbcecf54e1939953aeba22eabc39384c8976bc02dbc7c59dc7557981aa4",
+      "name": "MUHAMMAD ISAM MUHAMMAD ANWAR NUR SHAMMOUT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-dec8188cf5874a0df3df11b7d40e11e00ed5d7803abc95d92eff6e782e018300",
+      "name": "MUHAMMAD ISAM MUHAMMAD ANWAR NUR SHAMMOUT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-fb9d0483114a1d2d48da315b06db168e939cdfdf2a3566aee8bc61d583d43a96",
+      "name": "MUHAMMAD ISAM MUHAMMAD ANWAR NUR SHAMMOUT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e95976090bcb27c88247aface4be3a54500d1e2062d600a4c695d0278b9988d2",
+      "name": "MUHAMMAD ISAM MUHAMMAD ANWAR NUR SHAMMOUT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-16c7fbd8e310997d71d2029f83332b564c05a9b6239f71d1b467a1091535f012",
+      "name": "ISSAM ANWAR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-89ffd0662146e682498969199c94912767e6ddb6809a0c7fe1c2367268c9fcbb",
+      "name": "ISSAM ANWAR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3e7456e3a7a86e196383d9e1debce13c8c6b6dfec385d19aba966412b22b57b4",
+      "name": "ISSAM ANWAR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-166e35786047f8d11d3b13c6ce9b728a67de6f6f9ae0ed86294787b61c3d001c",
+      "name": "ISSAM ANWAR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c6df7a83437f4ff96c270a79b606bbc367911ce3d7c456cf8f6fe0886a336fa9",
+      "name": "MANSOUR MOGHTADERI ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1c24331c9147f74f270b839f383700d00278d600ede53cfc782a84f979a969a1",
+      "name": "MANSOUR MOGHTADERI ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-60e02bc42753e2b29e62d1660b04c7cab5b4066cecfb53ccc120eba8ebdece16",
+      "name": "MANSOUR MOGHTADERI ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-921a6a2af4fe6bbb265ec802a8afabe72846d8d37c8a696bc71bcd615041a89a",
+      "name": "MANSOUR MOGHTADERI ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c30439188cf12b3cf8aba3e0804bfa0108ddc49d6edbe67920bfd8592b73ceaa",
+      "name": "MANSOUR ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2feeee98a594c22e5237523efd5e184263af8bd9af66f06771e2c482c19f0a04",
+      "name": "MANSOUR ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2f5a409ca83264990a30ff70e2f0ef8b8b3d9888f12c701a6ec6375ac2ddfdf2",
+      "name": "MANSOUR ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-59290e47303725899d34f06855f52ff92505d1fdaba24874128157196889b02d",
+      "name": "MANSOUR ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f22ffdc2896a7718f668785d1cb313bd3815140d09b28ef3d2da34c48358d8d3",
+      "name": "MITA ZAREK",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6da29cddb0cdea9dac41b73b3e53a052e26106e85710da8b5057ebe055e6bf76",
+      "name": "MITA ZAREK",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cd10f648694c2606d902618d6d0e39099d822de64c13830b5ff521cd75200f31",
+      "name": "MITA ZAREK",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-665c890b4220e2f610f327ea12048ad31a15be02a66e6a65f080170e983c54f1",
+      "name": "MITA ZAREK",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-24ddae376b7edb6b602e6f58994c2a4bff6177117657989a6ab055eee0f91267",
+      "name": "MITA ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-baefa303fcd423af0f651cc2c2fd28be213039e24cf1626ca272c63b579df1f2",
+      "name": "MITA ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-767b4faa869f5cb51aa1811dd4479f4e9409f7cc0026fb6247ffeafe5b2f5d7f",
+      "name": "MITA ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3baabb8e6e8f115571589fc6595bb187409c9ae8f2153e18405cb80927554c39",
+      "name": "MITA ZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0309e326c955a5caa38b2d0ff7611a39d0e0c5bc7c3936c3ce20b3fd5176ca72",
+      "name": "ALEXEY KRUTILIN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7e3ecbd8336894b9c054d5efa6a4679bc9e2b12ded8d4e306c4424f3db9ba2da",
+      "name": "DAVID POWELL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3bcdf47469ad68df3ffebbc2b539882960950edac79c604b64649a769e977de4",
+      "name": "GERARDO TREVINO-MONCIVAIS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-04775dbe72ec07dbf96ab83f8551c2d7af07d9b63656a54f4b95cfcf732f38b2",
+      "name": "AL NASER WINGS AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-70a30fec33fd49a4bf0479c284f771cd9f2d58733c0ce7048f0d5eeb6bd3840c",
+      "name": "AL NASER WINGS AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-583f86068a066367244db6d9dada8be91de703e0f7ffcc1e3179c0c83e01f51b",
+      "name": "AL NASER WINGS AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-ce1a985008e8993f81906664a40f43c0cf53ce15b6777c4ac645e09fe5d396b2",
+      "name": "AL NASER WINGS AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-f141e2a26d3093136e24a7166e39a4902e13f1bd21901d31c3b46abe4a5faba2",
+      "name": "SAEID YAHYA CHARKHIAN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2854906b5c6da17a45937ffcdd93c3b8af02db80281e180fd7ba1f0254b650ad",
+      "name": "CASPIAN INDUSTRIAL MACHINERY SUPPLY LLC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-3b8fd020882413f78f0101a80bd38f8d97de811a07ed11c8f9852c88d47f72c6",
+      "name": "IRINA CVETKOVIC",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c45428754c6a3c2b079459c76283fe2df7fbe831ee5445ab7a2a1659347c2a2f",
+      "name": "TRILOGY INTERNATIONAL ASSOCIATES, INC.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-397668ccca7dc082710bdfe7d711c6b584c89e12b91640cb1c2ca63e0505db95",
+      "name": "TRILOGY INTERNATIONAL ASSOCIATES, INC.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-930b3071b231ecdc1c48ccdfcbc647e07deb8cc9c24b479e68dbbc63ad452c13",
+      "name": "WILLIAM MICHAEL JOHNSON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9b988bbec6d8025190c1a96b779da0115bb4df3fced6a047a346ca09dc58c2f8",
+      "name": "WILLIAM MICHAEL JOHNSON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1c826db4fd31685471934f072823d08ca4435fa94e92651eb96e12f484368298",
+      "name": "VOLODYMYR NEDOVIZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-97fcbfb08f4d17fe063257a405bf357d5f62299974150759ecb29dcc87769c2d",
+      "name": "VOLODYMYR NEDOVIZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0e7a4a117ae82ba42a3ac090ecae90c4b78a3fa3357d0d9ea8d4808a9f6e0da6",
+      "name": "STEPHEN EDWARD SMITH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-31e873030aa2d5e294c7f1c3331f0b62dfcfdc2677f76015529e7b41d60355b1",
+      "name": "EARL HENRY RICHMOND",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-dbf3e34019d616cb583cc0852ffc2672f06b7719461554834d384402adbc0e7b",
+      "name": "PETER STEVE PLESINGER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-695f1049a681af1a2e98dbe4ca30940674a2d0b68590d23438a90c58aa1444f5",
+      "name": "ERDAL KUYUMCU",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-30c05dcc3c1109400a2e08bd436b7361311eb174270e226a02fd318a790e688a",
+      "name": "MUHAMMED ALI HIJAZI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a32edff01a44281b05f105481e24c92a7f8a8348d9c7350101331cd1d38f119f",
+      "name": "ALI M HIJAZI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-79c86c6c1b79f3c587184aeadf39c4586140ea0ac31db6d32e99d1d2ee1947e5",
+      "name": "FUYI SUN A/K/A FRANK SUN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c1bea679fc208a4bb788e7de7673d71e2ed28045770863342a9b7676014cc103",
+      "name": "ROLANDO ARMANDO MADRID",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5c137d47aad1382cfa6a04c14800afaedae9269f3c87688fb10fc428a7749be5",
+      "name": "JUAN DIEGO MADRID",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f337c835ca1f0b6908d970556c0df22793a6efd3434393572ff4891d535d8beb",
+      "name": "RUBEN ARNOLDO MADRID",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0c7b1ae517a625e2c31af2581a375a12aca322b07a287ef27b860a76b25f8bb3",
+      "name": "ERIK VILLASANA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a88c8066a8fe2c796c866cc6c487e5338b117c30f125f308c8e7ce545ef6aabb",
+      "name": "LUIS ANTONIO URDANETA POZO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3941da3627128ce9a9e504b09dd014ab08a76b82af0e5af0ed822a7687a0b8a8",
+      "name": "GREGORY ALLEN JUSTICE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a8cf58ba600acb70aa0849e2342a733bfc6e3e14c4d1fe66c505ec45e8ec1cc9",
+      "name": "JOEL PRADO, JR.",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-564415d56722cdc0bdecd96683d38bf42a8da3e488ce15b71faf6a2a4cfdc986",
+      "name": "EDUARD ROEL VAZQUEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-59ec7a5b5592844e271464f65e9dc9c423745f8fff3b0e9f7ca3a4eeafd96bbf",
+      "name": "MOHAN L. NIRALA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-55b490465298842ede5a0760bcd3520cd225d66e74e0560f7e0a338dd8c35c6b",
+      "name": "ARNOLDO ANTONIO ARREDONDO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d59ef8c3ec68bdc3d026de832ff3c6b3aaba93104934dfa3a15cd8d588f76052",
+      "name": "OLAF TEPPER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-be3d93fc2f497a33c0afdf2bd19c0f0be87de3802592e1e21ae70c9e313f872e",
+      "name": "POURAN AAZAD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2e10a157e95ccc86a02789bc4671f4a1fd9f6eb6c303f53cf03e28bea8378f92",
+      "name": "POURAN AZAD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d25409edfd464ffb99836fb8e36a522e6311197f92b121d3a78fe3c9d7afb429",
+      "name": "POURANDOKT AAZAD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-819d4aa0cc228fc33ccbea29496ebe79955d1a72ba9f0b9c038adab698de4693",
+      "name": "POURANDOKT AZAD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3f60c19099501aac3001531297d8996f69945b9fd290a7ee40a5572514bb70e7",
+      "name": "SADR EMAD-VAEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cc3d879d8f6e758613e37f0ec4ea19f0ac37ea5513a77dc6abf8afb74671ccc0",
+      "name": "SEID SADREDIN EMAD VAEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ab4c024e29666026f9139d5ffa318d8f9d64356373ac55ffcf484a428c4381f3",
+      "name": "GHAREH SABZ CO.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-6c0dd25615c6d7853a202d5ae19bbcbfa7363a0a000e8d8fd6327646449c2729",
+      "name": "GHARE SABZ CO.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-b768ebcfcf79fb7ef44f438757bc08ae056b8406c05495a0409ad3a6bc58fb5d",
+      "name": "GHS TECHNOLOGY",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-04a46e0ac2fd7501d7c2c1098cbe656435bb594b45c43a0885097b991f7cddad",
+      "name": "GHAREH SABZ CO.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-068f8bff903737fa10b1148f1d59cfea1b6339672a8856e4289ebf85c2f331c3",
+      "name": "GHARE SABZ CO.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-5a52aaa28d7baa0c33cbbd49398785a409eb78ff51db370c299caaf5ff3f946a",
+      "name": "GHS TECHNOLOGY",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-e20df489011c88ff6927746f206cccc1d5068769d8f09358d5506a1f5cfe4d25",
+      "name": "JUAN JESUS DE LA ROSA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-412da49f7edd6b69fb6b3a5b83a8505d80c3c287f37b5ace1b855ad4f27518a2",
+      "name": "SI CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-639f2f4dd88f5a051958fef6086369abe31462d173f49a39ca57f4ffd6044cd7",
+      "name": "CATHY CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2636901ecc4be68a3fcb026ff682e9a98cd50e3dc187a3c226691c84eccf6932",
+      "name": "CELIA CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-22b0baa6932598e86f092621ab8a88b806bc4d0e62c61f066c2b2a1e65785095",
+      "name": "CECELIA CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5a4f7fa4c0c48607f4c4a437cb225a9245ad4dc9ec478516a4b5645574998724",
+      "name": "CHUNPING JI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e4479f570ba08447a1260aab74ef4ce81abd4a7bfe543fad82b22903dd088e36",
+      "name": "SI CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-607eec8d6d59256e7f02adf5e103d21ee9e3499cf04960390b331b2228b2a944",
+      "name": "CATHY CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7c10af37e709191ce3c7cb4a66bc2130ab6fa56ca090cb384cea4e0b7955b8a6",
+      "name": "CELIA CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-29589d08c623f19b189728dc2a049e401c4849a110e182acffd589883c0f96f6",
+      "name": "CECELIA CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8afdfe7f4c49195df2e1fff5a912e72e42149ac0c395d485f65f524527499f20",
+      "name": "CHUNPING JI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a6ab08057d008a655b3eaf0757f3e88290db1f548e24b01a8935a35052ca3ef4",
+      "name": "ALI AFIF AL HERZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-bad9baa34814c5f53ecf91adeffc7ddf1dbd50079162240eb4e38ab81e627696",
+      "name": "ADAM AL HERZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8949ae931c22ca7649eac359098f8af5b01dc0614fb10f94dbcfff4e1a11534c",
+      "name": "BASSEM AFIF HERZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cc863cab041ee4761e5836556c8d507873999f8a15ea3d8cb4d4e65b99ca52a3",
+      "name": "SARAH MAJID ZEAITER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2d9c17bfa85fb54d76619131c69872593d7b42f4ad8ccebf07df44b9c67f518b",
+      "name": "RASHEED AL JIJAKLI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-fdb9afaafe127937f72de0abc2da4fb5bc548cbaf3b1f50f6c2320255a9d1c9e",
+      "name": "ELDAR REZVANOV",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d14b396d75c044329567101cc402a61bba2f5b2630e8edee27c211386e2c9280",
+      "name": "MOJTABA BIRIA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a798059c66b5f6b0893928e3c427e6fac837697fec8c58f6b48e5cbf355f8d14",
+      "name": "PAUL STUART BRUNT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e3ea546a6be2819fd4a3a0927eee493f2d7569ece58a8e9ee3132890b009f899",
+      "name": "RUBEN BELTRAN-RAMOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-95d6ea52eb0571ea93921d0287eb3cc8c8575e1e58ef63f764b97f0cc1844c13",
+      "name": "RUBEN RAMOS-BELTRAN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5e1ca161d196d285f8b977fdd10575aca835f14fb0cac11de1aadb8b5634428f",
+      "name": "RESIT TAVAN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cedc242bbc529552413c7335bbfc96e817dcceb72de49f7cfa7137142c484bc3",
+      "name": "NORDIC MARITIME PTE. LTD.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-b6360be5803834af325eb09830ca839df6ea16126d5ae2233b66eb34e887dd88",
+      "name": "MORTEN INNHAUG",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-28d70efe5d6531e715bcbaa25a68b5636c27e1da0e7f5d7b37ee291f7a022c98",
+      "name": "ZIMO SHENG",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-02a3b86a4b22d1f0a42352e153339acffcfabf276e13b2d8d7960e13f8b074eb",
+      "name": "ZIMO SHENG",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1d3a5fed83ac2aae30b03911d9e0d00cd12b3f660a15680d06e5d2c0d5c24ac0",
+      "name": "MAHIN MOJTAHEDZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-27d061d70d62ea68e5ec6b3cbec7b71117d373314bf9235350de18e15e1b6b1f",
+      "name": "MAHIN TOUSSI MOJTAHEDZADEH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1f72e4d5bd79b477daff88870e94ca5b3f30b57b9dc3476addd524bd871aee13",
+      "name": "MAHIN MOJTAHEDZADEH TOUSSI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-29d25d13494d04fe2a5cdf7b9e3f940752144cb6d6cc402825397810224bc643",
+      "name": "PATRICK GERMAIN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e8391c4eb6768cb92770a96da4f02bcf7781041dd9cbeaec28150350654e4372",
+      "name": "OSWALDO SANCHEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7866b0d74a7c71ec5330be5688eb16335522b01d93d6b30681d384e8610cdb92",
+      "name": "ISSAM HAMADE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4e61eee81e5490d8c1f08c4b60640186fc10f602da93fae36959e0015c2eae2f",
+      "name": "IRMA LIZETTE TREVIZO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-55d5e82d13f5bd6624a97c9e47c3b00db2ef9cb378e010d505670a7f323cd95e",
+      "name": "SIDDHARTH BHATT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2b7354fb817a9294fae7ef8e6b6b1d33bc9915549fcb2002c59342d20d17a50e",
+      "name": "SIDDHARTH BHATT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7f6a184dfc0f602eacb92aadac9065a8729f017c63f9144532f4cb16066ad939",
+      "name": "ALEXANDER BRAZHNIKOV JR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1ebafe9f2f59a11b4ce2626b1f04ad39f374104c434a43b83cfa30145afa5cc6",
+      "name": "CLAUDIA GUERRA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7de5fde7ee7fedddc2f6ddc2c929dfb6dd248e929248530c958210bd1dcac658",
+      "name": "MEHMET HAKAN ATILLA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2336ddb145ca2d856fc709c8b3625e5e75f0fedc7b1bf8d3254d426f9a2c9be6",
+      "name": "MEHMET HAKAN ATILLA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-483aef2088654a28ec4b7272732fc96903e70382b8c9e0ba5dcc214320214441",
+      "name": "ABEL HERNANDEZ, JR.",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-66bc4765e32bc02053e50cd5761a883cf11649713b1c5ea85680f6ddfef15608",
+      "name": "SERGIO DANIEL SERRANO-LOPEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ef56d683117078cee9bb7ce80b6c532912f949ee4be2faef43eec4804ff32c30",
+      "name": "BEHZAD POURGHANNAD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c714b992092c377ec032b7f3d852a7f11833db2fed146df081721fc7a308376f",
+      "name": "CHRIS RODRIGUEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a4159214fa432d705eca4d57b3d9c3be3fceff0bd5228a48bfb23f905796e304",
+      "name": "OBEN CABALCETA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-efe033937a54f16d3a623c4b5e4e3d17070808c56fc5d8c8eae1145a0335b846",
+      "name": "ROGER SOBRADO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4f80459a82fb950b6b6d0629e13521eb18ca7583be1729ab65e353a07700f46a",
+      "name": "MATTEO TAERRI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7e1e3592af8b018f2f51d922ea612587bdd4d0ddf58a0e31047418faf1fb8f5b",
+      "name": "MAJID TAHERI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d846554090a74ad6e88966647846d9901b7f903cfd9e4793adb6440c8b7e273f",
+      "name": "LUIS LOPEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a43e25123fb2da16569abb103af5a93422951ab5dc502b0da58b1ca824917410",
+      "name": "ANASTACIO SAN MIGUEL-PADRON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-58967edf89966d07b3a87eef0866354be2b9b600de7c2d6213c35b980c087b76",
+      "name": "RROK MARTIN CAMAJ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-aaea045598c379e36f1d649339e154589224d09a17325cf9c5417238ae8d4580",
+      "name": "TENGIZ SYDYKOV",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-be2d46160624696f5c27bb91778f951a567c000162c06ae7cfd08827f7e88613",
+      "name": "ELI RAMIREZ-RIOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e48606290b763892a65661ed1215caeb8b6eeb17c2c8359e3f4485cc4c43541e",
+      "name": "AKEEM SHONARI AWER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-201c023642cc4f19268fe0028433d81488a61e27641472c118146204f2480f63",
+      "name": "ANDY LLOYD HUEBSCHMANN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-33469d67fcf0229c61845efdf83b5a7e02a656ca851cb979f5975b1e84e86655",
+      "name": "CHRISTOPHER DANIEL STINES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5d9d8c769bcce2d19eaa8de033e5d438c4e4e6c74cc41c7918efcb6ba843dfd5",
+      "name": "SI MONG PARK",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0046b535b5c96929252d8b82d04d8c8220d06965b35058c8386cbd1db78ef66f",
+      "name": "NICKY LEE QUIROZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1870b15f18be9af5b8b73b00200d9b8926b633a2c500c144e415c8de58a91877",
+      "name": "ALI KOURANI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-26feb245ce9ccc67a37a6fab9eae7c49126e1c53f7d9ada2d6420a5ed20b202f",
+      "name": "ERNESTINA HERNANDEZ-JUAREZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-501d47e0dfbbb4a7549baf94ac3e6ed815274c44f4091f2caa4d09109ed94308",
+      "name": "LUIS MARTIN CAMARENA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-486c78bdf80227d68a914e11a71a03a65f32b27549f3e7ff2fadabdfd07d542c",
+      "name": "ABDIEL PADRON MADRID",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c199c0266b479ea1f184ace5837e93fdda267ed1842010daed31b8c4bf74100b",
+      "name": "RAMON AGUILAR-MANRIQUEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-173485b4e067b36b59fa529f5f8aca26a3b4cc372fe33489a6201f81ae825117",
+      "name": "LUIS CURIEL-TREVINO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-34dc8b05e88bff17aa55345dd93844ff0f9a5b37996fdc614d81e11a9355e0dc",
+      "name": "NAFEZ EL MIR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a39b72c77a284f60934cfd1d78020069e4cb4d501939aa2ca7d82d861ae91375",
+      "name": "GUADALUPE HORACIO GARZA-CAVAZOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a806f9e8f5ed6550d9d1f4680d1e2b0d3414313f089a65c1990f634b735698df",
+      "name": "HICHAM DIAB",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a5b177002a6ff15a951894df5956b65628816b3f530e3915dcbf8472c919e095",
+      "name": "ANDREW ESTRADA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-246f48fe62f282e707be04ded3170daf3c0db226d34ad17b158d60ef93b74c11",
+      "name": "PJSC AEROFLOT",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-209c70e863f8b31848a84716220ce7af396afdcb3cdda170e871dc28400c41bc",
+      "name": "AZUR AIR",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-e5dd211c9ad58b0e5a22617a9582272a49456216b361ebe0893ce5bd0568637d",
+      "name": "UTAIR AVIATION JSC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-2be5f44ff286833fe07d443063c8728859cb2180c126f2ebd14d7f8faff6864b",
+      "name": "AVIASTAR - TU",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-dcd05f0e2393aec7c4c9ef22e982c4fceec6a4b5b2183958acdcbcdc069d7930",
+      "name": "ROSSIYA AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-85cb2513401b409282bbffaf92b4f7199428ab7c67c6ff32de77ca64de83ebf5",
+      "name": "SIBERIAN AIRLINES D/B/A S7 AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-ce21a8a6829a9e777807196280d8b449847827c3cdec35c7b1ffe9e6ead7b8bc",
+      "name": "NORDWIND AIRLINES",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-aca933266e74c38de13ce62bb9f78fde39de0f2c1de0a98d18fc3722dbe7ae25",
+      "name": "HASSAN ALI MOSHIR-FATEMI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-36dd7657f2b32dcc6fbf6594f53097df1f988944330efaeb4a06d9b0a44ed53d",
+      "name": "USAMA DARWICH HAMADE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6592eb45ba4ffb016993777f57893421a3b95fde8b05d76b0c9fbc4225e92229",
+      "name": "AMILKAR MURILLO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7934a2f16a669891e961c45a9840bd53d65d4d8a3137cef17fa2a308f0f4e02b",
+      "name": "JOYCE MARIE ELIABACHUS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d6d8549943dfd3fe7eb07d1ab40a4cfc9958a48d04b39cd97a85b2d52493b203",
+      "name": "ISMAEL GOMEZ, JR.",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-585cef5806f0f7180153e5d1dfe15b4b0580a34368ce3519bddbc9bc9bee528e",
+      "name": "MR. JULIO CESAR VEGA-AMARAL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-41b260e3c511b8c30f93e5ddf41038cd3ab59eb7ac33a4bce1b3798180f7c9d4",
+      "name": "NAUM MORGOVSKY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4d4fbb86283fb2d8a7198ed73e276b5c2d044740ec34008dd62bd89791f55b64",
+      "name": "NAUM MORGOVSKY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f43860844476c18b3105d4b2f78789131e73ffdde74d70d19b56a7d0f1fa9193",
+      "name": "IRINA MORGOVSKY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f7bbb98f18c5ab47f820420606d17c2bc25e222e77755e57de2e5dad15755963",
+      "name": "IRINA MORGOVSKY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d06d3e34bea4a08624f729ec1961b9065381a11811afd957da9ae86fc0a30eac",
+      "name": "MICHAEL JUSTIN HUYNH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9092e93600a703d76bd36f359f0e9b57fbb488dffbc464c0d0aa907db417f012",
+      "name": "NICOLAS ARMANDO QUINTANA-SAENZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ad0e8b7dc31c76f1746405751894698584d24dabcb7a985f1a702530f35ddc5b",
+      "name": "WEI SUN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5544136439d75a9b1b0341ac853a088bb12842e4ed4477419dfcffdc5d8500f8",
+      "name": "JAVIER MELESIO DELEON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d92116bbe451dc2d1b2ba09613e74951b8bdd5d52dbf73d238aa977415b10063",
+      "name": "MAURICE TAYLOR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8842a6e3cf260a73e68ea99ecf706a2e5bd064fd3dad2adc0e9c0d2a903a2597",
+      "name": "LUIS CARLOS QUINTANA-SAENZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-caa7d13f33960210c2b50d898aaef872f43d21192605429d18e2f2f2b69ed2b8",
+      "name": "JOSE ERNESTO GARCIA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9183f77fdf0fc0b3e2478622c9cceab51863d92f014f3a11d656c6268a53a40c",
+      "name": "JOSE LUIS AREVALO-GONZALEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6accea4117b5acd24c8c5f79cbd00882e7751dc739d899cdc8aa5c5f552d9147",
+      "name": "MEHDI HASHEMI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a231e1399dec1085f5380546ab3c0b0e9d105af6b56df6d52add8fd6c5054e6f",
+      "name": "EDDIE HASHEMI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-113ae05ef8e2e83039896471ca0a5f71d21e7b5e4eafcee00769eb2c07f7a6f4",
+      "name": "BRYAN VILLANUEVA-VALLES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5d171db161fb82075e0e9e9450b3503f2d3e2d07b611f98215616dadbbec8138",
+      "name": "URAL AIRLINES JSC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-6eb4f01f76b72d3e7440c405d4df3d9117ab1bf8210eb1d1f2bc7a4d8d7bcd54",
+      "name": "CLAUDIA DELGADILLO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c7ca19700337a70f613914cd3c434f02b284f8e34b3852763864a0d3843cc596",
+      "name": "JOSE MARTIN GALLEGOS-LUEVANOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e3899567bf0034ec139f8b3ee6361b09906714a9adcbce3ed0dfc13e1d943c18",
+      "name": "MAURICIO MARTELL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c0252596d675c3b03403911e10ab9b9342830a9ec32e8ff13e48573ad68e94e4",
+      "name": "JOSE MIGUEL LAZARIN-ZURITA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7c73392a179464b82c7c165fd2ca7ca726667f7eaeb4adb5a13bce8c21d86f31",
+      "name": "GENE SHILMAN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-20b403a7506c499e96adb15ffccd416ada5f4e0e700e8699bcc31ba2efaaa16e",
+      "name": "TIAN MIN WU",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-de7d780776ee803dd81375a5078f80f4ffde2eccf0ccc849c5b5f5b77966bf9d",
+      "name": "MARK KOMOROSKI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4a982cd7486e6eb149d762f27cf059b95705297bed18d1233ca60fec9bb044b3",
+      "name": "RENE SARMIENTO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-770c399f98f2cfa1ace0ffae7651fda17ba1b71ed2f215ef1c9381a7bf2ced34",
+      "name": "PRISCILLA BUSTOS MARTINEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9bbf15b298010da30fc4a1157f370e40724c589c7f8e4fbc6c1dc73d9b3d5245",
+      "name": "JESSE CORTEZ-ARGUELLES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7f44a062b5539da09de93a796e42eb87a71a5566b85bca7586fa8c4a76307ddb",
+      "name": "MAURICIO ROBLES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3593f73f20d2fbcd84e4569fb380ef9d268f9125a308fd9b991f5e5b98388148",
+      "name": "HANY VELETANLIC",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-79b296a70d9274efe32a0a957662a95b5206ed272fd8d5e64dab9cf289bc0fa6",
+      "name": "BRETT MCGINNIS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3b60ddbe4021826e62f1295b36e2c295d28f527e5c00977a769edb107961df36",
+      "name": "GE SONG TAO (GE)",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-34256456f775e9e6b4edd286777388f572095b227f3807e021d650e2b46fba99",
+      "name": "ELI ISAEL RODRIGUEZ-JASSO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a5834f09079e8f5361ba9d5bc5cf385069716b59b9716e7f37c10d55d4947662",
+      "name": "JERMAINE CRAIG RHOOMES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-210dbc9e658184b70bfa4a587330f48f51780093dfb0167c18245338a52dc333",
+      "name": "AMIN YOUSEFI JAM",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1b675b61d1c65cdb4d179ee8fe231ff1ffcaee56dc7ce0f1bc25b87115c1fa34",
+      "name": "MARIA GUADALUPE PINA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5cd5519bb9f79aebb841adff036a218d0ebb18580e4e300a5b523bdef4d3ba4f",
+      "name": "JOSEF KOYSHMAN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-091fdc35024bab62a784792b6b9c0a333a077ec576781d493a2eb82512ce56b0",
+      "name": "OBAIDULLAH SYED",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5f696ec2a046144a709ea6b6f45221b37dfd46e24dc26db1741d36cfb71a4ef2",
+      "name": "VICTOR ANTHONY BOCANEGRA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3483f5d66ea9d930049137d1e4e806b4c95ae38d070700477095538a051abf59",
+      "name": "MICHAEL COX",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ed836f56dd2e37b03de51ebbb25180557bdab112aa349ee335bdf4ccead547b9",
+      "name": "ARASH YOUSEFI JAM",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0cb8ebd4ca53d1a44c6a8a9ea2795509ade11b0ea3baf23141095e6ae204d1e4",
+      "name": "SHUREN QIN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7304680fec61f203c884383960005eb3e471c7893781949ce667f02fa71aabbf",
+      "name": "CARLOS FRANCISCO RODRIGUEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-bcbf16ca77696e024fa1b79895770a2826b0b28d41f13a13154acfecae0ecf96",
+      "name": "RAFAEL PALOMARES, JR.",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5e1ed6ae536543feeaea9fbb685026efe3c94fff2c193681907141c8ec88fb25",
+      "name": "QINGSHAN LI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d6f96a324161dd0e22382b39e9bd8c2292e32c29bde587f60ce9e7fd002030a8",
+      "name": "JAVIER CAMPOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0ba96b385c3dfc826a0d16f3d04fb6ba3b99e62864af748519272c943680a17a",
+      "name": "MARCO RODRIGUEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1bb7648f899bb583f0490ab89640b2624d69a9fb4a9435d90f661212078e995a",
+      "name": "ERICK SAMUEL CHAVEZ GONZALEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7c6f1ed20a8e08c7c449b009171bc5da8818d5869b497dac53055701e940271f",
+      "name": "PARISA MOHAMADI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-dd353020264e551cf9e3e10b4f3df35ab3b98dd0fc125314de9374e51bd074bb",
+      "name": "MOHAMMAD KHAZRAI SHANEIVAR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ffcd44e18e661fc98292d9fa4188967376268561f436b3fb57b9dc31d84a59c3",
+      "name": "GENOVEVO ALVAREZ-RONQUILLO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e76f95297b5468e85cfc2987fd0faed90abaef89d09c675df1db35ffb2a4f21a",
+      "name": "AIDEN DAVIDSON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f1b838c9189f1cbd1719590a2b50540f5776266146d9b46c9272be7213ce2547",
+      "name": "ERIK AGUERO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d1bd2353a09aef2784211496a96f01e2bc20e0ee7959600013b3e64431cdd931",
+      "name": "RANDY LEW WILLIAMS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1bdd072b54af2112df82d6d7c14df3c8a897fb9a6b3e9557640d5ff54fda3bfd",
+      "name": "JESUS ADRIAN RAMIREZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d19a89c47f967027c5f89e2db28a4975db0bebaad8004b368804655940095576",
+      "name": "JESUS ADRIAN RAMIREZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f9f44984d74bbbfcf8bb1e6390ac30c034c6d8b0ac09470b64de98d79708226d",
+      "name": "GERARDO EMMANUEL SIFUENTES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6acca74203348fc4bf98fe3c3bc48c3ce64ecb329ad6c6da98ac1f22264dcf2d",
+      "name": "JOSEPH ORMOND KIRK, III.",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e2b53da6aedc2780c08b7f8075f207efc695782671a4a664b10d0ef249643e46",
+      "name": "ENRIQUE REYES-MORALES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5fe46a857d2af29bd3fa67f036e121c2127455617a29de7a3d9d3a92daba0e6c",
+      "name": "HAMED ALIABADI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a95feb941095f779fa24483276c30c265eb156ab94173bbd85ed33cf983a0900",
+      "name": "OBED RAFAEL CUEVAS-SERRATOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-35437a441355faece0a92d3b7b1ceab7956a855bbbc22d9237c15ffca32f0709",
+      "name": "MARIO RAMIREZ-RIOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-152aeb14ed1ad85b8293655b664c55865e01b95a0535e76d5eb5247668545f8f",
+      "name": "JOSE LUIS ALONSO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d3ad11006009fff06e2824fac1461d4f5cb14579a20136dfc083effa2ab1c345",
+      "name": "JOSE LUIS ALONSO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-42875d0e8289791ac49ac3f3ec77ee78aed33de239e88abf9b6357a7f1f7492a",
+      "name": "YE SANG \"IVY\" WANG",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7f84017db7410b53826b560b65617ae096299118ab2afcc7ba5ddaaed5e66bfe",
+      "name": "SCOTT COMMUNICATIONS, INC.",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-f499ecc15f3e86a217b8a386720ed50dbb1435b8d8816a7949f66cf1cdd609f2",
+      "name": "MISSION COMMUNICATIONS, LLC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-9306806d9966314197c46abf040dcceb6febc674fa47fddb56113539c54eff94",
+      "name": "KENNETH PETER SCOTT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-292fee79170d09eb13320f3cf89c8ac6fc486cffd28a65d85e83d52d11affd56",
+      "name": "DAMIAN ESPINOZA-GONZALEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-aa0dc8a4fa9f33ce0629f95b1aabd61ef42d782d2a595d622f9a2d16688ea5b8",
+      "name": "DARUS ZEHRBACH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-95d2022e4671417580f0b13b37fc1ea7e7cd5c8adb983b3383612fd121cb2a4c",
+      "name": "KATIE ELLEN O'BRIEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8478116b0896db6c3d1c3daf05d13e4919c17777bb311e1d305917ef388c39d9",
+      "name": "ANDRES MORALES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3a7f3cbd30fb40e555d45d365ccad5937c5463470b30a3220ad3ca3c92a3b5cf",
+      "name": "LIZZETTE B. JAIMES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3a80f4c804e02f3a9ac405ff981f6c9abebfc329686531f01028f95aa4ca99b1",
+      "name": "VIRGIL GRIFFITH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-54be8becc42e94626073c12f2fde2bb764c959856e6b2fb41a346f0593173c63",
+      "name": "JUAN ANTONIO CEPEDA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-78fe78ad70039ca4fb6ec0ea82c7424762487efc26a1fd5ca3598e6991bccd67",
+      "name": "JUAN MARVIN GARCIA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0cf394b4c084dcae86e8ec23315ff1ae3ff67a88abf7fe654148032f8af65ed8",
+      "name": "ADRIANA GABRIELA GUAJARDO-CAVAZOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f491a1dd87a76c9c9dc2fc40b978c8334de36b6ec49edfb9b5367d7c35e8cbb0",
+      "name": "CARLOS DANIEL RODRIGUEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c3a19724fd561951714d2bd2603eb7b7a2da86dd322aced5da2f9eafb09fd1f6",
+      "name": "MANUEL ALBERTO MUNOZ-SANDOVAL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c3d3e9430514104171a82608fbce4631c5bbd537ddbdfaec6896be342695f58d",
+      "name": "DAVID ALBERTO DUARTE-MARQUEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5404cf3f2564a472f1f64234d378aab1c864a58dc2c3e8e17a8ffaaa066c0180",
+      "name": "REYNOLDO LOPEZ-COTA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-08a68e0ed3b24291dead7bb2895e92fe730a22be06a2c53394ca1cac23839e27",
+      "name": "LUIS MANUEL BRAY-VAZQUEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-098423ef1177153a0c549c50680aa4312e3125c10ec2c88c5dc7e1e03c36bc51",
+      "name": "JOHNATHON MARTIN SORIA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7ab07cecf93727614c140c0d7f16f5f57e3dc8439c7167d2060fec60ff59db54",
+      "name": "OSCAR IGNACIO LOPEZ SOTO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-80a7053e521feeefad37f69f5601a8ee684099d38f74193cdcd7321641fe735f",
+      "name": "MARIO ISMAEL QUIJADA, JR.",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-28cb406c6e2c4ea10b3cbce09bff5159476aeea274634384aa89b442586ee944",
+      "name": "LEONEL APOLINAR LOPEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-bd5227fb2115419d8bdc26d5e309b4ef1bd94e503f74e2ed9761bc5c7a9af876",
+      "name": "ALEX YUN CHEONG YUE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5e5446232af6ddb53f3fd2f9fcdecee694fa97d6b04f885e770027a28c944b32",
+      "name": "JACOBO JAVIER GARZA-SOLIS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4f75f8e87c73920bdf43deb7d857f8e49b82fdefcc2e81806479ccba995e516f",
+      "name": "LUIS SANCHEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c7556b920c90a23a4eb1a976398ede1ac722db20c2ec36d9758d6c56796599bf",
+      "name": "THOMAS HARRIS, JR.",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6491e04723f64ab1a38c09bfae1cf330b5e12090e30648154a5fc9dfc2183264",
+      "name": "PATRICK LEE SOUSA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4a2fe1494d1189cfc76b57df20783a093de53e60d2ad86e8acde55b36d0bcf0a",
+      "name": "ELI ESPINOZA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-85cbc4c9a62a90defcce43bb5cb8b1b65b07b9bc6939e5d6d26650dcf97670c9",
+      "name": "SHAOHUA \"ERIC\" WANG",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3005d9a6a88e761e2954eca5a678aad5476142543af22c7a8ce87a0ea2c0bda3",
+      "name": "KHALID JARRAH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f5492b54a842e545ecf68f8ac0111a2dada77e5ebf7b5d8b4a3abff4365fcd86",
+      "name": "LUIS DAVID ARMENDARIZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c284e3220c730f7bb36f1810016b28ffb335c04f5d244d1be175e5c63a5323f6",
+      "name": "SAMET DOYDUK",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8433ff245520a737043e023d3fded95639ff6dd3799a9e14e40ba8cc98fb45ef",
+      "name": "VICTOR THOMAS DIAZ, III",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-22bcd228c31fc4799e4cd8937f8eca17c056405dcd5f35cc0a2b3b0a841dcff8",
+      "name": "EMILIE VOISSEM",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-fb367b15023ddafa6ca4783310cc58ed0555fe8a10660bd6b869254308c8bd7f",
+      "name": "VLADIMIR VOLGAEV",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-44d9d4b9fde605e3fc9f3ae20757f840a4cc40d2c19302f3edec29eb9a0c052e",
+      "name": "GUILIANO PECCI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ebf4e67dc7280ff7f977af1b095acc44ed4c1a087479aeb1bc678895833411c5",
+      "name": "OMRAN ISMAIL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c2a600e822ac67e1ff41d48d4065def138c2e4209aa0f222e8c52d8e39bc75b9",
+      "name": "BRADLEY JON MATHENY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6394a7f8610a5d1cdf34cf27fe6079c69b1e1c7b66f041193d5b6a1d716d157e",
+      "name": "ESTEBAN ANDRES ALEXANDER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f7e41891ae30dc4c11b9cc8058a798a88ce30c1c35d172ecdae48f1e76b8766b",
+      "name": "NAOMI NATAL HAYNES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-307c70fd7f1c54a9be41af7f98eacdfdb5129d26f9d042b69eb96132c9ddb98f",
+      "name": "TUQIANG XIE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-68ea44ace8b103d121738cdf52514ef41165f8c2bafd8549d812c1018b93930d",
+      "name": "RUBEN BELTRAN PEDROZA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-695da2c2711c0ae420d86255a7c886eeb8394e60acacd39159fa4e15e9bc6d59",
+      "name": "NICOLAS AYALA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2ca76b555a57c17c8c309706c7b2b0e13e8e5db761db771330c21504f79a55f6",
+      "name": "JONATHAN SANTIAGO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cc261a4d28548bcea9ae9bbdf44b932416df58f576386cef4a1e0f4346c9508e",
+      "name": "PETER SOTIS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-60359b80a4b5756662e90027eb2ba84af0d55114b0f4eb108356626d0d3556f2",
+      "name": "SAPHARA LYNN ANDERSON",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5845b10488189ef7cf20f9013626262df7eee058c281dd19c11766a9827f5e36",
+      "name": "JACQUES YVES SEBASTIEN DUROSEAU",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-641761cf64b4e0b6852cb8113b6156ca85029bb85500e32284d9018ed8dbc027",
+      "name": "CARLOS EDUARDO ZEPEDA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-553668ce98d577df01e2b28247e2ac5d005e66deb899ea4eb03adb685cb1056d",
+      "name": "LEONEL MOLINA, JR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0fcb21ab606fb53468d5abe7c90ff48f97ee829a0b8943f519e0408b5d6991ab",
+      "name": "SAMANTHA CORONADO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-b5f5ddf5cbf37cb64025f7d635096bd859e3e363ebc1ca59ea9998f5e549d690",
+      "name": "JAVIER ALONSO GALVAN-HERNANDEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-73cb69541dcd7146cf94e95b600fad9ba3841c1bbf6a8eb0f6b987c953389b1b",
+      "name": "EDSON DANIEL MONTELONGO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c4a2067578c52af7a49db2ab12b37febc00fb55d5a0e02a0745024a1ab0ee334",
+      "name": "ANGEL HUERTA-GARAY",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-fd77e3180f7a751b0e01331b04153c34dae3e61c3d779c32add6fa96487a4dd2",
+      "name": "ROLONDO ALEXEI PUPO-ABRAHANTES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-e91fd300b53a6d443de3e244dc041c0241d46c99ac974304fffe42fc845ceba9",
+      "name": "JONATHAN YET WING SOONG",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-bbff1fd70f65191676126c2addc7d8442a44f98796a8198b4897432c75e31d98",
+      "name": "STEPHANIE JOAHNA GLORIA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-b5df0b708d847ccf0ce553b569a1165841ae4acaa5c31a8b702579156a92b141",
+      "name": "JOSE LUIS GARCIA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-79aae6f4a76adac4ff4aeeecf8d5ebd1e20136290e2fefa90f1bb7dcba4f4f50",
+      "name": "TINA CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9d662ae9cd4013002f0f8cefa147ed900e602528279b4daae87c3407d93e3a6c",
+      "name": "YA WHEN CHEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-639ee72c76adfc168f73defe397e4648bcadbc3fabb7a3141db73b803e58fba1",
+      "name": "TINA DUNBAR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0bee7d0b6386d12cfbaddf05b990eee499b5f014b1b6d92f1d8ca450155448cf",
+      "name": "TINA DUBNER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8596c5a62831970f9fb9b0127e44e1b4692499d7cb4b22069e093fbacb606965",
+      "name": "HENDEL LAURENT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9c69c30ec7d40c6c9a029e9311ef1bf7a57ff407521fe56ed0ccfd8a6e48f6a0",
+      "name": "RON ROCKWELL HANSEN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-94768d4e19849f52892291f1223fa7c15e175011d663c2ef53080368c23ea746",
+      "name": "OZIEL ZUNIGA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-291d71e777ceaadc1ad95e55379e2ea21aa125859cb1074229170d94eb48c378",
+      "name": "MARTIN NAJERA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-b90322a22d43b540fa457d537ee318a6d0dd4e141a824eab9a78ca440c7c38fd",
+      "name": "IGOR PANCHERNIKOV",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-72bbcd46fbf748b4234ddc7f9759930ec6066bc06ad93c34e5af75d4fc2c8a9e",
+      "name": "ALEJANDRO VALLES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c929e3991bb8bab4a5164bfdb28d8060145fd1d76f10f9cbd2b1b8e11f176c57",
+      "name": "ALEJANDRO VALLES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ce261bebc5038ecb2bc4b36d1d07ec8fd57eb205e94793f2096942a33b11d909",
+      "name": "JONATHAN GUADALUPE ALMANZA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-b5958dd2a18e0af39ab18448d3983211e3e5ad091f228ff20aa0f4cf79890075",
+      "name": "THOMAS ALLEN GLOMSKI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1ca9a2b3b2ac0fb79fc3723e444da093673bc165927b6381107297e14034550d",
+      "name": "NOE DE HOYOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cd8db1bba63b32e14979e3cb76cc234ae774b0027562e674cd703b200b4696c2",
+      "name": "VICTOR AVALOS-TAVERA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-b3bf1bbba827c859fab03f1ddc502d3b942a183806b88e113b4b2b078da77879",
+      "name": "LEONARDO TORRES-AVALOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3075ce8354d07a55c5f4afd99f270250371f507050236d33a5c7c02741ccb695",
+      "name": "MICHAEL DAVID MUMMERT",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-16aa1448d31dda1821666ad47b5c1fbef61889a24a078473a044323fa7fabec8",
+      "name": "NILOUFAR BAHADORIFAR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f52d909e93a82e9b139593c94d1af03580b307a7099ea9a7f24db10af941ecad",
+      "name": "JUAN JOSE ROQUE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-178b6374a866939aaebbad030d93cb0a6e170075167dec200cd115e045995a79",
+      "name": "RUBEN ARNULFO CHAVARIN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-3fed4c887ffceb1650cefed494e0a3988ccd6cc33dce7619e7fbbb0087bdddc0",
+      "name": "ROBERT WISE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a15dd92490b4705f740a63100db98c1da0184a0379f71f359cf7a7c0c3c33839",
+      "name": "MELANIE ANN ESPINOZA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-7ac8e750f06e515198bfa23f8142017127ec5e18467c140a561f43f71c3636fe",
+      "name": "CHARLES MCGONIGAL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d9611da31bc8038d9e1e3c7a1dd1a63a89dad4de1873114882fce13ae4239941",
+      "name": "USGOBUY, LLC",
+      "entity_type": "Entity"
+    },
+    {
+      "source_record_id": "BIS-DPL-c0a4513924daa52a93f2bb3c675fe6d4062eb79b544f7e4d935f60b1e1960482",
+      "name": "KENAN L'HOMME",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8097ee77504a926d671f0b87f8ed2d73d7c1c3bda39f0a1a3af71ca3da511aa5",
+      "name": "RAMI NAJM GHANEM",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ea43b1071938f6577cc4a381ce51d673b618147320b2402a7d92042a12e348c5",
+      "name": "MARCO ANTONIO PERALTA-VEGA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-9f29e4f4b1a8d15498b26451fea7ae8218e498991476faa0be4a3ef36761e696",
+      "name": "YI-CHI SHIH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0fa568f101d67d1c950f611a1683ae61cefce10c858a0e9ff285b059db267d51",
+      "name": "YI-CHI SHIH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-105be018e03207812aa699f9f960afce447b5fa4a0c52574ea9e26c5f5fcdcff",
+      "name": "MARK FITTING",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d0046395317d3686016b88035da0abd0e28e125dfab01777f3595f80425fced8",
+      "name": "PIERRE MICHEL ALFRED",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2041135b60787466129ce247d6b9c35d595769b507fcd6fd463925a49de9c994",
+      "name": "PIERRE MICHEL ALFRED",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-41f6d2a85c541fd282c0fd9c0d8d8fc398ac18da47550102e8885eaa8b1d4b6e",
+      "name": "RAFAEL ALEJANDRO CANEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-844041cfecebd7581628f1e6b17fa6f690138e842b7a061aae8478164e895179",
+      "name": "DALI BAGROU",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-11e7b0631dd7d4f2c8925c74a09c1c072f7383a80f29830290985bf2e4109fb7",
+      "name": "ROBERT THWAITES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d371e056bc32a185a38c6062d90fe90c9f3494debafcff29ecbdbf09dc6b3268",
+      "name": "NICHOLAS JAMES FUCHS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cb901d50478a484b7895caac6d6e07086a5f26308ba915f1cd71b13cf85b776a",
+      "name": "NICHOLAS HOVAN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-79ce4252aae24ff9dbd18df139313c29e4c55da5b98bbacf8b9bc49e905ec227",
+      "name": "ZHENYU WANG",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-78945f12c80d354dd07ea94b194066a6557f52410d41e9b97f1e9f3ec3ba61a5",
+      "name": "BILL WANG",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ad5d0d3a764d1f2a36f421f1b4c74fe72efe7bd4f0f34e5a22fa250111326cfb",
+      "name": "ROBERT OMAR ALCANTARA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-2032670ebcb88171751cfd28437f38e52a78bf99f1f9629f865961a6fa1498d5",
+      "name": "CERBANDO ACOSTA-CARBAJAL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5d1205eae93cb74e38e922232d378676e53a4a7da6b6e667bd4896ac9e718f08",
+      "name": "MELONY ERICE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f69e6764947551c4381d186a63b52c579c6e1fd64401a9b33262afe6f465cd46",
+      "name": "DANIEL RAY LANE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f43e23b8eaa527c7b36b3d431be861b8c23c5874ff89daf6aac74cb5f3c3a9ba",
+      "name": "ERIC NANA KOFI AMPONG-COKER",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a949506eb588da949b439236dd7fced3ee821284269396a41aee227e521044d1",
+      "name": "JOEL ALEJANDRO GARZA-CORONA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-16ab07e1f7329982e43604a704defdc48ff17e5f21f99b10dd61154adf41caae",
+      "name": "ROBERTO MARRERO-CISNEROS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-0d0d8b09735dfdb5af34c1e55df4f33d0caa24685e0839c5e85c3deae8cc9854",
+      "name": "STEVE TREVINO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-208398e3a2b94fd6063462ad61a1c3b0cb522c2f791a7dca209d0aa1f3e3cb08",
+      "name": "OSMANI VALDIVIA PEREZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4023b80d6c44d0df60a5826b4b8ccf1b86c6e3db8d53cb44f33844bd7878d463",
+      "name": "SERGEY KARPUSHKIN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-49b4ca83559031b5fe39ab2a8c07bc1acfd692e3fc713477966bfce1283ba980",
+      "name": "CARLOS ORLANDO LEDESMA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-4cee7253b0ac679241b8420096548e9638bc4413b2220a69e3d3f6dc74e26e80",
+      "name": "ARLANDO TORRES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-75d9d870152dd0b1c10329f058841019685746e86df2c2be779ee61a80233a79",
+      "name": "FARES ABDO AL EYANI",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c155b7cc3e79089ade6986a01df9e27b1856546ce5ae125a5e7791d592e84183",
+      "name": "JUAN MANUEL CERVANTES-ACEVES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-83388bbb4c0f9d44aefd00f9bd8114bee2e8772ee8c461a22f1aca8216993e4f",
+      "name": "MIGUEL BARRERA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-61658e877adecd56bef8b6e648d4a3ef578efea46cc49570108bceac36e79f84",
+      "name": "VLADIMIR KUZNETSOV",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-77bb4bf591ce2ad8b2cf4d39a5244527a5059d7effd46f9a817b943bd807144a",
+      "name": "DAMIAN ALEJANDRO VIDAL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-1cbf4165d6d06c8afdb9abb2eb6a6546ec7d23568986594394d66ba5bde15972",
+      "name": "GABRIEL DANIEL PINNACE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ed61d6938be60824d892d65627801c485afc8671c5f5a8c3579ee805e2e63274",
+      "name": "PEDRO CRUZ ALMEIDA, JR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-cee23ed0d2321f489aae7c1975698e7b4097092cca0b9af12ae6ba111152b39e",
+      "name": "PRINCE BEDIAKO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f08e2d6176881d7e195a75a21b512ef4e079944044a42f7360dfdc8ce845c441",
+      "name": "JOSE GUADALUPE MEJIA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-f3cd868dfe947b90a369a8c6b1d80666113ca5565ca33f4adb114613dd4bd678",
+      "name": "CHRISSIE FIER WILLIAMS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-22803b2a5090884fbeafd115f2916861eab67cd81f59b34494d848e338c212f5",
+      "name": "FRANCISCO DARIO MORA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-44326025e2c184a8bc9121fc2a9d34324ee50be0f1fc291bda391cfb9cdab6f6",
+      "name": "JASMINE DESIRE GALLEGOS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8faabee55f19e8799d6510c9fbc44f48e0aac7c456b46fa494f862d662914da4",
+      "name": "GUADALUPE GIL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d65af850ddb9e145089289a4e55755a431da6a8cee9344518456d1d1e2e60819",
+      "name": "MAXIM MARCHENKO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6abb75a5b4a1fb954f9c6d1dbea02e7745cb1d1333a2347918943c61ad4d943f",
+      "name": "CESAR DAVID PIZ CORONA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-33e311e4051eed733c115792efcf93e9b0425eb562e98f86c9ecd5973b2591b3",
+      "name": "IMELDA JIMENEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-5c847d8e2361bbc3f9f344e41f8e8863c48fa3ef7fe45b8728acd113dd144512",
+      "name": "KAMIR ARMANDO BROWN BLANCHARD",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-b2a6e8cea98f0391b9d0889cd8b07f03991dd9be0a8eb0b1a0ab6d4992090b68",
+      "name": "MARTINA JUANITA GIL",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-29ac5fbab570aed2a734eeb132424d8dd41d32bc9e100b923e7774de185b48d6",
+      "name": "JESSICA ALVARADO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-08d6bf6fd4b53b259a204736e440534a28431fc9216e5e2643dd5df2c220bd33",
+      "name": "SADIR ARVIZU VELAZQUEZ",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a28f100efa56938431d437b47e3219e3e014e6fc584a3b518daab297f7146431",
+      "name": "MOHAMED DAOUD GHACHAM",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-bc2f1e396e58a233147312a379f61dc57c2d6f6f412cc35482de2829e8502c75",
+      "name": "KEVIN URIEL GARZA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-c54bc24dbaa39e3c6c5f0bb935ee83fd5d084dcb5de3d4a8172104b8c47e878c",
+      "name": "FEDERICK JOSEPH BERGMANN, JR.",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-8e2a6829fcf028169f21b308afef9f3b1f5ecb1cd9e326ff96181084529f5e7e",
+      "name": "FREDERICK JOSEPH BERGMANN",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-bbc67637701b472858687af5e5814bef509eba18dd1f02284d293ebda8310eca",
+      "name": "PEDRO MASCORRO",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-223d7bc08266f73c38b93c704614125c559aac115f82f7f81e2daf49ed678ddf",
+      "name": "MIGUEL OCURA-ARENAS",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-df25f56f03592b142676e20d35e6eeb9bc94e6092c22a9945aa961e13587b9c5",
+      "name": "JAMES MWANGANGI KIILU",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d46255b90e1f8d64ac50fc99a56f03aff9310c6a124a244d5dc5fe38af41efd6",
+      "name": "ANTONIO JOSE MELEAN REYES",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-11458a6d31b3893b42476bd007f6869776bf2aaa1af285f27d90a04a045b9016",
+      "name": "VARUN MAHARAJH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-6734f74d321d3b399f13ed030e3510e8dab1abe4fa432bc1455991ad1f123350",
+      "name": "KELVIN SINGH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-a55a3d3c99ba350cb77e7e19e51100d73b72430d01edfeeeb47d85b6db0b63de",
+      "name": "MARCO ANTONIO SANTILLAN VALENCIA",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d56827f534a5f5e6228f84e2de80dc1da2abad62ffd89b68ddae1e05b60d7341",
+      "name": "RICHARD G. SHIH",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-ef528c21512e5d73798c78d4ca6c29e38eb4688dc24add31d95d6b0fdd3d17ae",
+      "name": "NIKOLAY GOLTSEV",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-87b6b9a191c89bc4a33d2ac683f539f9dc57526d913ef9d71b00f1f9753a41a0",
+      "name": "JOSE RAUL PAREDES ARISPE",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-d2c3fa0d9eef730edc91ad60ef8c4282ab493ad8d6fd5504d6e13de2d737f3b9",
+      "name": "MARCO SANTILLAN, JR",
+      "entity_type": "Individual"
+    },
+    {
+      "source_record_id": "BIS-DPL-de93e4100545f598c0d04f0ad37249fa446f20e322d174288ae2e26038d110ec",
+      "name": "MARCO SANTILLAN, JR",
+      "entity_type": "Individual"
+    }
+  ]
+}

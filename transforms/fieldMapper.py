@@ -1131,15 +1131,24 @@ class GroupProcessor:
                 raw_json,
                 explode_rule
             )
-
+        
         obj = self._build_single_object(rules, raw_json)
 
-        # نکته مهم:
-        # در groupهای ساده، اگر فقط constantها مقدار داشته باشند
-        # مثلا comments[].type = other ولی comments[].text خالی باشد،
-        # نباید آیتم خالی داخل آرایه ساخته شود.
         if has_real_source_data(rules, raw_json):
             return [obj]
+
+        group_root = rules[0].target_path.split("[]")[0]
+
+        # Source metadata is meaningful even when supplied as constants.
+        # Require both source and list names to avoid empty source entries.
+        if group_root == "Sources":
+            has_source_identity = all(
+                not is_empty_value(obj.get(field))
+                for field in ("SourceName", "ListName")
+            )
+
+            if has_source_identity:
+                return [obj]
 
         return []
 
