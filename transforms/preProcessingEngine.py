@@ -245,49 +245,62 @@ class PreProcessingEngine:
         name_upper = name.upper()
 
         org_keywords = [
-            "INC",
-            "CORP",
-            "COMPANY",
-            "CO.",
-            "LLC",
-            "LTD",
-            "OPC",
-            "SERVICES",
-            "FIRM",
-            "OFFICE",
-            "ASSOCIATES",
-            "PARTNERS",
-            "CPA",
-            "CPAS",
-            "ACCOUNTING",
-            "BOOKKEEPING",
-            "AUDITING",
-            "CONSULTANCY",
-            "CONSTRUCTION",
-            "BUSINESS",
-            "GROUP",
-            "TRADING",
-            "STORE",
-            "SHOP",
-            "REALTY",
-            "BROKERAGE",
+            "INC", "CORP", "COMPANY", "CO.", "LLC", "LTD",
+            "OPC", "SERVICES", "FIRM", "OFFICE", "ASSOCIATES",
+            "PARTNERS", "CPA", "CPAS", "ACCOUNTING",
+            "BOOKKEEPING", "AUDITING", "CONSULTANCY",
+            "CONSTRUCTION", "BUSINESS", "GROUP", "TRADING",
+            "STORE", "SHOP", "REALTY", "BROKERAGE",
         ]
 
-        if any(
-            keyword in name_upper
-            for keyword in org_keywords
-        ):
+        organization_pattern = config.get(
+            "organization_pattern"
+        )
+
+        if organization_pattern:
+            is_organization = bool(
+                re.search(organization_pattern, name)
+            )
+        else:
+            is_organization = any(
+                keyword in name_upper
+                for keyword in org_keywords
+            )
+
+        if is_organization:
             record[output_field] = "Entity"
+            return record
+
+        individual_pattern = config.get(
+            "individual_pattern"
+        )
+
+        if individual_pattern and re.search(
+            individual_pattern,
+            name,
+        ):
+            record[output_field] = "Individual"
             return record
 
         parsed_name = HumanName(name)
 
-        if parsed_name.first and parsed_name.last:
+        has_person_name = bool(
+            parsed_name.first and parsed_name.last
+        )
+
+        has_title_and_name = bool(
+            organization_pattern
+            and parsed_name.title
+            and (parsed_name.first or parsed_name.last)
+        )
+
+        if has_person_name or has_title_and_name:
             record[output_field] = "Individual"
         else:
             record[output_field] = "Entity"
 
         return record
+
 
     def set_constant_field(self, record, config):
         """Stamp a fixed value; with `when_field`, only if that field matches `when_pattern` (default: non-blank)."""
