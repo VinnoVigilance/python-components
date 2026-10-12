@@ -1,0 +1,546 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "vv-risk-taxonomy-sha256-5700f55b88c6f95d5ebdb082de9adccaebd3a35cfb7ae816401650955e64f9a9",
+  "source": {
+    "file_name": "VV_Risk_Labels_Final_reviewed(20261011-062838).xlsx",
+    "sha256": "5700f55b88c6f95d5ebdb082de9adccaebd3a35cfb7ae816401650955e64f9a9",
+    "used_sheets": [
+      "Risk Labels",
+      "Annotation Rules"
+    ]
+  },
+  "preparation": {
+    "method": "english_cell_and_bilingual_segment_extraction",
+    "label_order": "existing_processed_labels_json",
+    "model_prompts_finalized": false,
+    "language": "en",
+    "configuration_revision": 2
+  },
+  "label_count": 23,
+  "labels": [
+    {
+      "name": "PEP",
+      "stable_id": "PEP_GEN",
+      "english_description": "Definition: Reporting that an individual currently holds or formerly held a prominent public function, or has been entrusted with a prominent function in an intergovernmental international organization. This is a person’s status and does not itself establish wrongdoing or criminality.\nCoverage: Senior political/government figures, heads of state/government, ministers, prominent legislators or political leaders, senior judicial/military officials, qualifying senior state-enterprise executives, and senior intergovernmental-organization officials. Domestic means a prominent function within the assessment jurisdiction; foreign means a function in another jurisdiction. International-organization subtype concerns a prominent intergovernmental role. All share this single label. Record title, organization, function jurisdiction and current/former dates separately.\nBoundary: Domestic/foreign is relative to the assessment jurisdiction, not inferred solely from nationality or publication location. “Foreign minister” is the minister of foreign affairs. Ordinary government employment, junior staff, ordinary organization/NGO membership and fame alone are insufficient. Use general PEP when prominence is supported but subtype is unknown.",
+      "examples": "Positive examples:\n1. The report identifies a person as a former finance minister.\n2. A person holds a senior intergovernmental-organization role.\n3. A minister held office in another jurisdiction; foreign subtype needs a defined assessment jurisdiction.\nBoundary: A ministry clerk has no reported prominent role.",
+      "sample_indicators": "head of state\ngovernment minister\nformer minister\nsenior judicial official\nsenior military official\nprominent public function\nsenior intergovernmental official\npolitically exposed person",
+      "dimension": "Entity status",
+      "inclusion_criteria": "A clearly prominent role or supported explicit PEP identification. Capture role title, function jurisdiction, organization and current/former dates. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Junior civil servants, generic government employees, ordinary NGO staff, and citizenship alone.",
+      "allowed_co_labels": "One general trainable label. Domestic/foreign and international-organization subtype are attributes. RCA applies to related persons, not automatically to the PEP.",
+      "handling_insufficient_information": "Unknown seniority or ambiguous title: mark unassessed and preserve the role text. “Foreign minister” is a job title, not foreign PEP proof. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "role_title, organization, function_jurisdiction, current/former tenure, pep_subtype, assessment_jurisdiction",
+      "external_context_required": "Assessment jurisdiction is required for domestic/foreign attribution. VV must approve borderline role scope and former-role handling.",
+      "open_business_policy_question": "Approve prominent-role boundaries, former-role policy and assessment jurisdiction.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A3:E3",
+        "annotation_rules": "'Annotation Rules'!A3:J3"
+      }
+    },
+    {
+      "name": "RCA",
+      "stable_id": "RCA_GEN",
+      "english_description": "Definition: Reporting of a family relationship or close, known association between an individual and an identified PEP. Both the related person and PEP anchor must be identifiable.\nCoverage: Blood, marriage or comparable family partnerships, such as spouse/partner, child, parent or sibling within VV policy; and close personal, social or business associations, such as a close business partner, joint beneficial owner or person with a close ongoing PEP relationship. Preserve Family Member or Close Associate as supporting subtypes. Use general RCA where a qualifying relationship is supported but its subtype is unclear.\nBoundary: Spouse/partner of an arbitrary person is insufficient. A meeting, attendance at an event, routine business contact, shared board membership or proximity alone does not establish closeness. If the anchor’s PEP role comes only from external evidence, record that reference and dependency. RCA alone does not imply misconduct.",
+      "examples": "Positive examples:\n1. A person is reported as the spouse of the named minister.\n2. A person is described as the minister’s close business partner and joint owner.\nBoundary: Two people attended a conference; neither closeness nor a PEP anchor is established.",
+      "sample_indicators": "spouse of the minister\nchild of the named PEP\nfamily member of a PEP\nclose business associate\njoint beneficial owner with a PEP\nknown close associate",
+      "dimension": "Relationship",
+      "inclusion_criteria": "A named/resolvable PEP plus evidence of qualifying kinship or a close association. A supported statement “RCA of [identified PEP]” may support the general label. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Spouse/partner of an arbitrary person, a meeting, shared workplace, shared board membership alone, or unsupported proximity.",
+      "allowed_co_labels": "PEP may describe the anchor PEP in the same article. Record who is related to whom. Relationship subtype = family/close associate/unspecified.",
+      "handling_insufficient_information": "If the PEP anchor, prominence or closeness is not established, do not force RCA. Unknown subtype does not block a supported general relation. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "relationship_type, relation wording, identified pep_anchor, anchor role evidence",
+      "external_context_required": "If anchor role is absent, use approved identity-resolved PEP evidence and record it. Set family/association scope with VV analyst.",
+      "open_business_policy_question": "Approve family/close-association scope and treatment of external PEP-anchor evidence.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A4:E4",
+        "annotation_rules": "'Annotation Rules'!A4:J4"
+      }
+    },
+    {
+      "name": "State-Owned",
+      "stable_id": "OWN_STATE",
+      "english_description": "Definition: An entity that is directly or indirectly owned by a government or state entity through a significant ownership interest.\nCoverage: Explicitly reported state-owned company status, or reported direct/indirect government equity with supported significant ownership. Preserve the government owner, stated share, ownership intermediary and date separately. Explicit state-owned or wholly government-owned characterization can support assignment; a reported percentage alone must not create a materiality cutoff without approved VV policy.\nBoundary: State control, ownership complexity or opacity alone does not establish state ownership. Subsidies, sovereign loans/contracts, regulation and stock-exchange listing are insufficient. When only a government stake is reported and its significance is unclear, preserve the stake and flag policy review rather than force a positive or negative. State ownership does not imply misconduct.",
+      "examples": "Positive examples:\n1. The report states Alpha is wholly government-owned.\n2. The article identifies Alpha Bank as state-owned and names its government owner.\nBoundary: Government appointment rights without equity do not establish this label; a small reported stake with undefined significance needs review.",
+      "sample_indicators": "state-owned company\nwholly government-owned\nsignificant government ownership interest\nindirect state ownership\ngovernment shareholder with stated state-owned status",
+      "dimension": "Entity ownership characteristic",
+      "inclusion_criteria": "Explicit state-owned/wholly government-owned characterization, or supported significant direct/indirect government equity under an approved VV significance policy. Preserve the owner and reported equity relationship. The original significant-interest scope is retained. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "Control without ownership evidence; complex/opaque ownership alone; government grants, customers, loans or regulation; listed/public company meaning exchange-listed. A stake of unknown significance is not automatically positive.",
+      "allowed_co_labels": "PEP only for a qualifying reported person-role; other labels require independent support. State control, complexity and opacity are outside the agreed targets and may be supporting fields. State ownership does not automatically prove control or wrongdoing.",
+      "handling_insufficient_information": "A reported stake with unclear significance: retain ownership_percent and mark policy review/unassessed. No guessed percentage threshold. Explicit state-owned status can qualify even when the share is unstated.",
+      "supporting_information": "government/state owner, direct/indirect relationship, stated share, explicit state-owned characterization, intermediary, date, significance_basis/policy_version",
+      "external_context_required": "None for explicit state-owned reporting. VV significance policy and ownership records are needed for ambiguous stake-only cases.",
+      "open_business_policy_question": "Define what significant ownership means for VV. Do not assume every government stake qualifies.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A24:E24",
+        "annotation_rules": "'Annotation Rules'!A24:J24"
+      }
+    },
+    {
+      "name": "Jurisdiction Risk",
+      "stable_id": "JUR_RISK",
+      "english_description": "Definition: Specific reporting about a jurisdiction’s AML/CFT or financial-crime risk status, or a specific entity link to such a jurisdiction, supported by a source and date. The original High-Risk Jurisdiction subtopic is retained within this broader label.\nCoverage: Reported identification by FATF or a VV-approved authority, strategic AML/CFT deficiencies, calls for action/enhanced controls, increased monitoring, listing changes/removal and actual entity exposure such as incorporation, operations or business ties where the link to risk status is explicitly reported. Preserve list type, authority, effective date and exposure type; call-for-action and increased-monitoring statuses are distinct.\nBoundary: Country name, nationality, address or news location alone is insufficient; do not treat a jurisdiction as permanently high-risk. For text-only classification the article must discuss risk status or its reported exposure link. Status known only through an external list is dated enrichment, not a text-supported gold label unless that context is supplied. Jurisdiction risk alone does not establish entity crime/adversity.",
+      "examples": "Positive examples:\n1. A report cites a dated FATF statement and the list type for Jurisdiction A.\n2. An article explicitly links company operations to an authority’s risk designation in that period.\nBoundary: An article only gives a country of incorporation and no risk-status context.",
+      "sample_indicators": "FATF high-risk jurisdiction\ncall for action\nstrategic AML/CFT deficiencies\njurisdiction under increased monitoring\ndated high-risk country designation\nremoved from a monitored-jurisdiction list\nreported exposure to a listed jurisdiction",
+      "dimension": "Jurisdiction risk status / reported exposure",
+      "inclusion_criteria": "The article specifically reports a dated/source-supported AML/CFT or financial-crime risk status, its listing change/removal, or a specific entity exposure explicitly linked to that status. Distinguish call-for-action and increased monitoring. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "Country name, citizenship, address, incorporation, article location or stereotypes alone; current external list projected onto an unrelated historical article; ordinary exposure without explicit risk-status context.",
+      "allowed_co_labels": "PEP, State-Owned, Sanctions or conduct labels only with their own evidence. Jurisdiction risk does not itself establish entity wrongdoing. Status/list type and exposure are attributes.",
+      "handling_insufficient_information": "Country-only text: no supported positive. Unavailable source/date or ambiguous list type: review. External-only risk mapping is enrichment and must not be silently used as a text-only gold label.",
+      "supporting_information": "jurisdiction, authority/source, list type, effective/as-of date, change/status, incorporation/operation/business exposure, requires_context",
+      "external_context_required": "Dated authoritative reference if classification or verification depends on information outside the article. Record historical as-of date; supplied model input must contain required context.",
+      "open_business_policy_question": "Approve authorities, accepted list types and as-of/exposure policies.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A23:E23",
+        "annotation_rules": "'Annotation Rules'!A23:J23"
+      }
+    },
+    {
+      "name": "Sanctions",
+      "stable_id": "SAN_GEN",
+      "english_description": "Definition: Reporting of an official current or historical sanctions status or measure concerning an identified person, entity, vessel, aircraft, jurisdiction or target, issued by a competent authority.\nCoverage: (1) Formal designation/listing; (2) sanctions blocking of funds, accounts, assets or economic resources to prevent access, transfer, use or disposal; (3) sanctions-based entry, departure, transit, travel or visa bans; (4) restrictions on payments, transfers, financing, banking services and specified financial transactions; (5) sectoral measures targeting an industry, activity or transaction type without necessarily prohibiting all dealings; (6) trade, purchase, sale, import, export, supply or transfer restrictions on goods, technology and services; (7) arms embargoes on sale, supply, transfer, import, export or brokering of weapons and military equipment. Reported lifting, suspension or amendment of a specified measure is covered with date and status preserved.\nBoundary: Preserve each subtopic only with its evidence. Listing does not establish every measure, and a measure does not establish listing. Financial, sectoral and trade details of one measure are not separate labels. Judicial seizure, ordinary account holds, bail travel conditions, ordinary tariffs, export controls without a sanctions basis and sports/workplace sanctions are insufficient. Proposed-only sanctions are supporting proposal information, not an actual measure. Debarment or exclusion by a development bank or procurement body is Regulatory, not Sanctions, even when the issuer calls it a sanction.",
+      "examples": "Positive examples:\n1. A named authority formally designated Alpha.\n2. Alpha’s accounts were blocked under that sanctions regime.\n3. The named person received a sanctions-based entry ban.\n4. Sanctions barred new debt financing for Alpha Bank.\n5. Sectoral sanctions restricted financing of new energy projects.\n6. Sanctions prohibited drilling-equipment exports to the target.\n7. An international authority imposed an arms embargo on Group Alpha.\nBoundary: A bank held an account for incomplete identification, with no reported sanctions basis.",
+      "sample_indicators": "officially designated\nadded to sanctions list\nblocked assets under sanctions\nsanctions travel ban\nprohibited financing under sanctions\nsectoral sanctions\nsanctions trade restriction\narms embargo\nsanctions lifted",
+      "dimension": "Entity status / official restrictive measure",
+      "inclusion_criteria": "A specific official current/historical designation or sanctions measure is reported with an identifiable target and competent authority/regime. Actual lifting or amendment of an identified measure also qualifies. Generic reference to unspecified sanctions alone requires review. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "Proposals/calls only; sports/workplace sanctions; ordinary bank holds, civil/criminal seizure, bail restrictions, tariffs or export controls without a sanctions basis.",
+      "allowed_co_labels": "PEP or RCA only with their own supported role/relation. Underlying conduct, Regulatory, Law Enforcement or Judicial / Court only for reported facts satisfying those labels. Sanctions subtopics are attributes of this one label; designation and measures are not inferred from each other.",
+      "handling_insufficient_information": "Missing basis, target or official context: preserve the wording and mark unclear. Do not guess the precise restriction. Proposed-only status is supporting information.",
+      "supporting_information": "authority, regime/instrument, target, designation/measure subtype, sector, goods/services, date, imposed/lifted/historical status",
+      "external_context_required": "None for clearly reported content. Dated official instruments/lists and identity resolution are needed to independently verify current status or legal scope.",
+      "open_business_policy_question": "Approve recognized authorities and treatment of historical/lifted measures in operational screening.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A2:E2",
+        "annotation_rules": "'Annotation Rules'!A2:J2"
+      }
+    },
+    {
+      "name": "Terrorism / Terrorist Financing",
+      "stable_id": "TER_GEN",
+      "english_description": "Definition: Reporting of a specific terrorism-related activity, status or relationship supported in the article or attributed to an identifiable source. This broad label combines the four original subtopics.\nCoverage: Terrorist acts, plots, planning or participation; providing, collecting, transferring or using money/assets for terrorists, organizations or acts; reported terrorist-organization characterization or specific membership/affiliation; and nonfinancial operational, material, logistical, training, recruitment, service, safe-house or travel-facilitation support. Preserve activity, financing, membership/affiliation or support as subtopic attributes; one does not imply all.\nBoundary: Generic violence, war, political criticism, ordinary transfers, charitable activity, acquaintance/meetings, shared ethnicity/religion and rhetorical use of “terrorist” are insufficient. The terrorism link and actor/group role must be reported. Funding does not itself establish membership. Record allegation, charge, source characterization and judicial outcome separately; the label is not independent proof of crime.",
+      "examples": "Positive examples:\n1. Prosecutors accused Group Alpha of planning a terrorist attack.\n2. A person allegedly collected and transferred funds for an identified terrorist organization.\n3. An identified source described the person as a member of the named terrorist group.\n4. Prosecutors allege Alpha supplied training and safe houses to that group.\nBoundary: A person donated to charity with no reported terrorism link.",
+      "sample_indicators": "terrorist attack allegation\nterrorist plot\nterrorist financing charge\nfundraising for a terrorist organization\nmember of named terrorist group\nterrorist affiliation\nlogistical support to terrorists\nterrorist recruitment or training",
+      "dimension": "Conduct / financing / entity status / relationship",
+      "inclusion_criteria": "Specific attributed terrorist act/plot; funds/assets with a reported terrorism purpose; supported terrorist group status or membership/affiliation; or concrete nonfinancial support with a reported terrorism link. At least one subtopic is sufficient. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "Generic violence/war, ordinary transfers/charity, political rhetoric, sympathy alone, meetings/contact, shared ethnicity/religion, or services without a supported terrorism link.",
+      "allowed_co_labels": "Sanctions only for separately supported official sanctions status/measure. Crime-Violent Crime for supported violent conduct. Other conduct or official-event labels require their own evidence. Funding does not imply affiliation. Activity, finance, affiliation and support are subtopic attributes, not four labels.",
+      "handling_insufficient_information": "Unclear terrorism link, recipient characterization or relationship: preserve source wording and mark unclear. Do not force a subtype or assert that an allegation is established.",
+      "supporting_information": "activity/financing/affiliation/nonfinancial-support subtype, actor/recipient/group, purpose, attribution, allegation_stage, date",
+      "external_context_required": "None for explicit attributed reporting. If group status is external, record a dated approved designation/reference and requires_context.",
+      "open_business_policy_question": "Approve reference sources and handling of contested group characterizations.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A17:E17",
+        "annotation_rules": "'Annotation Rules'!A17:J17"
+      }
+    },
+    {
+      "name": "Proliferation / Proliferation Financing",
+      "stable_id": "PF_GEN",
+      "english_description": "Definition: Reporting of unlawful WMD proliferation, its financing or support, with a specific link supported in the text or explicitly attributed to a source. This combines the three original subtopics.\nCoverage: Unlawful development, manufacture, acquisition, possession, transfer, export, import or use of nuclear, chemical or biological weapons and proliferation-related items; missile items/technology only with a reported proliferation link; provision/transfer of money, assets or financial services for a proliferation program/network; and nonfinancial procurement, equipment, technology, services, expertise, technical or logistical assistance. Record activity, end use, role and subtopic only as supported.\nBoundary: Peaceful nuclear energy, ordinary chemicals, lawful research, dual-use technology or transfers without a proliferation link are insufficient. Conventional arms trade or missile discussion alone does not qualify. Do not infer financing from technical services or direct activity from support. Add Sanctions only where a formal sanctions status/measure is independently reported.",
+      "examples": "Positive examples:\n1. An authority accused a company of illegally supplying a chemical-weapons program.\n2. A network allegedly financed procurement for a WMD program.\n3. A report describes technical/logistical assistance to a proliferation network.\nBoundary: A bank financed a peaceful power project with no reported proliferation link.",
+      "sample_indicators": "WMD proliferation allegation\nillicit nuclear or chemical weapons program\nproliferation financing\nfinancing WMD procurement\nproliferation procurement network\ntechnical assistance to a WMD program\nproliferation support or facilitation",
+      "dimension": "Conduct / financing / support",
+      "inclusion_criteria": "Reported unlawful WMD activity or attributed proliferation allegation; finance/assets/services with a supported proliferation purpose; or nonfinancial procurement/technical/logistical help with that link. At least one of these subtopics is sufficient. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "Peaceful nuclear work, lawful research, ordinary chemicals, generic missiles, conventional arms trade, dual-use goods or international transfers without a reported unlawful WMD/proliferation link.",
+      "allowed_co_labels": "Sanctions only with a supported formal measure/status; Crime-Trafficking & Smuggling only with illicit movement evidence. Activity, finance and support remain attributes of one label. A technical service does not itself establish financing.",
+      "handling_insufficient_information": "Unknown end use or unlawful context: retain item/purpose wording and mark unclear. A supported broad allegation need not specify all technologies or mechanisms.",
+      "supporting_information": "WMD/item/program, end use, unlawful/proliferation link, activity/finance/support subtype, role, source, date",
+      "external_context_required": "None for explicit allegations. Dated applicable restrictions or technical/end-use references may resolve ambiguity; record external dependency.",
+      "open_business_policy_question": "Approve reference sources for disputed end use or legality without introducing technical keyword thresholds.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A18:E18",
+        "annotation_rules": "'Annotation Rules'!A18:J18"
+      }
+    },
+    {
+      "name": "Human Rights / Atrocities",
+      "stable_id": "HR_ALL",
+      "english_description": "Definition: Reporting of a specific serious human-rights abuse or an event characterized, alleged or found by an identified source to constitute genocide, crimes against humanity or war crimes. This combines the four original subtopics.\nCoverage: Genocide with reported intent to destroy a national, ethnic, racial or religious group in whole/part; crimes against humanity in a reported widespread/systematic attack on civilians, with knowledge of that attack; war crimes involving serious violations of the law of armed conflict that can entail individual criminal responsibility; and other grave abuses such as torture, extrajudicial killing, enforced disappearance, severe arbitrary detention, enslavement, serious sexual violence, severe persecution and forced displacement. Derive subtype/legal characterization from reported evidence or source allegation.\nBoundary: Killing, violence, wartime casualties, political disputes or generic human-rights wording do not automatically establish genocide/international crimes. A specific legal subtype requires explicit source attribution; do not infer legal elements from keywords. Other grave abuses require supported event, severity and human-rights context. Preserve allegations and judicial findings separately.",
+      "examples": "Positive examples:\n1. An inquiry characterized specific acts against ethnic Group Alpha as genocide.\n2. Prosecutors alleged the disappearance campaign constituted crimes against humanity.\n3. Investigators characterized a specific armed-conflict attack as a war crime.\n4. An inquiry reported that officers tortured detainees.\nBoundary: A report describes conflict casualties without a supported grave abuse or legal characterization.",
+      "sample_indicators": "genocide allegation\ncrimes against humanity allegation\nwar crimes charge\ntorture of detainees\nextrajudicial killing\nenforced disappearance\nserious human rights abuse\nforced displacement or severe persecution",
+      "dimension": "Conduct / attributed legal characterization",
+      "inclusion_criteria": "An identified source characterizes a specific event as genocide, crimes against humanity or war crimes, or reports a specific grave human-rights abuse with supported severity/context. At least one supported subtopic is sufficient. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "Ordinary violence, wartime deaths, political disputes, metaphorical torture, generic rights discussion or keywords without a supported grave event or specific legal characterization.",
+      "allowed_co_labels": "Crime-Violent Crime for described violent conduct; other agreed labels for independently supported facts/events. Several serious-abuse subtopics remain attributes of the same broad label and must not multiply an event.",
+      "handling_insufficient_information": "No specific international-crime characterization: do not infer that subtype. A supported other grave abuse can still support the broad label. Unclear severity/context requires review.",
+      "supporting_information": "abuse/event, supported legal subtype, attributing source, affected population, actor role, allegation/finding/outcome, date",
+      "external_context_required": "Source attribution for legal characterizations. Independent legal verification needs applicable case records; external-only status must be flagged.",
+      "open_business_policy_question": "Approve severity boundaries for other serious human-rights abuses.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A19:E19",
+        "annotation_rules": "'Annotation Rules'!A19:J19"
+      }
+    },
+    {
+      "name": "Regulatory",
+      "stable_id": "REG_GEN",
+      "english_description": "Definition: Reporting of a specific regulatory matter/event involving an identified person, entity or activity, including formal regulator inquiry, alleged breach, established violation and formal enforcement/supervisory action. The original violation/action subtopics are combined; investigation is captured within the same broad scope.\nCoverage: AML/CFT, reporting, licensing, prudential, market-conduct or consumer-protection issues; case-specific formal warnings, fines/penalties, license suspension/revocation, activity restrictions and debarment/procurement restrictions imposed by a competent authority. This includes debarment or cross-debarment by a multilateral development bank (e.g. World Bank, ADB, AfDB) and government procurement blacklisting. Preserve authority, target, issue, action and stage.\nBoundary: Inquiry/suspicion is not a finding. A fine or no-admission settlement without a finding need not establish a proven breach. General guidance, education, broad market warnings, policy changes, ordinary licensing and industry surveys without a specific matter are insufficient. Classify multi-mandate agencies by their reported regulatory/criminal capacity; police action and court penalties receive other labels only for supported events.",
+      "examples": "Positive examples:\n1. A regulator opened an inquiry into Alpha Bank’s reporting.\n2. The authority found AML breaches and imposed a fine.\n3. An entity’s license was suspended over supervisory concerns.\nBoundary: A regulator published an educational anti-scam leaflet with no specific case.",
+      "sample_indicators": "regulator opened an investigation\nalleged regulatory breach\nregulator found non-compliance\nAML/CFT compliance violation\nformal target-specific warning\nregulatory fine\nlicense suspended or revoked\nregulatory debarment\ndevelopment-bank debarment",
+      "dimension": "Official regulatory inquiry / allegation / finding / action",
+      "inclusion_criteria": "Specific formal regulatory inquiry; a concrete alleged regulatory breach involving an identifiable subject/requirement; an authority finding; or an actual target-specific supervisory/enforcement measure. Record which is reported; one does not establish the others. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "General guidance, public education, policy announcements, routine license renewal, broad industry surveys or routine examinations without a specific reported matter. Police action and court punishment do not automatically become regulatory events.",
+      "allowed_co_labels": "Relevant conduct labels need supported conduct. Law Enforcement applies to a reported criminal-capacity event; Judicial / Court to an actual judicial event. Inquiry, finding and action are attributes of this broad label. No automatic finding from a fine/no-admission settlement.",
+      "handling_insufficient_information": "Authority capacity, target or matter unclear: retain wording and review. A clear allegation may qualify without a proven finding; finding_status remains suspected/unestablished.",
+      "supporting_information": "authority/capacity, requirement, subject/witness role, inquiry/allegation/finding/action, measure, admission/finding wording, date",
+      "external_context_required": "None for explicit reporting. Official notice/mandate or local legal context may clarify findings and criminal versus regulatory capacity.",
+      "open_business_policy_question": "Approve borderline formal notices and examinations; define interpretation of consent orders and no-admission settlements.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A20:E20",
+        "annotation_rules": "'Annotation Rules'!A20:J20"
+      }
+    },
+    {
+      "name": "Law Enforcement",
+      "stable_id": "LE_GEN",
+      "english_description": "Definition: Reporting of official law-enforcement status, investigation or action in a specific criminal case/activity. The original alert/wanted, investigation and action subtopics share this broad label.\nCoverage: Official criminal wanted/fugitive declarations and case-specific enforcement notices concerning suspects/cases; criminal investigations by police, prosecutors or criminal-capacity authorities; arrest, issue/execution of arrest/search warrants, searches, seizure of property/evidence and other reported formal criminal actions. Preserve investigated matter, action target and each actor’s role.\nBoundary: Witnesses, victims and enforcement officials are not automatically suspects. Missing-person notices, witness requests treated as wanted status, journalistic/corporate inquiries, general police education, routine checks, civil-only seizure and sanctions blocking are excluded. Investigation is not proof and a warrant is not a conviction. A regulator receives this label only when acting in a reported criminal capacity; supervisory action is Regulatory.",
+      "examples": "Positive examples:\n1. Police declared a named person wanted in a criminal case.\n2. Prosecutors are investigating alleged embezzlement.\n3. Police searched premises and seized evidence under a criminal warrant.\nBoundary: Police invited a witness to provide information; the witness is not wanted.",
+      "sample_indicators": "official criminal wanted notice\nfugitive status\npolice criminal investigation\nprosecutors investigating\narrest warrant\ncriminal search warrant\narrested or detained in a criminal case\nevidence seized by police",
+      "dimension": "Official criminal status / investigation / action",
+      "inclusion_criteria": "Official criminal wanted/fugitive notice; formal criminal investigation into an identifiable subject/activity; or concrete formal criminal action such as an issued warrant, arrest, search or seizure. Preserve reported subtype and target. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "Missing-person notices; witness requests misread as wanted status; journalist/corporate inquiry; general policing/education; civil-only seizures; sanctions blocking; regulatory action without reported criminal capacity.",
+      "allowed_co_labels": "Conduct labels require their own allegation/event evidence. Regulatory for a separately supported regulatory matter; Judicial / Court for a supported judicial event. Arrest does not imply conviction; a warrant does not imply a separate wanted notice.",
+      "handling_insufficient_information": "Generic under investigation/detained/seized without criminal capacity or event context requires review. Witness or victim involvement does not establish that actor as a suspect.",
+      "supporting_information": "authority/capacity, wanted/investigation/action subtype, target/activity/property, suspect/victim/witness/official role, case, date",
+      "external_context_required": "None for explicit reporting. Dated official notice/mandate can clarify capacity or verify current status.",
+      "open_business_policy_question": "Resolve borderline multi-mandate-authority events using reported capacity.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A21:E21",
+        "annotation_rules": "'Annotation Rules'!A21:J21"
+      }
+    },
+    {
+      "name": "Judicial / Court",
+      "stable_id": "JUD_GEN",
+      "english_description": "Definition: Reporting of a specific judicial proceeding, event or disposition in a criminal case or civil, commercial, contractual or financial dispute. This combines the four original criminal-proceedings, criminal-judgment, sentencing and civil/commercial-proceedings subtopics.\nCoverage: Formal prosecution/charges in a criminal judicial context, indictment, arraignment, hearings, trial and judicial pleas; guilty verdict/conviction and not-guilty verdict/acquittal; prison, criminal fines, probation or suspended sentences; appeal, vacatur, dismissal, termination or other specified dispositions; and filed civil/commercial lawsuits, hearings or judgments on contracts, ownership or financial claims. Record party role, case type, stage, charge and precise outcome separately.\nBoundary: This label alone establishes neither guilt nor adversity; acquittal reporting qualifies too. Dismissal, bail release and withdrawal do not automatically mean acquittal. Police inquiry, threatened suit, private negotiation and purely regulatory punishment without a judicial event are insufficient. Separate historical events from current outcome when a case history is reported.",
+      "examples": "Positive examples:\n1. Alpha’s director went on criminal trial.\n2. The court convicted the director on one charge.\n3. The court acquitted the director on another charge.\n4. The court imposed imprisonment for the reported conviction.\n5. An appeal court vacated the prior conviction; vacatur is not automatically acquittal.\n6. Alpha’s civil contract lawsuit was filed and the court issued judgment.\nBoundary: A customer only threatened to sue; no case was filed.",
+      "sample_indicators": "indictment or arraignment\ncriminal trial or hearing\nconvicted or guilty verdict\nacquitted or not-guilty verdict\ncriminal sentencing\nconviction vacated or case dismissed\nappeal proceedings\ncivil lawsuit or commercial judgment",
+      "dimension": "Judicial process / case outcome / penalty",
+      "inclusion_criteria": "Actually reported criminal prosecution/court-process event, guilty verdict/conviction, acquittal, imposed criminal sentence, specified other formal disposition, or filed civil/commercial litigation/hearing/judgment. One supported subtopic is sufficient. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "Police inquiry alone; threatened/unfiled suit; private negotiations; regulatory penalty without a court event; hypothetical outcomes. Arbitration alone remains outside current scope pending VV policy.",
+      "allowed_co_labels": "Conduct labels only for supported allegations/conduct, including historical allegations reported alongside acquittal. Law Enforcement/Regulatory require their own events. Conviction, acquittal, sentencing and dismissal are outcome attributes, not additional labels. Dismissal/bail/withdrawal/vacatur is not automatically acquittal; a guilty plea alone is not an entered conviction.",
+      "handling_insufficient_information": "Specific judicial event with unknown subtype/outcome may receive the broad label; preserve exact wording and unknown case_type/outcome. Generic legal issues without a real proceeding require review.",
+      "supporting_information": "court/authority, case ID/type, claimant/defendant role, charge/count, stage, plea, exact disposition, sentence, appeal, date and current/historical status",
+      "external_context_required": "None for explicit reporting. Court records or local terminology may be needed to resolve ambiguous process/outcome words.",
+      "open_business_policy_question": "Confirm relevant civil/commercial dispute scope and any future inclusion of arbitration.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A22:E22",
+        "annotation_rules": "'Annotation Rules'!A22:J22"
+      }
+    },
+    {
+      "name": "Crime-Corruption",
+      "stable_id": "CR_CORR",
+      "english_description": "Definition: Reporting of conduct or a specific allegation involving abuse of public power or entrusted authority for an improper personal or organizational benefit.\nCoverage: Giving/receiving bribes, graft, kickbacks or improper payments, abuse of office, influence peddling and diversion of contracts/resources for private benefit. Embezzlement/misappropriation may also qualify when entrusted-authority abuse is reported. Mentioning an official or PEP alone is insufficient.\nBoundary and overlap: A specific attributed allegation or supported conduct description is sufficient for reporting classification, not independent proof. Political criticism, inefficiency, an unexplained gift or rhetorical use of “corrupt” is insufficient. Reported appropriation may also receive Crime-Theft & Property Crime; independently supported financial deception may receive Crime-Fraud. Several labels for one event do not establish several independent offenses.",
+      "examples": "Positive examples:\n1. Prosecutors allege a director accepted a bribe to award a contract.\n2. An official is accused of diverting entrusted funds for private benefit.\nBoundary: An editorial calls a policy corrupt without reporting a specific event.",
+      "sample_indicators": "bribery allegation\nkickback scheme\ngraft\nabuse of public office\nimproper payment\ncorrupt procurement\ndiversion of public funds",
+      "dimension": "Conduct",
+      "inclusion_criteria": "An identified event with bribery, kickbacks or entrusted-power abuse is reported or attributed to a source. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Political criticism, inefficiency, an unexplained gift, or the word “corrupt” used rhetorically.",
+      "allowed_co_labels": "Crime-Theft & Property Crime for reported embezzlement. Both for embezzlement plus entrusted-authority abuse; private theft alone is not corruption. Official actions may co-occur.",
+      "handling_insufficient_information": "If improper benefit or abuse is only speculative, flag review without assignment. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "allegation_stage, improper benefit, authority/trust role, offense_text",
+      "external_context_required": "None for reported allegation. Legal classification verification may need jurisdiction-specific records.",
+      "open_business_policy_question": "None specific; test the boundary during annotation piloting.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A5:E5",
+        "annotation_rules": "'Annotation Rules'!A5:J5"
+      }
+    },
+    {
+      "name": "Crime-Fraud",
+      "stable_id": "CR_FRAUD",
+      "english_description": "Definition: Reporting of a deceptive scheme, intentional misrepresentation or fraudulent conduct intended to obtain economic benefit or cause financial loss. This is not an umbrella for every financial offense.\nCoverage: Investment scams, Ponzi/fictitious investment schemes, money obtained through false promises, estafa/swindling, loan/payment/insurance/invoice fraud, fabricated financial claims and deceptive identity misuse. Tax fraud, securities fraud and online scams are covered where deception is reported.\nBoundary and overlap: Business failure, investment loss, accounting error, debt or contract breach alone is not fraud. Money laundering, bribery and other financial offenses do not automatically receive Crime-Fraud without deception evidence. Tax fraud may receive Crime-Tax Crime plus Crime-Fraud; securities fraud Crime-Securities & Market Crime plus Crime-Fraud; deceptive phishing Crime-Cybercrime plus Crime-Fraud.",
+      "examples": "Positive examples:\n1. A company collected investments using fabricated records and promised guaranteed returns.\n2. Attackers obtained money through a fake payment site.\nBoundary: Shares lost value in a market decline with no reported deception.",
+      "sample_indicators": "fraudulent investment scheme\nPonzi scheme\ninvestment scam\nfalse financial representation\nloan fraud\ninsurance fraud\nsecurities fraud\ntax fraud",
+      "dimension": "Conduct",
+      "inclusion_criteria": "Specific financial deception or an attributed fraud allegation/charge in an identified event. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Money laundering, bribery, tax evasion or market manipulation without reported deception. Mistake, poor investment return, or a generic financial-crime reference.",
+      "allowed_co_labels": "Crime-Tax Crime + Crime-Fraud for tax fraud. Crime-Securities & Market Crime + Crime-Fraud for securities fraud. Crime-Cybercrime + Crime-Fraud for cyber-enabled deception. Do not add Crime-Fraud merely because another financial offense is present.",
+      "handling_insufficient_information": "If deception is unspecified, retain the reported offense wording and seek review. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "deception mechanism, gain/loss, offense subtype, allegation_stage",
+      "external_context_required": "None for reported content. No classifier should infer fraud from a loss alone.",
+      "open_business_policy_question": "None specific; test the boundary during annotation piloting.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A6:E6",
+        "annotation_rules": "'Annotation Rules'!A6:J6"
+      }
+    },
+    {
+      "name": "Crime-Forgery & Counterfeiting",
+      "stable_id": "CR_FORGE",
+      "english_description": "Definition: Reporting of unlawful creation, alteration, reproduction or knowing use of forged documents, currency, identities, securities, instruments or counterfeit items, or a specific forgery/counterfeiting allegation.\nCoverage: Deliberate falsification of documents/certificates, fake identification, counterfeit currency, forged securities/financial instruments, forged signatures and criminal presentation/use of these items. Possession is covered only where knowledge or the relevant offense is reported.\nBoundary and overlap: Administrative errors, authorized copies, marked props/replicas, generic “fake news” and unknowing possession are insufficient. Forgery for financial gain may also receive Crime-Fraud; forged tax records in a tax offense Crime-Tax Crime; and criminal digital identity forgery Crime-Cybercrime. Preserve item type and maker/user role.",
+      "examples": "Positive examples:\n1. A suspect allegedly obtained a loan using forged identification.\n2. A network is accused of producing counterfeit currency.\nBoundary: Clearly marked replica banknotes are film props.",
+      "sample_indicators": "forged document\ncounterfeit currency\nfalsified certificate\nfake identity document\nforged signature\ncounterfeit securities\nknowing use of a forgery",
+      "dimension": "Conduct",
+      "inclusion_criteria": "An attributed forgery/counterfeiting offense or specific intentional falsification/knowing use. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Accidental errors, authorized copies, harmless props, generic “fake news”, or unknowing possession alone.",
+      "allowed_co_labels": "Crime-Fraud for documented deceptive gain, Crime-Tax Crime for forged tax records in a reported tax offense. One event can carry several supported labels.",
+      "handling_insufficient_information": "Authenticity concerns without intentional wrongdoing are unassessed. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "item/document type, intentional creation or knowing use, actor role",
+      "external_context_required": "None for reporting. Expert/document evidence for verification where disputed.",
+      "open_business_policy_question": "None specific; test the boundary during annotation piloting.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A12:E12",
+        "annotation_rules": "'Annotation Rules'!A12:J12"
+      }
+    },
+    {
+      "name": "Crime-Money Laundering",
+      "stable_id": "CR_ML",
+      "english_description": "Definition: Reporting of money laundering or a specific allegation involving conversion, transfer, concealment or legitimization of criminal proceeds to hide their origin, ownership or criminal link.\nCoverage: Moving proceeds through accounts/intermediaries, transaction layering, integrating criminal funds into apparently legitimate activity, using shell companies or hidden ownership to disguise proceeds, trade-based laundering and other methods supported by the report. Placement/layering/integration are relevant only in a criminal-proceeds context.\nBoundary and overlap: Ordinary transfers, large transactions, unexplained wealth, company/system integration and lawful intermediary structures are insufficient. A criminal-proceeds link or explicit laundering allegation must be reported. Predicate conduct such as trafficking, corruption or fraud receives its own label only with evidence for that conduct. Unknown origin or method must not be guessed.",
+      "examples": "Positive examples:\n1. Prosecutors allege trafficking proceeds were concealed through shell companies.\n2. A network allegedly disguised criminal proceeds using fabricated trade invoices.\nBoundary: A bank integrated software systems; “integration” here is not laundering.",
+      "sample_indicators": "money laundering charge\nlaundering criminal proceeds\nconcealment of criminal funds\ntrade-based money laundering\nlayering illicit proceeds\nshell companies used to launder funds",
+      "dimension": "Conduct",
+      "inclusion_criteria": "Explicit laundering allegation/charge or described concealment/legitimization of identified criminal proceeds. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Routine transfers, unexplained wealth alone, corporate integration, lawful tax structures, or merely holding stolen funds without reported laundering activity.",
+      "allowed_co_labels": "Crime-Fraud, Crime-Corruption, Crime-Trafficking & Smuggling or another predicate label only if that conduct is reported. Concealed ownership can be supporting information; it is not an extra agreed label. Official-event labels require their own evidence.",
+      "handling_insufficient_information": "“Layering” or “integration” alone is insufficient. Record unclear proceeds/source linkage. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "proceeds link, alleged method, predicate wording, allegation_stage",
+      "external_context_required": "None for article reporting. Court/legal records for independent verification.",
+      "open_business_policy_question": "None specific; test the boundary during annotation piloting.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A7:E7",
+        "annotation_rules": "'Annotation Rules'!A7:J7"
+      }
+    },
+    {
+      "name": "Crime-Tax Crime",
+      "stable_id": "CR_TAX",
+      "english_description": "Definition: Reporting of deliberate tax evasion, fraud or concealment constituting a criminal breach of tax obligations, or an explicit tax-crime allegation.\nCoverage: Tax evasion, deliberately false returns, concealed taxable income, fraudulent tax claims/refunds, fabricated documents for unlawful tax reduction and other specifically reported tax offenses. Preserve tax type, authority and allegation/investigation/outcome stage.\nBoundary and overlap: Lawful tax planning/reduction, tax avoidance without illicit/criminal context, tax debt/delay and administrative mistakes alone are insufficient. An administrative assessment/fine does not automatically establish crime. Deceptive tax fraud may also receive Crime-Fraud; forged records Crime-Forgery & Counterfeiting; and a regulatory-capacity inquiry/action Regulatory, only with evidence for that event.",
+      "examples": "Positive examples:\n1. Prosecutors allege a director concealed income through false tax returns.\n2. A suspect allegedly used false invoices for fraudulent tax refunds.\nBoundary: A company used a lawful allowance or paid late; no crime was reported.",
+      "sample_indicators": "tax evasion allegation\ntax fraud\nfalse tax return\nconcealed taxable income\nfraudulent tax refund\ncriminal tax charge",
+      "dimension": "Conduct",
+      "inclusion_criteria": "Specific deliberate evasion/fraud allegation or an explicitly reported criminal tax proceeding. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Lawful tax avoidance, administrative filing error, overdue tax, tax-policy criticism or a noncriminal assessment alone.",
+      "allowed_co_labels": "Crime-Fraud for reported deceptive tax fraud; Crime-Forgery & Counterfeiting for forged records. Regulatory, Law Enforcement or Judicial / Court only with the corresponding reported event.",
+      "handling_insufficient_information": "If criminal/deliberate character is not supported, keep tax_issue attribute and do not assign CR_TAX. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "tax type, authority, alleged deliberate/criminal conduct, offense_text",
+      "external_context_required": "None for explicit reported allegations. Local law/authority record for ambiguous criminal status.",
+      "open_business_policy_question": "Approve legal/reference sources for ambiguous criminal versus administrative tax issues.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A13:E13",
+        "annotation_rules": "'Annotation Rules'!A13:J13"
+      }
+    },
+    {
+      "name": "Crime-Securities & Market Crime",
+      "stable_id": "CR_MARKET",
+      "english_description": "Definition: Reporting of a crime or specific allegation involving abuse of securities markets, financial instruments or market information, including insider dealing, criminal manipulation and securities fraud.\nCoverage: Unlawful trading on material non-public information; sham/coordinated trades manipulating price or volume; pump-and-dump schemes; fraudulent securities offerings; deceptive financial disclosures/claims linked to issuance/trading; and other specifically reported market offenses.\nBoundary and overlap: Lawful trading, price changes, stock losses, late reporting and technical or purely administrative breaches alone are insufficient. Criminal status or criminal conduct must be supported in the report. Deceptive securities fraud may also receive Crime-Fraud; insider dealing is not automatically Crime-Fraud. Related regulatory investigation, findings or penalties may receive Regulatory.",
+      "examples": "Positive examples:\n1. A director was accused of trading on confidential information before results were published.\n2. A network allegedly manipulated a share price through sham trades.\nBoundary: A company filed late and only an administrative breach was reported.",
+      "sample_indicators": "insider dealing charge\ncriminal market manipulation\nsecurities fraud\npump-and-dump scheme\nsham trades to manipulate prices\nfraudulent securities offering",
+      "dimension": "Conduct",
+      "inclusion_criteria": "Specific attributed securities fraud/insider-dealing offense or criminal manipulation allegation. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Lawful trading, price movement, poor disclosure without criminal allegation, or a civil technical securities breach alone.",
+      "allowed_co_labels": "Crime-Fraud for securities fraud with deception. Regulatory for supported regulatory inquiry/finding/action; Law Enforcement or Judicial / Court for supported official events. Insider dealing does not automatically receive Crime-Fraud.",
+      "handling_insufficient_information": "A generic “securities violation” does not establish CR_MARKET. Preserve offense wording and review criminal context. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "instrument/market, nonpublic information, deception/manipulation, criminal context",
+      "external_context_required": "None for clear reported conduct. Jurisdiction-specific legal context for ambiguous market offenses.",
+      "open_business_policy_question": "Confirm treatment of market conduct reported exclusively as civil/administrative breaches; do not infer crime.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A14:E14",
+        "annotation_rules": "'Annotation Rules'!A14:J14"
+      }
+    },
+    {
+      "name": "Crime-Cybercrime",
+      "stable_id": "CR_CYBER",
+      "english_description": "Definition: Reporting of a crime or specific allegation targeting computers, networks, systems or digital data, or involving a material digital mechanism.\nCoverage: Unauthorized intrusion/access, criminal hacking, malware, ransomware, unlawful data theft/alteration, intentional system attacks, phishing, digital identity theft and digitally enabled fraud/extortion. A breach qualifies when linked to a reported attack, unauthorized access or offense. Record attacker, suspect, victim and affected-organization roles separately.\nBoundary and overlap: System failure, accidental exposure, a vulnerability without reported crime, routine internet use or a suspect sending ordinary email is insufficient. A breached entity is not thereby a perpetrator. Digital deception may also receive Crime-Fraud; property/data appropriation may overlap only where the other label’s criteria are met.",
+      "examples": "Positive examples:\n1. Attackers encrypted company data with ransomware.\n2. A phishing site stole victims’ login credentials.\nBoundary: Misconfiguration exposed data, with no reported attack or crime.",
+      "sample_indicators": "unauthorized computer access\ncriminal hacking\nransomware attack\nmalware infection\nphishing scam\ncyber-enabled fraud\ndata theft by intruders",
+      "dimension": "Conduct / digital mechanism",
+      "inclusion_criteria": "An intentional unauthorized act or attributed cyber offense. For cyber-enabled conduct, describe how digital systems materially enabled it. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Accidental data leak, system outage, routine online business, a suspect simply using email, or a victim blamed merely for being breached.",
+      "allowed_co_labels": "Crime-Fraud for phishing deception, Crime-Violent Crime for reported threats of physical harm, or other conduct labels with their own evidence. Capture victim/perpetrator role.",
+      "handling_insufficient_information": "A breach with unknown cause supports an incident attribute, not confirmed cybercrime. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "digital mechanism, intent/cause, incident, actor role",
+      "external_context_required": "None for reported content. Incident investigation may resolve intent or cause.",
+      "open_business_policy_question": "None specific; test the boundary during annotation piloting.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A9:E9",
+        "annotation_rules": "'Annotation Rules'!A9:J9"
+      }
+    },
+    {
+      "name": "Crime-Trafficking & Smuggling",
+      "stable_id": "CR_TRAFFIC",
+      "english_description": "Definition: Reporting of illicit trafficking, trade or movement of people, substances, weapons, goods or controlled items, or human trafficking for exploitation.\nCoverage: Drug/controlled-substance trafficking; human trafficking including sexual exploitation or forced labor; migrant smuggling; illicit arms/prohibited-equipment trafficking; goods smuggling and unlawful shipments; and illicit trade/movement of protected wildlife or natural resources. Human trafficking need not cross a border. Preserve subtype, commodity and person/entity role only as supported by the text.\nBoundary and overlap: Lawful migration, authorized trade/transport, a shipment without illicit context and web-traffic usage are insufficient. Wildlife trafficking may also receive Crime-Environmental & Wildlife Crime; reported abduction/violence may receive Crime-Violent Crime. Arms trafficking alone does not establish an arms embargo.",
+      "examples": "Positive examples:\n1. A network allegedly hid drugs in commercial shipments.\n2. Workers were trafficked for forced labor.\n3. People are accused of illegally transporting protected animals.\nBoundary: A company exported authorized goods; no smuggling was reported.",
+      "sample_indicators": "drug trafficking\nhuman trafficking\nforced-labor trafficking\nmigrant smuggling\narms trafficking\nillicit goods shipment\nwildlife trafficking",
+      "dimension": "Conduct",
+      "inclusion_criteria": "Specific attributed trafficking or smuggling activity. Human trafficking does not require crossing a border. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Lawful migration, ordinary shipping, transport of legal commodities, trafficking used to mean web traffic.",
+      "allowed_co_labels": "Crime-Environmental & Wildlife Crime for wildlife trafficking. Crime-Violent Crime for independently described force/threat or abduction. Sanctions only for a reported embargo, not inferred from arms trafficking.",
+      "handling_insufficient_information": "Commodity and subtype may be unknown if an explicit trafficking/smuggling allegation is supported. A vague suspicious shipment is insufficient. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "trafficking subtype, commodity, exploitation, actor role",
+      "external_context_required": "None for reported content. Commodity legality may need an approved dated legal/reference source.",
+      "open_business_policy_question": "None specific; test the boundary during annotation piloting.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A8:E8",
+        "annotation_rules": "'Annotation Rules'!A8:J8"
+      }
+    },
+    {
+      "name": "Crime-Organized Crime",
+      "stable_id": "CR_ORG",
+      "english_description": "Definition: Reporting of activity, membership or participation in an organized criminal group/network, or a specific attributed allegation of that relationship. This captures organized group involvement, not every crime.\nCoverage: Structured groups or networks with continuity, coordination and collaboration to commit serious offenses for financial/material benefit, such as mafias, criminal syndicates and organized trafficking, fraud, laundering or extortion networks. A formal hierarchy or special name is not essential, but organization must be supported by the report or a specific allegation.\nBoundary and overlap: Several defendants, incidental co-offending or vague use of “group” is insufficient. Annotate the reported characterization rather than independently determining legal elements. Trafficking, fraud, corruption, violence or laundering may co-label where their conduct is supported; they may describe the same event/network.",
+      "examples": "Positive examples:\n1. Police described a continuing network with assigned trafficking and laundering roles as organized crime.\n2. Prosecutors identified a person as a member of a criminal syndicate.\nBoundary: Three people were accused in an incidental theft with no reported organization.",
+      "sample_indicators": "organized criminal group\ncriminal syndicate\nmafia network\norganized trafficking network\ncriminal enterprise\ncoordinated ongoing criminal network",
+      "dimension": "Conduct / group relationship",
+      "inclusion_criteria": "Specific reported organized criminal group activity, membership or participation, or a source-attributed allegation. Organization/continuity/coordination must be described or explicitly alleged; annotators do not independently adjudicate legal elements. Every assigned label requires an exact supporting article span with article ID, actor/role and source attribution.",
+      "exclusion_criteria": "Several defendants or incidental co-offending without organization evidence; generic group/network wording; nationality, neighborhood or social association alone.",
+      "allowed_co_labels": "Crime-Trafficking & Smuggling, Crime-Fraud, Crime-Money Laundering, Crime-Corruption, Crime-Violent Crime or other agreed conduct labels only when supported. The organized relationship and underlying conduct may concern one event/network.",
+      "handling_insufficient_information": "Unclear organization: retain group wording and review. A supported organized-group allegation may receive this broad label even if the exact underlying offense subtype is unknown.",
+      "supporting_information": "group/network name, organized characterization/source, participation role, reported coordination/continuity, offense_text",
+      "external_context_required": "None for explicit reporting. Official/case records would be needed for independent group-status verification.",
+      "open_business_policy_question": "Pilot the boundary between organized groups and incidental co-offending on VV articles.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A15:E15",
+        "annotation_rules": "'Annotation Rules'!A15:J15"
+      }
+    },
+    {
+      "name": "Crime-Violent Crime",
+      "stable_id": "CR_VIOLENT",
+      "english_description": "Definition: Reporting of an offense or specific allegation involving physical violence or threats of physical harm against people/property, or kidnapping/hostage-taking.\nCoverage: Murder/attempted murder, violent assault, abduction, kidnapping for ransom, hostage-taking, violent robbery and extortion involving physical violence or threats of physical injury. Record victim, suspect and reported-perpetrator roles separately.\nBoundary and overlap: Accidents, accidental injury, verbal disputes, economic threats or information blackmail without physical threats, and metaphorical “attacks” are insufficient. Do not force nonviolent extortion into this label; preserve offense wording for scope review. Violent robbery may also receive Crime-Theft & Property Crime. Violence alone does not establish terrorism, genocide, war crimes or crimes against humanity.",
+      "examples": "Positive examples:\n1. Police allege a group abducted a victim and demanded ransom.\n2. A suspect allegedly took property through threats of physical harm.\nBoundary: Someone threatened to publish information, with no reported physical threat or abduction.",
+      "sample_indicators": "murder allegation\nviolent assault\nkidnapping for ransom\nhostage-taking\nthreat of physical harm\nviolent robbery\nviolent extortion",
+      "dimension": "Conduct",
+      "inclusion_criteria": "A reported violent offense, abduction or explicit threat of physical harm involving an identified event. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Generic conflict, metaphorical attack, nonviolent blackmail, or accidental injury without alleged crime.",
+      "allowed_co_labels": "Crime-Theft & Property Crime for violent robbery. Terrorism or atrocity labels require their own attribution/context; violence alone does not establish them.",
+      "handling_insufficient_information": "If violence or criminal context is unclear, review. Nonviolent extortion is preserved as offense_text for analyst scope decision. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "offense_text, physical threat/violence, victim/suspect role",
+      "external_context_required": "None for reported content. VV must decide whether to add a separate nonviolent-extortion label.",
+      "open_business_policy_question": "Confirm future handling of nonviolent extortion; it is outside this label and must not be forced into it.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A10:E10",
+        "annotation_rules": "'Annotation Rules'!A10:J10"
+      }
+    },
+    {
+      "name": "Crime-Theft & Property Crime",
+      "stable_id": "CR_PROPERTY",
+      "english_description": "Definition: Reporting of unlawful taking, appropriation, transfer or misuse of another party’s property, or a specific allegation of that conduct.\nCoverage: Theft, qualified theft, robbery involving force/threat, embezzlement, unlawful use/appropriation of entrusted property, misappropriation, stolen property and other specific property offenses supported by the report. Preserve the trust relationship and asset type where reported.\nBoundary and overlap: Lost property, debt, contractual nonpayment, bankruptcy, disputed title and lawful asset transfers alone are insufficient. Embezzlement involving entrusted-authority abuse may also receive Crime-Corruption; violent robbery may receive Crime-Violent Crime; financial deception receives Crime-Fraud only if reported. A shortfall without an appropriation allegation/evidence is insufficient.",
+      "examples": "Positive examples:\n1. An accountant is accused of transferring entrusted funds to a personal account.\n2. Police reported a case of stolen equipment.\nBoundary: A contractor sues over an unpaid invoice; no theft is reported.",
+      "sample_indicators": "theft charge\nqualified theft\nrobbery\nembezzlement\nmisappropriation of entrusted funds\nstolen property\nunlawful appropriation",
+      "dimension": "Conduct",
+      "inclusion_criteria": "Specific attributed theft, robbery, embezzlement or unlawful appropriation conduct. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Lost property, contractual debt, lawful asset transfer, routine bankruptcy, or disputed title without alleged unlawful taking.",
+      "allowed_co_labels": "Crime-Corruption if entrusted-authority abuse is reported. Crime-Violent Crime for robbery with force/threat. Crime-Fraud only with distinct deceptive conduct.",
+      "handling_insufficient_information": "Unexplained missing funds are insufficient without reported unlawful taking or an attributed allegation. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "property/asset, entrusted relationship, taking/misuse, allegation_stage",
+      "external_context_required": "None for reporting. Legal context for independent ownership/crime verification.",
+      "open_business_policy_question": "None specific; test the boundary during annotation piloting.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A11:E11",
+        "annotation_rules": "'Annotation Rules'!A11:J11"
+      }
+    },
+    {
+      "name": "Crime-Environmental & Wildlife Crime",
+      "stable_id": "CR_ENV",
+      "english_description": "Definition: Reporting of a crime or specific allegation involving unlawful exploitation, destruction, hunting, trade or movement of environmental resources or wildlife.\nCoverage: Illegal logging, illegal fishing/mining, protected-species hunting, wildlife trafficking/illegal trade, unlawful resource/habitat destruction and other specifically reported environmental offenses. Illegal pollution/discharge is covered when specific criminal or unlawful conduct is reported.\nBoundary and overlap: General ESG criticism, emissions without illegality allegations, accidents alone, authorized activity and technical noncriminal breaches alone are insufficient. Wildlife trafficking may also receive Crime-Trafficking & Smuggling; regulator inquiry/action may receive Regulatory. A species or mine name alone does not establish crime. Where illegality depends on an external reference, record its source and date.",
+      "examples": "Positive examples:\n1. Suspects allegedly trafficked protected animals for illegal sale.\n2. A report describes illegal logging and criminal unlicensed mining allegations.\nBoundary: A report criticizes carbon emissions but alleges no specific unlawful conduct.",
+      "sample_indicators": "illegal logging\nillegal fishing\nillegal mining\nwildlife trafficking\nillegal wildlife trade\nprotected-species poaching\ncriminal environmental offense",
+      "dimension": "Conduct",
+      "inclusion_criteria": "Specific criminal/unlawful environmental or wildlife conduct, including an attributed allegation. Save the exact supporting text span(s), entity/role, source attribution and event/case ID.",
+      "exclusion_criteria": "Lawful resource use, accidental pollution without reported wrongdoing, generic sustainability criticism, or a technical noncriminal breach alone.",
+      "allowed_co_labels": "Crime-Trafficking & Smuggling for wildlife trafficking; Regulatory for supported regulatory inquiry/finding/action. Both conduct labels may describe the same shipment.",
+      "handling_insufficient_information": "If unlawfulness or the offense is unclear, preserve incident/commodity attributes and review. Assign only supported reported content. Mark unclear/unassessed separately, not a confirmed negative. Do not force a subtype.",
+      "supporting_information": "species/resource, protection/legality context, offense_text, actor role",
+      "external_context_required": "None for explicit reporting. Dated species protection and local law references if legality is unresolved.",
+      "open_business_policy_question": "Confirm unlawful/criminal scope versus technical noncriminal environmental breaches.",
+      "source_cells": {
+        "risk_labels": "'Risk Labels'!A16:E16",
+        "annotation_rules": "'Annotation Rules'!A16:J16"
+      }
+    }
+  ],
+  "shared_annotation_guidance": [
+    {
+      "rule_id": "G01 Scope",
+      "text": "Exactly 23 targets in Risk Labels. Articles may receive zero, one or multiple labels. PEP, RCA, ownership and acquittal are not inherently adverse. No extra Crime, sentiment or adverse-media label. The 12 crime targets are the Crime-<name> labels; there is no separate parent 'Crime' label to output.",
+      "source_cell": "'Annotation Rules'!C28"
+    },
+    {
+      "rule_id": "G02 Evidence",
+      "text": "Save article_id, label_id, exact evidence_span with offsets or sentence ID, entity/role, attributing source, event/case ID and date if reported. Allegations remain attributed allegations.",
+      "source_cell": "'Annotation Rules'!C29"
+    },
+    {
+      "rule_id": "G03 Article and actor",
+      "text": "The article label set is the union of supported facts; it does not apply every status to every named actor. Save suspect/defendant, victim, witness, official, claimant, sanction target, PEP and related-person roles per event.",
+      "source_cell": "'Annotation Rules'!C30"
+    },
+    {
+      "rule_id": "G04 Unknown and negative",
+      "text": "Use supported_positive, assessed_absent and unassessed separately. Unknown is not 0. Fully review zero-label articles; resolve unassessed targets or use a method that explicitly masks them before supervised training.",
+      "source_cell": "'Annotation Rules'!C31"
+    },
+    {
+      "rule_id": "G05 Allegation and denial",
+      "text": "A specific attributed allegation remains reportable alongside denial; retain both and any later outcome. Bare negation, hypothetical examples or explicitly debunked rumor with no real event are not positive conduct evidence.",
+      "source_cell": "'Annotation Rules'!C32"
+    },
+    {
+      "rule_id": "G06 Events and history",
+      "text": "Store allegation, inquiry, charge, trial, finding, conviction, acquittal, sentencing, vacatur and historical/current dates separately. Several labels do not create several independent events. A historical conviction can coexist with a later acquittal in the article history.",
+      "source_cell": "'Annotation Rules'!C33"
+    },
+    {
+      "rule_id": "G07 Broad labels",
+      "text": "Subtopics, sanctions measures, PEP/RCA types, offense types and judicial outcomes are supporting fields. Assign one broad label when any included subtopic is supported. No unreported subtype or companion event may be inferred.",
+      "source_cell": "'Annotation Rules'!C34"
+    },
+    {
+      "rule_id": "G08 Co-labeling",
+      "text": "Crime-Fraud + Crime-Cybercrime for material digital deception; Crime-Fraud + Crime-Tax Crime for deceptive tax fraud; Crime-Fraud + Crime-Securities & Market Crime for securities fraud; Crime-Trafficking & Smuggling + Crime-Environmental & Wildlife Crime for wildlife trafficking; Crime-Theft & Property Crime + Crime-Corruption for appropriation plus entrusted-authority abuse. Each label needs evidence.",
+      "source_cell": "'Annotation Rules'!C35"
+    },
+    {
+      "rule_id": "G09 Official events",
+      "text": "Investigation is not proof; regulator action need not establish a finding. Identify whether a multi-mandate agency acted in a regulatory or criminal capacity. Witness/victim involvement is not suspect status.",
+      "source_cell": "'Annotation Rules'!C36"
+    },
+    {
+      "rule_id": "G10 External context",
+      "text": "Flag requires_context and save the reference/date for externally established PEP anchors, jurisdiction status, protected commodities or ambiguous legality. Do not silently export external-only status as text-only gold.",
+      "source_cell": "'Annotation Rules'!C37"
+    },
+    {
+      "rule_id": "G11 Indicators",
+      "text": "Tax avoidance, data breach, integration, asset freeze, seizure, support and association are clues only. Require reported event, role, purpose and legal/official basis where relevant.",
+      "source_cell": "'Annotation Rules'!C38"
+    },
+    {
+      "rule_id": "G12 Pilot and model",
+      "text": "Definitions and examples have not been validated on VV articles. Pilot with independent annotators, adjudicate disagreements, version changes and build a reviewed gold set. Assess per-label support, precision and recall; rare labels may remain defined while automated activation is deferred.",
+      "source_cell": "'Annotation Rules'!C39"
+    },
+    {
+      "rule_id": "G13 Dataset split",
+      "text": "Keep duplicate, syndicated and same-event stories in the same split. Use a human-reviewed held-out test set; fictional workbook examples are not an adequate training dataset.",
+      "source_cell": "'Annotation Rules'!C40"
+    },
+    {
+      "rule_id": "G14 Uncovered topics",
+      "text": "Preserve uncovered offense/event wording for analyst review rather than forcing a target. State-Controlled, Complex Ownership Structure and Opaque Ownership Structure are outside these 23 labels.",
+      "source_cell": "'Annotation Rules'!C41"
+    },
+    {
+      "rule_id": "G15 Stable IDs",
+      "text": "Retain existing IDs for continuing labels. New broad labels receive SAN_GEN, TER_GEN, PF_GEN, HR_ALL, REG_GEN, LE_GEN and JUD_GEN rather than reusing narrower subtype IDs. CR_ORG and JUR_RISK are new in this scheme. OWN_STATE retains ownership identity but restores the analyst’s significant-interest scope. Keep taxonomy version with model/dataset.",
+      "source_cell": "'Annotation Rules'!C42"
+    }
+  ],
+  "experiment_scope": {
+    "classification_level": "article",
+    "article_labels": "zero_or_more_independently_supported_labels",
+    "reference_labels": "claude_gpt_consensus_silver",
+    "unknown_target": -1,
+    "unknown_pairs_excluded_from_metrics": true,
+    "test_reserved": true,
+    "scores_calibrated_on_vv": false,
+    "includes_evidence_extractor": false
+  }
+}
