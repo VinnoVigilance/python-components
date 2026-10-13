@@ -33,6 +33,11 @@ elasticsearch==9.5.0
 # --- LLM (risk classification / extraction) ---
 ollama==0.6.2
 
+# --- Risk category model (CPU student, risk/watchlist) ---
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu        # CPU-only build of the risk-label model runtime (no CUDA download)
+transformers==5.19.0     # loads the fine-tuned multilingual-e5-small risk student
+
 # --- Analyst UI (utils/vvAnalystApp.py) ---
 streamlit==1.59.2
 tqdm>=4.66,<5
