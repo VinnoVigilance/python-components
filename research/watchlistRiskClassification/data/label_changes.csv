@@ -1,0 +1,24 @@
+﻿record_key,label,action,reason
+COMELEC-2025-SENATORS:6,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+COMELEC-2025-SENATORS:31,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+COMELEC-2025-SENATORS:32,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+COMELEC-2025-SENATORS:38,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+COMELEC-2025-SENATORS:3,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+COMELEC-2025-SENATORS:59,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+COMELEC-2025-SENATORS:34,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+COMELEC-2025-SENATORS:52,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+EU-FINANCIAL-SANCTIONS:5419,Terrorism / Terrorist Financing,add,lookup rule: programme TAQA
+EU-FINANCIAL-SANCTIONS:180025,Human Rights / Atrocities,add,lookup rule: programme HR
+EU-FINANCIAL-SANCTIONS:5220,Terrorism / Terrorist Financing,add,lookup rule: programme TAQA
+EU-MOST-WANTED:2078,Crime-Theft & Property Crime,add,"Robbery rule: organisation he ranks in commits burglaries, thefts and robberies (same sentence already gives Violent and Organized Crime)"
+FBI-WANTED:72586d988b6c4157bc2bbae2f25f3064,Crime-Organized Crime,add,lookup rule: programme Criminal Enterprise Investigations
+OFAC-NON-SDN:15331,PEP,add,lookup rule: programme NS-PLC
+COMELEC-2025-SENATORS:11,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+COMELEC-2025-SENATORS:15,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+COMELEC-2025-SENATORS:33,PEP,add,lookup rule: list COMELEC-2025-SENATORS
+EU-FINANCIAL-SANCTIONS:109264,Terrorism / Terrorist Financing,add,lookup rule: programme TAQA
+SECO-SANCTIONS:71377,Terrorism / Terrorist Financing,add,"lookup rule: programme Hamas, Palästinensischer Islamischer Dschihad"
+SECO-SANCTIONS:76426,Terrorism / Terrorist Financing,add,"lookup rule: programme Hamas, Palästinensischer Islamischer Dschihad"
+FBI-WANTED:c93cfb9dc2fb428e858e9694fa50fc65,Crime-Violent Crime,add,lookup rule: programme Additional Violent Crimes
+FBI-WANTED:32f6d7fa6f2a437dab0f4126d237b3cb,Crime-Cybercrime,add,lookup rule: programme Cyber's Most Wanted
+SECO-SANCTIONS:71369,Terrorism / Terrorist Financing,add,"lookup rule: programme Hamas, Palästinensischer Islamischer Dschihad"

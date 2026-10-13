@@ -1,0 +1,6 @@
+﻿part,records,label_instances,from_lookup,pct_from_lookup,records_fully_from_lookup,records_needing_text,pct_needing_text,records_without_labels
+A - List coverage,364,547,391,71.5,250,114,31.3,31
+B - Rare-label top-up,339,850,428,50.4,138,201,59.3,1
+C - Hard case,56,34,28,82.4,52,4,7.1,32
+D - Random check,141,198,137,69.2,97,44,31.2,13
+ALL,900,1629,984,60.4,537,363,40.3,77
