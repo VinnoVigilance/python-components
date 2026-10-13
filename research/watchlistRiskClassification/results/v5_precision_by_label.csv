@@ -1,0 +1,16 @@
+label,n,correct,precision,95% low,decision
+PEP,100,88,0.88,0.8018773199709163,review queue
+Crime-Corruption,0,0,,,review queue
+Crime-Fraud,60,45,0.75,0.627676890545152,review queue
+Crime-Money Laundering,24,22,0.9166666666666666,0.741507847985494,review queue
+Crime-Trafficking & Smuggling,60,47,0.7833333333333333,0.6637973165265748,review queue
+Crime-Cybercrime,33,32,0.9696969696969697,0.8468093832683193,review queue
+Crime-Violent Crime,100,94,0.94,0.8752303146877749,review queue
+Crime-Theft & Property Crime,60,54,0.9,0.7985030550748896,review queue
+Crime-Forgery & Counterfeiting,4,4,1.0,0.5100999795960008,review queue
+Crime-Tax Crime,0,0,,,review queue
+Crime-Organized Crime,45,39,0.8666666666666667,0.738224177587027,review queue
+Terrorism / Terrorist Financing,100,94,0.94,0.8752303146877749,review queue
+Proliferation / Proliferation Financing,58,55,0.9482758620689655,0.8586037466498081,review queue
+Human Rights / Atrocities,60,59,0.9833333333333333,0.911446617732205,auto-apply
+Judicial / Court,100,92,0.92,0.8500173312059693,review queue
