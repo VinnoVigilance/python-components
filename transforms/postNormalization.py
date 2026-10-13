@@ -556,7 +556,8 @@ def _strip_html(value):
 
 
 def sanitize_html_handler(entity, rule, config=None):
-    """Strip HTML from a free-text leaf on every element of an array.
+    """Strip HTML from a free-text leaf: every element of an array
+    (``Comments[].text``) or a single nested field (``Content.Title``).
 
     Reads the array leaf named by ``condition_path`` (e.g. Comments[].text) and
     rewrites each element's value with the markup removed. Generic across all
@@ -565,7 +566,15 @@ def sanitize_html_handler(entity, rule, config=None):
     fields (identifiers, dates, numbers) are never touched. Runs before
     DEDUPLICATE so two texts that differ only in markup collapse to one.
     """
-    source_list, source_leaf = _split_array_path(rule["condition_path"])
+    path = str(rule["condition_path"])
+    if "[]" not in path:
+        parent_key, _, leaf = path.rpartition(".")
+        parent = entity.get(parent_key) if parent_key else entity
+        if isinstance(parent, dict) and isinstance(parent.get(leaf), str):
+            parent[leaf] = _strip_html(parent[leaf])
+        return
+
+    source_list, source_leaf = _split_array_path(path)
 
     items = entity.get(source_list)
     if not isinstance(items, list):
