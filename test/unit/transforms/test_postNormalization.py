@@ -345,6 +345,24 @@ class TestSanitizeHtmlHandler:
 
         assert entity["additionalInfo"][0]["Value"] == 5000
 
+    def test_handler_cleans_a_nested_scalar_field(self):
+        entity = {"Content": {"Title": "National gov&#8217;t to continue monitoring"}}
+        sanitize_html_handler(entity, {"condition_path": "Content.Title"})
+
+        assert entity["Content"]["Title"] == "National gov’t to continue monitoring"
+
+    def test_handler_decodes_ampersands_in_urls(self):
+        entity = {"Attachments": [{"Type": "Image", "URL": "https://x.org/a.png?ixlib=rb&amp;q=45"}]}
+        sanitize_html_handler(entity, {"condition_path": "Attachments[].URL"})
+
+        assert entity["Attachments"][0]["URL"] == "https://x.org/a.png?ixlib=rb&q=45"
+
+    def test_missing_scalar_parent_is_a_no_op(self):
+        entity = {"Names": []}
+        sanitize_html_handler(entity, {"condition_path": "Content.Title"})
+
+        assert entity == {"Names": []}
+
 
 class TestEngineEndToEnd:
     def test_runs_rules_and_does_not_mutate_input(self):
