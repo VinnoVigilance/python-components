@@ -1,0 +1,17 @@
+scikit-learn==1.9.0  # TF-IDF, linear models, metrics
+scipy==1.18.0  # sparse matrices for scikit-learn
+numpy==2.5.1  # arrays
+pandas==3.0.5  # tables in notebooks
+matplotlib==3.11.1  # notebook charts
+openpyxl==3.1.5  # reading the taxonomy / lookup workbooks
+ipykernel==7.3.0  # running the notebooks
+jupyter_client==8.9.1  # running the notebooks
+iterative-stratification==0.1.9  # multi-label stratified folds
+jupyterlab==4.6.4  # opening the notebooks
+torch==2.14.1  # encoders (CPU build: pip install torch --index-url https://download.pytorch.org/whl/cpu)
+transformers==5.19.0  # loading and fine-tuning encoders
+sentence-transformers==6.1.0  # frozen embeddings
+bitsandbytes==0.50.2  # loading the checker LLM in 4-bit on the GPU
+accelerate==1.15.0  # placing the checker LLM on the GPU
+sentencepiece==0.2.2  # mDeBERTa student tokenizer
+protobuf==7.36.2  # mDeBERTa student tokenizer
