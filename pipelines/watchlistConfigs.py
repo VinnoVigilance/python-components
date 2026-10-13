@@ -1675,4 +1675,108 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
+    "EBRD_INELIGIBLE_ENTITIES": {
+        "source_name": "EBRD",
+        "list_name": "EBRD_INELIGIBLE_ENTITIES",
+        "date_order": "DMY",
+        "download_method": "API",
+        "url": "https://www.ebrd.com/bin/ebrd_dxp/filterlistservlet",
+        "file_type": "jsonl",
+        "external_id_path": "source_record_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "page",
+                "page_param": "currentPage",
+                "start_page": 1,
+            },
+            "items_path": "searchResult",
+            "params": {
+                "parentPath": (
+                    "/content/dam/ebrd_dxp/content-fragments/occo/"
+                    "ineligible-entities"
+                ),
+                "secondParentPath": "",
+                "cardType": "iecard",
+                "searchKey": "",
+                "eventSort": "",
+                "sortBy": "",
+                "filters": "",
+                "countryFilters": "",
+                "sectorFilters": "",
+                "topicFilters": "",
+                "statusFilters": "",
+                "noticeTypeFilters": "",
+                "pageTypeFilters": "",
+                "startDate": "",
+                "endDate": "",
+                "IsLoggedIn": "false",
+                "isAlumni": "false",
+                "isBeeps": "false",
+            },
+            "headers": {
+                "x-requested-with": "XMLHttpRequest",
+                "accept": "application/json",
+                "user-agent": "Mozilla/5.0",
+            },
+            "throttle_delay": 0.3,
+            "write_mode": "single_jsonl",
+        },
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "title",
+                        "nationality",
+                        "address",
+                        "originatingInstitution",
+                        "ineligibleFromDate",
+                        "ineligibleUntilDate",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "EBRD",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "title",
+                    "pattern": (
+                        r"(?is)^(?P<primary_name>.+?)\s*"
+                        r"(?P<alias_blob>,?\s*\(?\s*"
+                        r"(?:(?:also|formerly|previously|now)\s+known\s+as"
+                        r"|(?:may\s+)?(?:also\s+)?(?:be\s+)?"
+                        r"doing\s+business\s+(?:as|under)"
+                        r"|formerly(?:\s+operating\s+as)?"
+                        r"|\baka\b|\bf/k/a)(?!\w).*)?$"
+                    ),
+                    "outputs": {
+                        "primary_name": "primary_name",
+                        "alias_blob": "alias_blob",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "subtitle",
+                    "pattern": (
+                        r"(?is)^\s*(?:(?P<sub_alias_blob>\(?\s*"
+                        r"(?:also|formerly|previously|now)\s+known\s+as\b.*)"
+                        r"|\(?\s*(?P<native_name>.*?)\s*\)?)\s*$"
+                    ),
+                    "outputs": {
+                        "sub_alias_blob": "sub_alias_blob",
+                        "native_name": "native_name",
+                    },
+                },
+            },
+        ],
+    },
 }
