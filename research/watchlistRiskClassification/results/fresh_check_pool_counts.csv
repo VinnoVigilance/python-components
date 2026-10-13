@@ -1,0 +1,16 @@
+label,checker yes in rest,reserved for check pool,below 60
+PEP,2055,100,False
+Crime-Corruption,32,32,True
+Crime-Fraud,198,60,False
+Crime-Money Laundering,117,60,False
+Crime-Trafficking & Smuggling,339,100,False
+Crime-Cybercrime,118,60,False
+Crime-Violent Crime,836,100,False
+Crime-Theft & Property Crime,149,60,False
+Crime-Forgery & Counterfeiting,86,60,False
+Crime-Tax Crime,8,8,True
+Crime-Organized Crime,149,60,False
+Terrorism / Terrorist Financing,628,100,False
+Proliferation / Proliferation Financing,130,60,False
+Human Rights / Atrocities,200,100,False
+Judicial / Court,489,100,False

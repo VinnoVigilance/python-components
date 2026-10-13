@@ -1,0 +1,17 @@
+label,check_pool,excluded_copy,heldout_list,random300,training,total
+Crime-Corruption,32,0,0,0,0,32
+Crime-Cybercrime,85,0,0,0,33,118
+Crime-Forgery & Counterfeiting,69,0,0,0,17,86
+Crime-Fraud,108,0,0,1,90,199
+Crime-Money Laundering,93,0,0,0,24,117
+Crime-Organized Crime,94,1,9,1,54,159
+Crime-Tax Crime,8,0,1,0,0,9
+Crime-Theft & Property Crime,86,0,4,3,63,156
+Crime-Trafficking & Smuggling,154,1,15,4,184,358
+Crime-Violent Crime,246,0,25,11,590,872
+Human Rights / Atrocities,115,0,8,3,85,211
+Judicial / Court,232,1,43,4,256,536
+PEP,197,6,1132,97,1852,3284
+Proliferation / Proliferation Financing,65,0,12,1,65,143
+Terrorism / Terrorist Financing,159,2,54,8,467,690
+total,1743,11,1303,133,3780,6970

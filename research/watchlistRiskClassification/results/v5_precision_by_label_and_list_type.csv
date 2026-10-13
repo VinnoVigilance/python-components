@@ -1,0 +1,27 @@
+label,list type,n,correct,precision,95% low,decision
+PEP,Officials & candidates,58,54,0.9310344827586207,0.8356610516539494,review queue
+PEP,Sanctions & terror lists,42,34,0.8095238095238095,0.6669893264500356,review queue
+Crime-Fraud,Regulatory / debarment,16,16,1.0,0.8063865817272801,review queue
+Crime-Fraud,Sanctions & terror lists,7,0,0.0,0.0,review queue
+Crime-Fraud,Wanted lists,37,29,0.7837837837837838,0.6280453872612309,review queue
+Crime-Money Laundering,Sanctions & terror lists,2,1,0.5,0.09452865480086611,review queue
+Crime-Money Laundering,Wanted lists,22,21,0.9545454545454546,0.7820151050048196,review queue
+Crime-Trafficking & Smuggling,Sanctions & terror lists,16,13,0.8125,0.5699064013154177,review queue
+Crime-Trafficking & Smuggling,Wanted lists,44,34,0.7727272727272727,0.6300735713298432,review queue
+Crime-Cybercrime,Sanctions & terror lists,8,7,0.875,0.5291051942301385,review queue
+Crime-Cybercrime,Wanted lists,25,25,1.0,0.8668035060468212,review queue
+Crime-Violent Crime,Sanctions & terror lists,17,15,0.8823529411764706,0.6566315750229009,review queue
+Crime-Violent Crime,Wanted lists,83,79,0.9518072289156626,0.8825396981330589,review queue
+Crime-Theft & Property Crime,Sanctions & terror lists,2,1,0.5,0.09452865480086611,review queue
+Crime-Theft & Property Crime,Wanted lists,58,53,0.9137931034482759,0.8135613862273434,review queue
+Crime-Forgery & Counterfeiting,Sanctions & terror lists,1,1,1.0,0.20654329147389294,review queue
+Crime-Forgery & Counterfeiting,Wanted lists,3,3,1.0,0.4384939195509822,review queue
+Crime-Organized Crime,Sanctions & terror lists,16,13,0.8125,0.5699064013154177,review queue
+Crime-Organized Crime,Wanted lists,29,26,0.896551724137931,0.7361455275293085,review queue
+Terrorism / Terrorist Financing,Sanctions & terror lists,64,59,0.921875,0.8298024712135222,review queue
+Terrorism / Terrorist Financing,Wanted lists,36,35,0.9722222222222222,0.8582996626496918,review queue
+Proliferation / Proliferation Financing,Sanctions & terror lists,58,55,0.9482758620689655,0.8586037466498081,review queue
+Human Rights / Atrocities,Sanctions & terror lists,57,56,0.9824561403508771,0.9070903306173727,auto-apply
+Human Rights / Atrocities,Wanted lists,3,3,1.0,0.4384939195509822,review queue
+Judicial / Court,Sanctions & terror lists,24,19,0.7916666666666666,0.5952915551476453,review queue
+Judicial / Court,Wanted lists,76,73,0.9605263157894737,0.8902503272853766,review queue

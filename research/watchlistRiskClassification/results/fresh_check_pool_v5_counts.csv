@@ -1,0 +1,16 @@
+label,v5 yes in training,reserved,below 60
+PEP,1859,100,False
+Crime-Corruption,0,0,True
+Crime-Fraud,132,60,False
+Crime-Money Laundering,24,24,True
+Crime-Trafficking & Smuggling,126,60,False
+Crime-Cybercrime,33,33,True
+Crime-Violent Crime,408,100,False
+Crime-Theft & Property Crime,63,60,False
+Crime-Forgery & Counterfeiting,4,4,True
+Crime-Tax Crime,0,0,True
+Crime-Organized Crime,45,45,True
+Terrorism / Terrorist Financing,454,100,False
+Proliferation / Proliferation Financing,58,58,True
+Human Rights / Atrocities,101,60,False
+Judicial / Court,285,100,False

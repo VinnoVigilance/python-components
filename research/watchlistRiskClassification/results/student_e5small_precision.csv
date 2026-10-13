@@ -1,0 +1,16 @@
+label,teacher yes checked,student keeps,student precision,95% low,decision,teacher-correct the student dropped
+PEP,100,99,0.898989898989899,0.8239677083435178,review queue,1
+Crime-Corruption,32,17,0.9411764705882353,0.730174547964372,review queue,13
+Crime-Fraud,60,50,0.96,0.8653966212204532,review queue,8
+Crime-Money Laundering,60,60,0.85,0.7388517410884039,review queue,0
+Crime-Trafficking & Smuggling,100,99,0.6666666666666666,0.5691185836060461,review queue,0
+Crime-Cybercrime,60,60,1.0,0.939826069522067,auto-apply,0
+Crime-Violent Crime,100,89,0.651685393258427,0.5482912406815136,review queue,6
+Crime-Theft & Property Crime,60,39,0.9487179487179487,0.8311406095436208,review queue,18
+Crime-Forgery & Counterfeiting,60,60,0.3333333333333333,0.2272909421592783,review queue,0
+Crime-Tax Crime,8,8,0.625,0.3057378545838018,review queue,0
+Crime-Organized Crime,60,57,0.8070175438596491,0.6865906266298637,review queue,3
+Terrorism / Terrorist Financing,100,94,0.8936170212765957,0.8151427646530538,review queue,5
+Proliferation / Proliferation Financing,60,56,0.8392857142857143,0.721935455503243,review queue,2
+Human Rights / Atrocities,100,97,0.9381443298969072,0.8715605974418302,review queue,2
+Judicial / Court,100,86,0.9186046511627907,0.8413964054350904,review queue,8
