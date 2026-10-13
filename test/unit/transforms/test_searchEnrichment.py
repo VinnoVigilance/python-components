@@ -151,6 +151,22 @@ class TestCountryToIso2:
     def test_alias_table_resolves_abbreviated_name(self):
         assert country_to_iso2("St. Lucia", self.VALID) == "LC"
 
+    @pytest.mark.parametrize(
+        "name, code",
+        [
+            ("Hong Kong SAR, China", "HK"),
+            ("Democratic Republic of Congo", "CD"),
+            ("Turkey", "TR"),
+            ("Taipei China", "TW"),
+            ("Republic of Kosovo", "XK"),
+        ],
+    )
+    def test_alias_table_resolves_ebrd_spellings(self, name, code):
+        assert country_to_iso2(name, {"HK", "CD", "TR", "TW", "XK"}) == code
+
+    def test_comma_separated_countries_return_empty(self):
+        assert country_to_iso2("Lebanon, Jordan", {"LB", "JO"}) == ""
+
     def test_pycountry_resolves_plain_name(self):
         assert country_to_iso2("United States", self.VALID) == "US"
 
