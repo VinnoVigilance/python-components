@@ -12,6 +12,17 @@ from sb_stealth_wrapper import SeleniumBaseDriver
 logger = logging.getLogger(__name__)
 
 
+class _DisconnectedDriverProbeFilter(logging.Filter):
+    """Drop urllib3 retry warnings from probing the intentionally stopped local chromedriver."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not ("host='localhost'" in message and "/session/" in message)
+
+
+logging.getLogger("urllib3.connectionpool").addFilter(_DisconnectedDriverProbeFilter())
+
+
 class CompatibleSeleniumBaseDriver(SeleniumBaseDriver):
     """Driver strategy pinned to the device's installed Chrome."""
 
