@@ -107,6 +107,399 @@ class PreProcessingEngine:
 
         return fixed_records
 
+
+    def merge_un_designated_vessel_rows(self, records, config):
+        """Group UN 1718 PDF rows into one record per vessel."""
+
+        def clean(value):
+            if value is None:
+                return ""
+            return re.sub(r"\s+", " ", str(value)).strip()
+
+        def split_numbered(value):
+            parts = re.split(
+                r"(?:^|\s)\d+\s*[:.]\s*",
+                clean(value)
+            )
+            result = []
+            seen = set()
+
+            for part in parts:
+                part = clean(part)
+
+                if part and part.casefold() not in seen:
+                    result.append(part)
+                    seen.add(part.casefold())
+
+            return result
+
+        detail_fields = {
+            "flag": "FlagRaw",
+            "call sign": "CallSignRaw",
+            "type": "VesselType",
+            "other information": "OtherInformation",
+            "picture link": "PictureLinkRaw",
+            "designated as economic resources of": "EconomicResourceOf",
+        }
+
+        required_fields = {
+            "RecordNumber",
+            "VesselNameOrDetailLabel",
+            "DetailValue",
+            "IMOAndMMSI",
+            "DesignationDate",
+        }
+
+        vessels = []
+        current = None
+        seen_numbers = set()
+
+        for row_index, row in enumerate(records, start=1):
+            if not isinstance(row, dict):
+                raise ValueError(
+                    f"UN vessels row {row_index} is not a dictionary."
+                )
+
+            if not required_fields.issubset(row):
+                raise ValueError(
+                    f"UN vessels row {row_index} has unexpected columns."
+                )
+
+            number = clean(row.get("RecordNumber"))
+            label = clean(row.get("VesselNameOrDetailLabel"))
+
+            if number:
+                if not re.fullmatch(r"\d+", number):
+                    raise ValueError(
+                        f"Invalid UN vessel record number: {number}"
+                    )
+
+                if number in seen_numbers:
+                    raise ValueError(
+                        f"Duplicate UN vessel record number: {number}"
+                    )
+
+                names = split_numbered(label)
+
+                if not names:
+                    raise ValueError(
+                        f"UN vessel {number} has no name."
+                    )
+
+                seen_numbers.add(number)
+
+                current = dict(row)
+                current["source_rows"] = [dict(row)]
+                current["VesselName"] = names[0]
+                current["VesselNames"] = [
+                    {
+                        "Name": name,
+                        "NameType": (
+                            "Primary Name" if index == 0 else "Alias"
+                        ),
+                    }
+                    for index, name in enumerate(names)
+                ]
+
+                for field in detail_fields.values():
+                    current[field] = None
+
+                vessels.append(current)
+                continue
+
+            if not any(
+                clean(row.get(field))
+                for field in required_fields
+            ):
+                continue
+
+            output_field = detail_fields.get(label.casefold())
+
+            if current is None or output_field is None:
+                raise ValueError(
+                    f"Unexpected UN vessel detail at row "
+                    f"{row_index}: {label!r}"
+                )
+
+            current["source_rows"].append(dict(row))
+            value = clean(row.get("DetailValue"))
+
+            # Join PDF line breaks inside picture URLs.
+            if (
+                output_field == "PictureLinkRaw"
+                and value.lower().startswith(("http://", "https://"))
+            ):
+                value = re.sub(r"\s+", "", value)
+
+            previous = current[output_field]
+
+            if value:
+                current[output_field] = (
+                    f"{previous}\n{value}" if previous else value
+                )
+
+        if not vessels:
+            raise ValueError(
+                "No numbered UN vessel records were found."
+            )
+
+        seen_ids = set()
+
+        for vessel in vessels:
+            identifiers = clean(vessel.get("IMOAndMMSI"))
+            imo_match = re.match(r"^(\d{7})(?!\d)", identifiers)
+            imo = imo_match.group(1) if imo_match else None
+
+            if (
+                imo is None
+                and identifiers.casefold() != "does not exist"
+            ):
+                raise ValueError(
+                    f"Unexpected IMO value for vessel "
+                    f"{vessel['RecordNumber']}: {identifiers!r}"
+                )
+
+            mmsi_parts = re.split(
+                r"\bMMSI\s*:",
+                identifiers,
+                maxsplit=1,
+                flags=re.IGNORECASE
+            )
+
+            vessel["IMO"] = imo
+            vessel["MMSI"] = (
+                list(dict.fromkeys(
+                    re.findall(r"\b\d{9}\b", mmsi_parts[1])
+                ))
+                if len(mmsi_parts) == 2
+                else []
+            )
+
+            vessel["Flags"] = split_numbered(
+                vessel["FlagRaw"]
+            )
+            vessel["CallSigns"] = split_numbered(
+                vessel["CallSignRaw"]
+            )
+
+            if imo:
+                source_id = f"UN-1718-VESSEL-IMO-{imo}"
+            else:
+                name_key = vessel["VesselName"].casefold()
+                name_hash = hashlib.sha256(
+                    name_key.encode("utf-8")
+                ).hexdigest()
+
+                source_id = f"UN-1718-VESSEL-NAME-{name_hash}"
+
+            if source_id in seen_ids:
+                raise ValueError(
+                    f"Duplicate UN vessel source identifier: {source_id}"
+                )
+
+            seen_ids.add(source_id)
+            vessel["source_record_id"] = source_id
+
+        for vessel in vessels:
+            source_rows = vessel.get("source_rows")
+
+            if not isinstance(source_rows, list) or not source_rows:
+                raise ValueError(
+                    "UN vessel record must contain non-empty source_rows."
+                )
+
+            measure_definitions = {
+                "Measure_1718_8d_2270_12": (
+                    "Asset Freeze",
+                    "Asset freeze under paragraph 8(d) of resolution "
+                    "1718 (2006) and paragraph 12 of resolution 2270 (2016).",
+                ),
+                "Measure_2321_12a": (
+                    "Maritime Restriction",
+                    "De-flagging under paragraph 12(a) of resolution "
+                    "2321 (2016).",
+                ),
+                "Measure_2321_12d": (
+                    "Asset Freeze",
+                    "Asset freeze under paragraph 12(d) of resolution "
+                    "2321 (2016).",
+                ),
+                "Measure_2371_6_2375_6": (
+                    "Maritime Restriction",
+                    "Port-entry restriction under paragraph 6 of resolution "
+                    "2371 (2017) and paragraph 6 of resolution 2375 (2017).",
+                ),
+                "Measure_OMM_EconomicResources": (
+                    "Asset Freeze",
+                    "Listed as an economic resource controlled or operated "
+                    "by Ocean Maritime Management (KPe.020); asset freeze "
+                    "under paragraph 23 of resolution 2270 (2016).",
+                ),
+            }
+
+            dates = []
+            measures = []
+            seen_dates = set()
+            seen_measures = set()
+
+            for row in source_rows:
+                if not isinstance(row, dict):
+                    raise ValueError(
+                        "UN vessel source row is not a dictionary."
+                    )
+
+                designation_date = clean(
+                    row.get("DesignationDate")
+                )
+
+                if designation_date.casefold() in {"", "na", "n/a"}:
+                    designation_date = ""
+
+                if (
+                    designation_date
+                    and designation_date not in seen_dates
+                ):
+                    dates.append({
+                        "OriginalValue": designation_date,
+                        "Type": "Designation Date",
+                    })
+                    seen_dates.add(designation_date)
+
+                for field, definition in measure_definitions.items():
+                    measure_type, note = definition
+                    flag = clean(row.get(field)).casefold()
+
+                    if flag in {"", "na", "n/a"}:
+                        continue
+
+                    if flag != "yes":
+                        raise ValueError(
+                            f"Unexpected UN measure value: "
+                            f"{field}={flag!r}"
+                        )
+
+                    if not designation_date:
+                        raise ValueError(
+                            f"UN measure {field} has no designation date."
+                        )
+
+                    key = (field, designation_date)
+
+                    if key in seen_measures:
+                        continue
+
+                    seen_measures.add(key)
+                    measures.append({
+                        "MeasureType": measure_type,
+                        "EffectiveDate": designation_date,
+                        "Note": note,
+                    })
+
+            if not dates or not measures:
+                raise ValueError(
+                    "UN vessel record has no designation dates or measures."
+                )
+
+            identifiers = []
+            seen_identifiers = set()
+
+            for identifier_type, values in (
+                ("IMO Number", [vessel.get("IMO")]),
+                ("MMSI", vessel.get("MMSI") or []),
+                ("Call Sign", vessel.get("CallSigns") or []),
+            ):
+                for value in values:
+                    number = clean(value)
+
+                    if number.casefold() in {"", "na", "n/a"}:
+                        continue
+
+                    key = (identifier_type, number.casefold())
+
+                    if key in seen_identifiers:
+                        continue
+
+                    seen_identifiers.add(key)
+                    identifiers.append({
+                        "Type": identifier_type,
+                        "Number": number,
+                    })
+
+            aliases = [
+                {
+                    "Alias": clean(item.get("Name")),
+                    "AliasType": "AKA",
+                }
+                for item in (vessel.get("VesselNames") or [])
+                if item.get("NameType") == "Alias"
+                and clean(item.get("Name"))
+            ]
+
+            seen_alias_names = {
+                clean(vessel.get("VesselName")).casefold()
+            }
+            seen_alias_names.update(
+                item["Alias"].casefold()
+                for item in aliases
+            )
+
+            other_information = clean(
+                vessel.get("OtherInformation")
+            )
+
+            # Extract names explicitly attributed to this vessel.
+            # Example: "now operating as a DPRK flagged vessel named ..."
+            for match in re.finditer(
+                r"\bnow\s+operating\s+as\s+[^.\n]*?"
+                r"\bvessel\s+named\s+(?:the\s+)?([^.\n]+)",
+                other_information,
+                flags=re.IGNORECASE,
+            ):
+                for value in re.split(
+                    r"\s+or\s+",
+                    match.group(1),
+                    flags=re.IGNORECASE,
+                ):
+                    alias = clean(value)
+                    alias_key = alias.casefold()
+
+                    if alias_key in {"", "na", "n/a"}:
+                        continue
+
+                    if alias_key in seen_alias_names:
+                        continue
+
+                    aliases.append({
+                        "Alias": alias,
+                        "AliasType": "AKA",
+                    })
+                    seen_alias_names.add(alias_key)
+
+            comments = []
+
+            for field, comment_type in (
+                ("OtherInformation", "Other Information"),
+                ("EconomicResourceOf", "Designated Economic Resource Of"),
+                ("FlagRaw", "Flags As Listed"),
+                ("CallSignRaw", "Call Signs As Listed"),
+                ("PictureLinkRaw", "Picture Link As Listed"),
+            ):
+                text = clean(vessel.get(field))
+
+                if text.casefold() not in {"", "na", "n/a"}:
+                    comments.append({
+                        "type": comment_type,
+                        "text": text,
+                    })
+
+            vessel["DesignationEntries"] = dates
+            vessel["SanctionMeasures"] = measures
+            vessel["VesselIdentifiers"] = identifiers
+            vessel["VesselAliases"] = aliases
+            vessel["VesselComments"] = comments
+
+        return vessels
+
     def merge_dfat_split_records(self, records, config):
         grouped = {}
 

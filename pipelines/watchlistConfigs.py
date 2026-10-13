@@ -1779,4 +1779,91 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
+    "UN-DESIGNATED-VESSELS": {
+        "source_name": "UN",
+        "list_name": "UN-DESIGNATED-VESSELS",
+        "date_order": "DMY",
+        "download_method": "BYPASS",
+        "url": (
+            "https://main.un.org/securitycouncil/en/"
+            "sanctions/1718/materials/"
+            "1718-Designated-Vessels-List"
+        ),
+        "file_type": "pdf",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": [
+                "1718 Designated Vessels List",
+            ],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "a[href*="
+                        "'1718_designated_vessels_list_final.pdf']"
+                    ),
+                    "timeout": 60,
+                },
+                {
+                    "action": "save_pdf",
+                    "url": (
+                        "https://main.un.org/securitycouncil/"
+                        "sites/default/files/"
+                        "1718_designated_vessels_list_final.pdf"
+                    ),
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.pdf"
+                    ),
+                    "timeout_seconds": 60,
+                    "max_size_bytes": 10_000_000,
+                },
+            ],
+            "validation": {
+                "min_size_bytes": 10_000,
+            },
+        },
+
+        "parser_config": {
+            "expected_headers": [
+                "Vessel Name",
+                "IMO number",
+            ],
+            "column_names": [
+                "RecordNumber",
+                "VesselNameOrDetailLabel",
+                "DetailValue",
+                "IMOAndMMSI",
+                "DesignationDate",
+                "Measure_1718_8d_2270_12",
+                "Measure_2321_12a",
+                "Measure_2321_12d",
+                "Measure_2371_6_2375_6",
+                "Measure_OMM_EconomicResources",
+            ],
+        },
+
+        "preprocessing": [
+            {
+                "handler": "merge_un_designated_vessel_rows",
+                "level": "dataset",
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Vessel",
+                },
+            },
+        ],
+    },
+
 }
