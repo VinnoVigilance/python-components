@@ -13,7 +13,7 @@ Run the whole unit tier: pytest -m unit
 
 import pytest
 
-from transforms.dateResolver import (
+from transforms.post_normalization.dateResolver import (
     build_row,
     clean_text,
     disbelieved_year,
