@@ -1,0 +1,7 @@
+# Optional: classical models do not need these dependencies.
+# Install the CPU build of torch using the command in README.md first.
+torch==2.9.0
+transformers==4.57.1
+tokenizers==0.22.2
+safetensors==0.8.0
+huggingface-hub==0.36.2
