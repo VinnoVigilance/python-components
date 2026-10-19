@@ -1,5 +1,6 @@
 from ingestion.urlResolver.linkResolver import (
     resolve_by_link_text,
+    resolve_json_list_filter,
 )
 
 
@@ -22,6 +23,11 @@ def resolve_url(config):
             link_text=resolver_config[
                 "value"
             ],
+        )
+
+    if resolver_type == "json_list_filter":
+        return resolve_json_list_filter(
+            cfg=resolver_config,
         )
 
     raise ValueError(

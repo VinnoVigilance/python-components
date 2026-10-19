@@ -385,10 +385,22 @@ WATCHLIST_CONFIGS = {
         "list_name": "EU-TRAVEL-BAN",
         "download_method": "HTTPS",
         "versioning_strategy": "continuous",
-        "url": (
-            "https://www.sanctionsmap.eu/"
-            "api/v1/travelbans/file/101"
-        ),
+        "url_resolver": {
+            "type": "json_list_filter",
+            "source_url": (
+                "https://www.sanctionsmap.eu/api/v1/data"
+            ),
+            "list_path": "data.travelBansFiles",
+            "filter_field": "mimeType",
+            "filter_value": "text/xml",
+            "id_field": "id",
+            "sort_field": "id",
+            "url_template": (
+                "https://www.sanctionsmap.eu/"
+                "api/v1/travelbans/file/{id}"
+            ),
+            "timeout": 30,
+        },
         "file_type": "xml",
         "external_id_path": "logicalId",
         "root_tags": ["sanctionEntity"],

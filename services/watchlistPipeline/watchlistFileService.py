@@ -10,11 +10,11 @@ from ingestion.apiCollector.interface import ApiCollectorTask, collect
 from ingestion.crawler.interface import crawl
 from ingestion.crawler.models import CrawlerTask
 from ingestion.downloader.models import DownloadTask
+from ingestion.urlResolver.interface import resolve_url
 from ingestion.bypassCollector import BypassCollector
 from repositories import jobStateRepository
 from repositories import watchlistFileLogRepository
 from repositories import watchlistFileRepository
-from ingestion.urlResolver.interface import resolve_url
 from utils.hashing import calculate_file_hash
 
 
@@ -213,9 +213,9 @@ def acquire_source_file(
 
     source_url = config.get("url")
 
-    if not source_url:
+    if not source_url and not config.get("url_resolver"):
         raise ValueError(
-            "The watchlist configuration must contain either 'local_path' or 'url'."
+            "The watchlist configuration must contain either 'local_path', 'url', or 'url_resolver'."
         )
 
     return _download_source_file(
