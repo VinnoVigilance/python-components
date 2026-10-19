@@ -14,18 +14,10 @@ import sklearn
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.svm import LinearSVC
 
-
-LABELS = (
-    "Terrorism / Terrorist Financing", "Regulatory", "Law Enforcement",
-    "Judicial / Court", "Crime-Corruption", "Crime-Fraud",
-    "Crime-Forgery & Counterfeiting", "Crime-Cybercrime",
-    "Crime-Trafficking & Smuggling", "Crime-Violent Crime",
-    "Crime-Environmental & Wildlife Crime",
+from intelligence.risk.mediaRiskCategory.contract import (
+    MediaRiskModelError,
+    load_label_contract,
 )
-
-
-class MediaRiskModelError(RuntimeError):
-    """The configured model is missing, incompatible, or invalid."""
 
 
 class _ThresholdState:
@@ -90,12 +82,14 @@ def load_model(directory: Path) -> tuple[dict, dict]:
             if not (directory / name).is_file():
                 raise MediaRiskModelError(f"Missing {directory / name}. Copy it from the selected run.")
         metadata = json.loads((directory / "run.json").read_text(encoding="utf-8-sig"))
+        contract = load_label_contract(directory)
         if (metadata.get("status") != "completed" or metadata.get("model_name") != "nbsvm_oof"
-                or metadata.get("labels") != list(LABELS) or not metadata.get("run_id")):
-            raise MediaRiskModelError("Expected run.json from a completed 11-label nbsvm_oof run.")
+                or metadata.get("labels") != list(contract.artifact_labels)
+                or metadata.get("run_id") != contract.run_id):
+            raise MediaRiskModelError("Completed nbsvm_oof run.json does not match manifest.json.")
         _check_environment(metadata["environment"])
         source = _load_original(directory / "model.joblib")
-        if (source["labels"] != list(LABELS) or source["score_method"] != "decision_function"
+        if (source["labels"] != list(contract.artifact_labels) or source["score_method"] != "decision_function"
                 or source["dataset_id"] != metadata["dataset_id"]
                 or source["protocol_id"] != metadata["protocol_id"]):
             raise MediaRiskModelError("model.joblib and run.json do not describe the same model.")
@@ -113,7 +107,7 @@ def load_model(directory: Path) -> tuple[dict, dict]:
             raise MediaRiskModelError("Saved model thresholds do not match run.json.")
         ratios = np.asarray(classifier.log_count_ratios_, dtype=float)
         classifiers = classifier.estimators_
-        width, count = len(vectorizer.vocabulary_), len(LABELS)
+        width, count = len(vectorizer.vocabulary_), len(contract.label_ids)
         if (thresholds.shape != (count,) or not np.isfinite(thresholds).all()
                 or ratios.shape != (count, width) or not np.isfinite(ratios).all()
                 or len(classifiers) != count):
@@ -125,7 +119,8 @@ def load_model(directory: Path) -> tuple[dict, dict]:
                     or not np.isfinite(svm.intercept_).all()):
                 raise MediaRiskModelError("Invalid fitted binary SVM.")
         model = {"vectorizer": vectorizer, "classifiers": classifiers,
-                 "ratios": ratios, "thresholds": thresholds}
+                 "ratios": ratios, "thresholds": thresholds,
+                 "label_contract": contract}
         return model, metadata
     except MediaRiskModelError:
         raise
@@ -134,13 +129,14 @@ def load_model(directory: Path) -> tuple[dict, dict]:
 
 
 def decision_scores(model: dict, texts: list[str]) -> np.ndarray:
+    count = len(model["label_contract"].label_ids)
     if not texts:
-        return np.empty((0, len(LABELS)), dtype=float)
+        return np.empty((0, count), dtype=float)
     features = model["vectorizer"].transform(texts)
     scores = np.column_stack([
         svm.decision_function(features.multiply(ratio).tocsr())
         for svm, ratio in zip(model["classifiers"], model["ratios"])
     ])
-    if scores.shape != (len(texts), len(LABELS)) or not np.isfinite(scores).all():
+    if scores.shape != (len(texts), count) or not np.isfinite(scores).all():
         raise MediaRiskModelError("Model returned invalid decision scores.")
     return scores

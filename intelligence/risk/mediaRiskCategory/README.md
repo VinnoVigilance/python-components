@@ -1,106 +1,112 @@
 # Media risk classification service
 
-One ML stage for the selected 11-label NB-SVM. It receives a normalized plain-text
-news title and full body and returns labels with the source model version.
-
-## Files and location
-
-| Location | Purpose |
-| --- | --- |
-| `services/adverseMediaPipeline/mediaRiskCategoryService.py` | Public service and terminal entry point |
-| `intelligence/risk/mediaRiskCategory/nbsvm.py` | Load the saved model and perform inference |
-| `intelligence/risk/mediaRiskCategory/__init__.py` | Package initialization |
-| `intelligence/risk/mediaRiskCategory/models/nbsvm-v1/model.joblib` | Your existing trained model, copied manually |
-| `intelligence/risk/mediaRiskCategory/models/nbsvm-v1/run.json` | Metadata from that same run, copied manually |
-
-The ZIP contains runtime code and this README. It does not contain a replacement
-trained model. Keep your selected run:
-`20261019T071053_870233Z_nbsvm_oof`.
+Standalone NB-SVM inference using the current 11-label model and the user's
+23-label business workbook. No trained weights, cutoffs, text preparation or
+scoring formula are changed.
 
 ## Install
 
-1. Copy the ZIP's `intelligence` and `services` contents into the matching project
-   folders. Replace the service and nbsvm.py from previous addon versions.
-2. Create `intelligence/risk/mediaRiskCategory/models/nbsvm-v1/` if absent.
-3. Copy `model.joblib` and `run.json` from
-   `research/mediaRiskCategoryClassification/outputs/20261019T071053_870233Z_nbsvm_oof/`
-   into that version directory. If already copied there, keep them.
-4. Use the same Python major/minor and the same NumPy, SciPy, scikit-learn and
-   Joblib versions recorded in run.json. The service validates them before loading.
+Use the existing project environment with Python 3.11.x (training: 3.11.9):
 
-No export command or retraining step is required. The service reads the original
-model directly and does not rewrite it. It maps the two historical research class
-names inside its own Joblib reader, without importing a root `models` package,
-changing import paths, or altering process-wide module mappings. This small reader
-uses Joblib's numpy-pickle container API and requires the recorded Joblib version.
-Only load model files from the trusted project.
-
-## Use from Python
-
-```python
-from services.adverseMediaPipeline.mediaRiskCategoryService import (
-    MediaRiskCategoryService,
-)
-
-# Initialize once per worker, outside the article loop.
-service = MediaRiskCategoryService()
-
-# Per article, after normalization:
-result = service.classify(title=news_title, body=news_body)
-labels = result["labels"]
+```powershell
+python -m pip install -r requirements.txt
 ```
 
-Use Content.Title and full Content.BodyText. Existing normalization remains
-responsible for extracting plain text from HTML. The service applies Unicode
+There is one application requirements file. NumPy, SciPy, scikit-learn and
+Joblib are pinned there to the selected run.json versions. openpyxl, already
+used by the project, reads the workbook. Docker installs this same file.
+This is not a complete lock of all transitive packages or OS dependencies.
+
+## Files
+
+```text
+data/rules/VV_RiskCategory_Labels.xlsx
+intelligence/risk/mediaRiskCategory/models/nbsvm-v1/
+    model.joblib
+    run.json
+    manifest.json
+```
+
+Keep the existing model.joblib and run.json from run
+`20261019T071053_870233Z_nbsvm_oof`. No retraining or export is required.
+
+The uploaded workbook is copied without modification. It is the sole business
+taxonomy; there is no separate taxonomy JSON to maintain. Its Risk Labels sheet
+owns the 23 names and English descriptions. Annotation Rules supplies each
+label's existing Stable Label ID, including TER_GEN, REG_GEN, LE_GEN and CR_FRAUD.
+Shared guidance rows without a Risk Label cell are not extra classification
+labels. Original Coverage, Change Log, examples, indicators and all detailed
+business criteria remain in that same file.
+
+The manifest records the model ID/run ID, a project-relative taxonomy_file,
+and the ordered model columns. Each column pairs the workbook's stable ID with
+its frozen artifact_name. Output order comes from the model manifest, not Excel
+row order. The loader checks the ordered artifact names against both run.json
+and the serialized model, and retains fitted dimension/threshold checks.
+The business workbook has 23 labels; this model only evaluates its 11 supported
+columns. Reading all definitions does not add new learned classifiers.
+
+The workbook is read once at service initialization. Results include an automatic
+`taxonomy_version` content fingerprint (`sha256:...`) of the exact workbook bytes
+used. Editing or replacing the workbook therefore changes its recorded version
+without another version file or export step. Preserve historical snapshots for
+results that need later reproduction, and restart workers after changing it.
+Descriptions are metadata: changing them does not retrain the model or add rule
+logic. Keep Stable Label IDs stable for the same meaning. A changed meaning or
+model scope needs compatibility review and, where appropriate, retraining.
+
+The default path lives under data/rules to match the project's other reference
+workbooks. .dockerignore includes this specific workbook so a Docker build can
+copy it. No other ignored data assets or unrelated Docker behavior were changed.
+Custom model directories can still be selected through MEDIA_RISK_MODEL_DIR or
+--model-path; their manifests refer to the shared project workbook.
+
+## Use
+
+```python
+from services.adverseMediaPipeline.mediaRiskCategoryService import MediaRiskCategoryService
+
+service = MediaRiskCategoryService()  # once per worker
+result = service.classify(title=news_title, body=news_body)
+labels = result["labels"]
+label_ids = result["label_ids"]
+```
+
+Existing result fields status, stage, model_version and labels retain their
+meaning and initial names. Added fields are label_ids (now the workbook's own
+stable IDs) and taxonomy_version. Consumers with an exact output schema must
+allow these fields. supported_labels, supported_label_ids and taxonomy_version
+expose the evaluated scope and the workbook snapshot.
+
+Use plain-text Content.Title and full Content.BodyText. Preparation still uses
 NFKC and whitespace collapse, then joins title and body with two newlines.
-This matches the previously verified frozen research input policy.
-
-Batch input: `service.classify_many([(title1, body1), (title2, body2)])`.
-The result order matches the input order. `service.supported_labels` exposes the
-11-label scope. Default paths resolve relative to the project. Override the
-model directory using MEDIA_RISK_MODEL_DIR or
-`MediaRiskCategoryService(model_path=directory)`.
-
-Each result contains `status`, `stage`, `model_version`, and `labels`.
-The stage is `ml`; the model version includes the original research run ID.
-A missing or blank body yields `SKIPPED_EMPTY_BODY`. A processed article yields
-`CLASSIFIED`, including when no supported label crosses its threshold.
-A missing title is allowed. Wrong input types raise TypeError. Model loading
-errors raise MediaRiskModelError; inference errors propagate to the caller.
-
-Decision rule: raw score >= the saved Train-OOF threshold for each label.
-Scores are not probabilities. This model produces labels rather than evidence
-sentences. No result certifies absence of risk outside the supported scope.
-
-## Terminal check
-
-From the project root with the model's environment active:
+A missing title is allowed. A blank/missing body yields SKIPPED_EMPTY_BODY with
+empty labels and IDs. Wrong types raise TypeError. Scores are not probabilities;
+the rule is still score >= the saved threshold. Empty CLASSIFIED results only
+cover evaluated labels. The 12 unsupported taxonomy labels remain unassessed.
 
 ```powershell
 python -m services.adverseMediaPipeline.mediaRiskCategoryService --title "News title" --body "Full plain-text news article."
 ```
 
-For longer news, use `--body-file article.txt` for a UTF-8 plain-text body.
+Use --body-file for a UTF-8 text file. classify_many preserves input order;
+use bounded batches for large corpora. The existing historical Joblib class
+adapter and exact runtime checks remain. Only load trusted model files.
 
-## Integration and handoff
+## Tests and scope
 
-Deliver these runtime files and the version directory containing your two copied
-files. The recipient does not need training data or the research folder.
-Existing intelligence/llm.py and the risk engine remain independent.
-The service neither stores results nor modifies the news payload. A future
-pipeline can call this ML stage, add a rule stage, resolve their outputs, and
-persist the result in the planned dedicated media risk table. Record the news
-version, model version and stage with every persisted result, including empty
-classifications. The caller owns those responsibilities.
+```powershell
+python -m unittest discover -s test/unit/adverseMedia/services -p test_mediaRiskCategoryContract.py -v
+```
 
-## Remove obsolete addon files
+Thirty focused tests cover the actual workbook structure, 23-to-11 scope,
+ordering, stable IDs, content version, malformed contracts, preserved scoring
+and dependencies. They use synthetic estimators and a substituted artifact
+reader, never the supplied original pickle. They are not an accuracy evaluation.
+A real-model smoke test is still needed in the recorded environment.
 
-If earlier addons created the following files, they are unused by this version:
+The service remains independent of pipeline invocation, DB persistence and retry.
+Those areas and the watchlist risk engine were not changed by this patch.
 
-- `models/__init__.py`, `models/_nbsvm.py`, `models/_oof_thresholds.py` in the project root.
-- `scripts/adverseMedia/export_media_risk_model.py`.
-- `risk/media/nbsvm.py`, `risk/media/__init__.py`, `risk/media/README.md`.
-- `test/unit/adverseMedia/services/test_mediaRiskCategoryService.py` from the earlier addon.
-
-Remove only those old addon files if present. Keep the existing risk engine,
-research outputs, and `intelligence/risk/mediaRiskCategory/models/nbsvm-v1/`.
+If the first patch was applied, remove its now-unused requirements-media-risk.txt
+and intelligence/risk/mediaRiskCategory/models/nbsvm-v1/taxonomy.v1.json.

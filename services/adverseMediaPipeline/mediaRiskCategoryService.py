@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from intelligence.risk.mediaRiskCategory.nbsvm import LABELS, decision_scores, load_model, prepare_text
+from intelligence.risk.mediaRiskCategory.nbsvm import decision_scores, load_model, prepare_text
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -22,11 +22,19 @@ class MediaRiskCategoryService:
 
     @property
     def model_version(self) -> str:
-        return "media-risk-nbsvm-v1:" + self._metadata["run_id"]
+        return self._model["label_contract"].model_id + ":" + self._metadata["run_id"]
 
     @property
     def supported_labels(self) -> tuple[str, ...]:
-        return LABELS
+        return self._model["label_contract"].display_labels
+
+    @property
+    def supported_label_ids(self) -> tuple[str, ...]:
+        return self._model["label_contract"].label_ids
+
+    @property
+    def taxonomy_version(self) -> str:
+        return self._model["label_contract"].taxonomy_version
 
     def classify(self, title: str | None, body: str | None) -> dict:
         return self.classify_many([(title, body)])[0]
@@ -36,12 +44,16 @@ class MediaRiskCategoryService:
         positions = [i for i, text in enumerate(texts) if text is not None]
         scores = decision_scores(self._model, [texts[i] for i in positions])
         results = [{"status": "SKIPPED_EMPTY_BODY", "stage": "ml",
-                    "model_version": self.model_version, "labels": []} for _ in texts]
+                    "model_version": self.model_version, "taxonomy_version": self.taxonomy_version,
+                    "labels": [], "label_ids": []} for _ in texts]
         for i, values in zip(positions, scores):
+            selected = [index for index, (value, cutoff) in enumerate(
+                zip(values, self._model["thresholds"])) if value >= cutoff]
             results[i] = {
                 "status": "CLASSIFIED", "stage": "ml", "model_version": self.model_version,
-                "labels": [label for label, value, cutoff in zip(LABELS, values, self._model["thresholds"])
-                           if value >= cutoff],
+                "taxonomy_version": self.taxonomy_version,
+                "labels": [self.supported_labels[index] for index in selected],
+                "label_ids": [self.supported_label_ids[index] for index in selected],
             }
         return results
 
@@ -51,7 +63,7 @@ if __name__ == "__main__":
     import json
     parser = argparse.ArgumentParser(description="Run the media risk model on one plain-text article.")
     parser.add_argument("--title", default="")
-    parser.add_argument("--model-path", type=Path, help="Directory containing model.joblib and run.json.")
+    parser.add_argument("--model-path", type=Path, help="Directory containing model.joblib, run.json and manifest.json.")
     body_args = parser.add_mutually_exclusive_group(required=True)
     body_args.add_argument("--body")
     body_args.add_argument("--body-file", type=Path)

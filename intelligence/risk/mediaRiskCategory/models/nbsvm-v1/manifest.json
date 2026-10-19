@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "model_id": "media-risk-nbsvm-v1",
+  "run_id": "20261019T071053_870233Z_nbsvm_oof",
+  "taxonomy_file": "data/rules/VV_RiskCategory_Labels.xlsx",
+  "labels": [
+    {
+      "id": "TER_GEN",
+      "artifact_name": "Terrorism / Terrorist Financing"
+    },
+    {
+      "id": "REG_GEN",
+      "artifact_name": "Regulatory"
+    },
+    {
+      "id": "LE_GEN",
+      "artifact_name": "Law Enforcement"
+    },
+    {
+      "id": "JUD_GEN",
+      "artifact_name": "Judicial / Court"
+    },
+    {
+      "id": "CR_CORR",
+      "artifact_name": "Crime-Corruption"
+    },
+    {
+      "id": "CR_FRAUD",
+      "artifact_name": "Crime-Fraud"
+    },
+    {
+      "id": "CR_FORGE",
+      "artifact_name": "Crime-Forgery & Counterfeiting"
+    },
+    {
+      "id": "CR_CYBER",
+      "artifact_name": "Crime-Cybercrime"
+    },
+    {
+      "id": "CR_TRAFFIC",
+      "artifact_name": "Crime-Trafficking & Smuggling"
+    },
+    {
+      "id": "CR_VIOLENT",
+      "artifact_name": "Crime-Violent Crime"
+    },
+    {
+      "id": "CR_ENV",
+      "artifact_name": "Crime-Environmental & Wildlife Crime"
+    }
+  ]
+}
