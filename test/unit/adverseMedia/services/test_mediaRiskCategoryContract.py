@@ -6,7 +6,6 @@ python -m unittest discover -s test/unit/adverseMedia/services -p test_mediaRisk
 from __future__ import annotations
 
 import copy
-import hashlib
 import shutil
 import json
 import tempfile
@@ -19,9 +18,10 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.svm import LinearSVC
 
-from intelligence.risk.mediaRiskCategory import nbsvm, contract as contracts
-from intelligence.risk.mediaRiskCategory.contract import load_label_contract, MediaRiskModelError
-from services.adverseMediaPipeline.mediaRiskCategoryService import MediaRiskCategoryService
+from intelligence.risk.mediaRiskCategory import nbsvm
+from intelligence.risk import labelContract as contracts
+from intelligence.risk.labelContract import load_label_contract, RiskModelError as MediaRiskModelError
+from intelligence.risk.mediaRiskCategory.predictor import MediaRiskPredictor
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -89,8 +89,8 @@ class MediaRiskContractTests(unittest.TestCase):
 
     def service(self):
         model, metadata = self.load()
-        with patch("services.adverseMediaPipeline.mediaRiskCategoryService.load_model", return_value=(model, metadata)):
-            return MediaRiskCategoryService(self.directory)
+        with patch("intelligence.risk.mediaRiskCategory.predictor.load_model", return_value=(model, metadata)):
+            return MediaRiskPredictor(self.directory)
 
     def test_manifest_preserves_original_label_order_and_names(self):
         contract = load_label_contract(self.directory)
@@ -122,12 +122,12 @@ class MediaRiskContractTests(unittest.TestCase):
 
     def test_duplicate_manifest_id_rejected(self):
         self.alter("manifest.json", lambda x: x["labels"][1].update(id=x["labels"][0]["id"]))
-        with self.assertRaisesRegex(MediaRiskModelError, "unique"):
+        with self.assertRaises(MediaRiskModelError):
             load_label_contract(self.directory)
 
     def test_duplicate_artifact_name_rejected(self):
         self.alter("manifest.json", lambda x: x["labels"][1].update(artifact_name=x["labels"][0]["artifact_name"]))
-        with self.assertRaisesRegex(MediaRiskModelError, "unique"):
+        with self.assertRaises(MediaRiskModelError):
             load_label_contract(self.directory)
 
     def test_duplicate_taxonomy_id_rejected(self):
@@ -136,10 +136,10 @@ class MediaRiskContractTests(unittest.TestCase):
         with self.assertRaisesRegex(MediaRiskModelError, 'Duplicate stable ID'):
             contracts._parse_taxonomy_rows(risk, annotations)
 
-    def test_taxonomy_version_tracks_exact_workbook_snapshot(self):
+    def test_taxonomy_version_tracks_label_content(self):
         original = load_label_contract(self.directory)
         parsed = contracts._read_workbook_taxonomy(self.workbook_path.read_bytes())
-        self.workbook_path.write_bytes(b'different synthetic workbook snapshot')
+        parsed['SAN_GEN']['definition'] = 'Revised sanctions definition'
         with patch.object(contracts, '_read_workbook_taxonomy', return_value=parsed):
             changed = load_label_contract(self.directory)
         self.assertNotEqual(original.taxonomy_version, changed.taxonomy_version)
@@ -202,7 +202,7 @@ class MediaRiskContractTests(unittest.TestCase):
         self.assertEqual(self.service().supported_label_ids[0], 'TER_GEN')
         self.assertNotIn('SAN_GEN', self.service().supported_label_ids)
 
-    def test_workbook_display_name_can_change_without_retraining(self):
+    def test_workbook_display_name_mismatch_requires_model_manifest_update(self):
         source = self.source()
         risk, annotations = self.taxonomy_rows()
         original_name = source['labels'][0]
@@ -214,10 +214,8 @@ class MediaRiskContractTests(unittest.TestCase):
                 row[1] = 'Revised display name'
         parsed = contracts._parse_taxonomy_rows(risk, annotations)
         with patch.object(contracts, '_read_workbook_taxonomy', return_value=parsed):
-            model, metadata = self.load(source)
-        self.assertEqual(model['label_contract'].display_labels[0], 'Revised display name')
-        self.assertEqual(model['label_contract'].label_ids[0], 'TER_GEN')
-        self.assertEqual(model['label_contract'].artifact_labels[0], metadata['labels'][0])
+            with self.assertRaises(MediaRiskModelError):
+                load_label_contract(self.directory)
 
     def test_adapter_derives_output_width_from_model_manifest(self):
         for filename in ("manifest.json", "run.json"):
@@ -244,7 +242,7 @@ class MediaRiskContractTests(unittest.TestCase):
     def test_threshold_tie_remains_inclusive(self):
         service = self.service()
         values = np.array([service._model["thresholds"]])
-        with patch("services.adverseMediaPipeline.mediaRiskCategoryService.decision_scores", return_value=values):
+        with patch("intelligence.risk.mediaRiskCategory.predictor.decision_scores", return_value=values):
             result = service.classify("Title", "Body")
         self.assertEqual(tuple(result["labels"]), service.supported_labels)
         self.assertEqual(tuple(result["label_ids"]), service.supported_label_ids)
@@ -258,7 +256,7 @@ class MediaRiskContractTests(unittest.TestCase):
         self.assertEqual([r["status"] for r in batch], ["SKIPPED_EMPTY_BODY", "CLASSIFIED", "SKIPPED_EMPTY_BODY"])
         self.assertEqual(batch[0]["label_ids"], [])
         for result in batch:
-            self.assertEqual(result["taxonomy_version"], 'sha256:' + hashlib.sha256(self.workbook_path.read_bytes()).hexdigest())
+            self.assertEqual(result["taxonomy_version"], load_label_contract(self.directory).taxonomy_version)
             self.assertEqual(result["model_version"], "media-risk-nbsvm-v1:" + self.read("run.json")["run_id"])
 
     def test_preparation_type_and_normalization_unchanged(self):

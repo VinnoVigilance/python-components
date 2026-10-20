@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "runtime_recipe": "watchlist-paired-passages-v1",
+  "model_id": "watchlist-risk-e5small-v6",
+  "run_id": "student_e5small_v6",
+  "taxonomy_file": "data/rules/VV_RiskCategory_Labels.xlsx",
+  "labels": [
+    {
+      "id": "SAN_GEN",
+      "artifact_name": "Sanctions"
+    },
+    {
+      "id": "REG_GEN",
+      "artifact_name": "Regulatory"
+    },
+    {
+      "id": "LE_GEN",
+      "artifact_name": "Law Enforcement"
+    },
+    {
+      "id": "PEP_GEN",
+      "artifact_name": "PEP"
+    },
+    {
+      "id": "CR_CORR",
+      "artifact_name": "Crime-Corruption"
+    },
+    {
+      "id": "CR_FRAUD",
+      "artifact_name": "Crime-Fraud"
+    },
+    {
+      "id": "CR_ML",
+      "artifact_name": "Crime-Money Laundering"
+    },
+    {
+      "id": "CR_TRAFFIC",
+      "artifact_name": "Crime-Trafficking & Smuggling"
+    },
+    {
+      "id": "CR_CYBER",
+      "artifact_name": "Crime-Cybercrime"
+    },
+    {
+      "id": "CR_VIOLENT",
+      "artifact_name": "Crime-Violent Crime"
+    },
+    {
+      "id": "CR_PROPERTY",
+      "artifact_name": "Crime-Theft & Property Crime"
+    },
+    {
+      "id": "CR_FORGE",
+      "artifact_name": "Crime-Forgery & Counterfeiting"
+    },
+    {
+      "id": "CR_TAX",
+      "artifact_name": "Crime-Tax Crime"
+    },
+    {
+      "id": "CR_ORG",
+      "artifact_name": "Crime-Organized Crime"
+    },
+    {
+      "id": "TER_GEN",
+      "artifact_name": "Terrorism / Terrorist Financing"
+    },
+    {
+      "id": "PF_GEN",
+      "artifact_name": "Proliferation / Proliferation Financing"
+    },
+    {
+      "id": "HR_ALL",
+      "artifact_name": "Human Rights / Atrocities"
+    },
+    {
+      "id": "JUD_GEN",
+      "artifact_name": "Judicial / Court"
+    }
+  ],
+  "text_labels": [
+    "PEP",
+    "Crime-Corruption",
+    "Crime-Fraud",
+    "Crime-Money Laundering",
+    "Crime-Trafficking & Smuggling",
+    "Crime-Cybercrime",
+    "Crime-Violent Crime",
+    "Crime-Theft & Property Crime",
+    "Crime-Forgery & Counterfeiting",
+    "Crime-Tax Crime",
+    "Crime-Organized Crime",
+    "Terrorism / Terrorist Financing",
+    "Proliferation / Proliferation Financing",
+    "Human Rights / Atrocities",
+    "Judicial / Court"
+  ],
+  "decision_policy": {
+    "version": "student-v6-frozen-1",
+    "text_threshold": 0.5,
+    "victim_threshold": 0.5,
+    "comparison": ">=",
+    "aggregation": "any_passage",
+    "context_chars": 150,
+    "max_tokens": 256,
+    "victim_record_chars": 1200,
+    "review_required_for_text": true
+  },
+  "environment": {
+    "torch": "2.14.1",
+    "transformers": "5.19.0"
+  },
+  "validation_status": "v6 requires fresh independent evaluation",
+  "files_sha256": {
+    "config.json": "5656456e77732b4117221d82563d0d099135d1a533b8c798f45b99f8d8fc80b2",
+    "tokenizer.json": "41afa0ea6683b445a509006f45162ccea64db9aaaca0a5c11ce3ab7526323b96",
+    "tokenizer_config.json": "4a0889ef5175b1a838fe2e6e5aace5252f453889b0480eff7a6a7fe90eefc99e",
+    "model.safetensors": "6ac36d64dfb8d50d58cf5aae2a2c66ee28271c6b6bbbe41dc9e3b7f26713b41d"
+  },
+  "research_sources_sha256": {
+    "highlighter.py": "d32321f6b1bda584280d588dd31c7126a328cc3019225a49c5853e04ca6a3640",
+    "lookupRules.py": "9f407c13cf1e9e56469d138f92cc31b7b14b489f1c2cf52dd63780afdf8a0468",
+    "watchlistText.py": "19d51b8a89192c460fa63876a7e44bb71e58fe0fde5db47047c3ccb9a6eb7933",
+    "student.py": "99d6c21586288732e099c64a76221f4fe9aeb4aac4ecd86d73ce49a37b633d98",
+    "evalStudent.py": "2bc3b5c5b871f1b549549180048931bedd6d79cf2244d9e85e3847fe30c0c26a"
+  },
+  "research_version": {
+    "frozen_on": "2026-10-13",
+    "reason": "general fixes after the v5 proof; no untouched rare-label data left in this export, so v6 waits for a new export to be proven",
+    "teacher_per_label": {
+      "PEP": "Qwen/Qwen3-4B-Instruct-2507",
+      "Crime-Corruption": "Qwen/Qwen3-4B-Instruct-2507",
+      "Crime-Fraud": "Qwen/Qwen3-8B",
+      "Crime-Money Laundering": "Qwen/Qwen3-4B-Instruct-2507",
+      "Crime-Trafficking & Smuggling": "Qwen/Qwen3-4B-Instruct-2507",
+      "Crime-Cybercrime": "Qwen/Qwen3-4B-Instruct-2507",
+      "Crime-Violent Crime": "Qwen/Qwen3-4B-Instruct-2507",
+      "Crime-Theft & Property Crime": "Qwen/Qwen3-4B-Instruct-2507",
+      "Crime-Forgery & Counterfeiting": "Qwen/Qwen3-4B-Instruct-2507",
+      "Crime-Tax Crime": "Qwen/Qwen3-4B-Instruct-2507",
+      "Crime-Organized Crime": "Qwen/Qwen3-4B-Instruct-2507",
+      "Terrorism / Terrorist Financing": "Qwen/Qwen3-4B-Instruct-2507",
+      "Proliferation / Proliferation Financing": "Qwen/Qwen3-4B-Instruct-2507",
+      "Human Rights / Atrocities": "Qwen/Qwen3-4B-Instruct-2507",
+      "Judicial / Court": "Qwen/Qwen3-8B"
+    },
+    "quantisation": "4-bit NF4 (bitsandbytes), bfloat16 compute; chat template with enable_thinking=False",
+    "prompt_version": "v6 (QUESTION_V6: part of a name is not evidence; NOTES_V6: PEP with candidates and sub-national roles, Fraud, Organized Crime, Corruption, Tax added to the v5 notes)",
+    "highlighter": "v5 + words naming the fight against a conduct skipped (flag_units version v6)",
+    "lookup": "COMELEC-2025-SENATORS -> PEP (dataset category)",
+    "cut_off": 0.5,
+    "record_rule": "label if any flagged piece has P(yes) >= 0.5",
+    "victim_rule": "no text-layer labels if Qwen3-4B P(victim) >= 0.5 (v4 role answers, unchanged)",
+    "student": "intfloat/multilingual-e5-small fine-tuned on v6 answers (cache/student_e5small_v6)",
+    "review_only_labels": [
+      "Crime-Corruption",
+      "Crime-Tax Crime"
+    ],
+    "design_data": "v5 check pool, random 300 and held-out samples (used to design v6; not proof data)",
+    "files_sha256_16": {
+      "scripts/checker.py": "be179cde6dec23cc",
+      "scripts/highlighter.py": "1f82a58f506ee362",
+      "scripts/lookupRules.py": "2f84d5cd50da8245",
+      "data/labelling_rules_pdg84.md": "a35bcfb91d9f1d72",
+      "data/blind_labelling_instructions.md": "3e6f95e3922a29f4",
+      "cache/fresh/checker_answers_v6.csv": "26de31d47b7bebb6",
+      "cache/checker_pyes_v6.csv": "04ba99b08674c2bd"
+    }
+  }
+}
