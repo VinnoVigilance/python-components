@@ -173,7 +173,7 @@ Interim score card: `results/encoders_interim_card.csv`. ML-part F1:
 
 1. Watchlist only; one valid label set; 0/1 columns kept; lookup independent of counts.
 2. Lookup rules decided from data (Claude decides borderline rules); training labels follow them.
-3. Single server query for server values; never modify `data/rules/riskClassification.xlsx` in the repo.
+3. Single server query for server values. The former `data/rules/riskClassification.xlsx` has been retired with the old rule engine.
 4. Model selection is driven by **unseen-list** performance.
 5. **Proposed label tiers** (agreed in principle; still to apply in the score card — Part A4 below):
    * Lookup only: Sanctions, Regulatory, Law Enforcement.
