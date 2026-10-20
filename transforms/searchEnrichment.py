@@ -288,6 +288,7 @@ _COUNTRY_ALIASES = {
     "HONG KONG SAR, CHINA": "HK",
     "TURKEY": "TR",
     "REPUBLIC OF KOSOVO": "XK",
+    "KOSOVO": "XK",
     "GUINÉE CONAKRY": "GN",
     "IRAN": "IR",
     "SYRIA": "SY",

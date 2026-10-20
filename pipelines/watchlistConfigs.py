@@ -1878,4 +1878,52 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "IDB_SANCTIONED_ENTITIES": {
+        "source_name": "IDB",
+        "list_name": "IDB_SANCTIONED_ENTITIES",
+        "date_order": "YMD",
+        "download_method": "API",
+        "url": "https://data.iadb.org/api/action/datastore_search",
+        "file_type": "jsonl",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+
+        "api_config": {
+            "pagination": {
+                "type": "offset",
+                "offset_param": "offset",
+                "size_param": "limit",
+                "page_size": 500,
+                "start_page": 0,
+            },
+            "items_path": "result.records",
+            "params": {
+                "resource_id": "cd0bd9ac-18c6-44bc-8592-9be468c2efd9",
+                "sort": "_id asc",
+            },
+            "dedup_path": "_id",
+            "write_mode": "single_jsonl",
+        },
+
+       "preprocessing": [
+    {
+        "handler": "generate_composite_id",
+        "level": "record",
+        "config": {
+            "fields": [
+                "Title",
+                "Entity",
+                "Nationality",
+                "Country",
+                "From",
+                "Source",
+            ],
+            "output_field": "source_record_id",
+            "prefix": "IDB",
+        },
+    },
+],
+    },
+
 }
