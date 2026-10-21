@@ -151,25 +151,28 @@ def deploy_database_procedures():
     try:
         with get_db_connection() as conn:
             
+            previous_autocommit = conn.autocommit
             conn.autocommit = True
+            try:
             
-            # We now pass the connection so the generator can read the database schema
-            daily_sql = generate_daily_sync_sql(SPOKE_MAPPING, conn)
-            rebuild_sql = generate_full_rebuild_sql(SPOKE_MAPPING, conn)
+                # We now pass the connection so the generator can read the database schema
+                daily_sql = generate_daily_sync_sql(SPOKE_MAPPING, conn)
+                rebuild_sql = generate_full_rebuild_sql(SPOKE_MAPPING, conn)
             
-            with conn.cursor() as cur:
-                # 1. Ensure the high-level logging table exists
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS core.spoke_run_log (
-                        run_date DATE PRIMARY KEY,
-                        status VARCHAR(50) NOT NULL,
-                        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                """)
-                # 2. Deploy the generated dynamic procedures
-                cur.execute(daily_sql)
-                cur.execute(rebuild_sql)
-                
+                with conn.cursor() as cur:
+                    # 1. Ensure the high-level logging table exists
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS core.spoke_run_log (
+                            run_date DATE PRIMARY KEY,
+                            status VARCHAR(50) NOT NULL,
+                            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+                    # 2. Deploy the generated dynamic procedures
+                    cur.execute(daily_sql)
+                    cur.execute(rebuild_sql)
+            finally:
+                conn.autocommit = previous_autocommit
         logger.info("Database stored procedures successfully compiled and deployed.")
     except Exception as err:
         logger.error(f"Critical failure while deploying stored database routines: {err}")
@@ -180,19 +183,22 @@ def execute_daily_sync(target_date: date):
     logger.info(f"Requesting Daily Spoke Sync execution for operational date: {target_date}")
     try:
         with get_db_connection() as conn:
+            previous_autocommit = conn.autocommit
             conn.autocommit = True
-            with conn.cursor() as cur:
-                # 1. Run the massive single-transaction sync
-                cur.execute("CALL delivery.sync_core_spoke_tables(%s);", (target_date,))
+            try:
+                with conn.cursor() as cur:
+                    # 1. Run the massive single-transaction sync
+                    cur.execute("CALL delivery.sync_core_spoke_tables(%s);", (target_date,))
                 
-                # 2. Drop the single watermark so downstream tasks know it's safe to proceed
-                cur.execute("""
-                    INSERT INTO core.spoke_run_log (run_date, status)
-                    VALUES (%s, 'ALL_SPOKES_COMPLETE')
-                    ON CONFLICT (run_date) 
-                    DO UPDATE SET status = 'ALL_SPOKES_COMPLETE', completed_at = CURRENT_TIMESTAMP;
-                """, (target_date,))
-                
+                    # 2. Drop the single watermark so downstream tasks know it's safe to proceed
+                    cur.execute("""
+                        INSERT INTO core.spoke_run_log (run_date, status)
+                        VALUES (%s, 'ALL_SPOKES_COMPLETE')
+                        ON CONFLICT (run_date)
+                        DO UPDATE SET status = 'ALL_SPOKES_COMPLETE', completed_at = CURRENT_TIMESTAMP;
+                    """, (target_date,))
+            finally:
+                conn.autocommit = previous_autocommit
         logger.info(f"Daily Spoke Sync operations successfully completed for {target_date}.")
     except Exception as err:
         logger.error(f"Daily Spoke Sync execution failed for date {target_date}: {err}")
@@ -204,16 +210,20 @@ def execute_full_rebuild():
     logger.warning("Initiating Full Spoke Rebuild. This will truncate all data...")
     try:
         with get_db_connection() as conn:
+            previous_autocommit = conn.autocommit
             conn.autocommit = True
-            with conn.cursor() as cur:
-                cur.execute("CALL delivery.rebuild_all_core_spoke_tables();")
-                # 2. Drop the single watermark so downstream tasks know it's safe to proceed
-                cur.execute("""
-                    INSERT INTO core.spoke_run_log (run_date, status)
-                    VALUES (CURRENT_TIMESTAMP, 'ALL_SPOKES_COMPLETE')
-                    ON CONFLICT (run_date) 
-                    DO UPDATE SET status = 'ALL_SPOKES_COMPLETE', completed_at = CURRENT_TIMESTAMP;
-                """)
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("CALL delivery.rebuild_all_core_spoke_tables();")
+                    # 2. Drop the single watermark so downstream tasks know it's safe to proceed
+                    cur.execute("""
+                        INSERT INTO core.spoke_run_log (run_date, status)
+                        VALUES (CURRENT_TIMESTAMP, 'ALL_SPOKES_COMPLETE')
+                        ON CONFLICT (run_date)
+                        DO UPDATE SET status = 'ALL_SPOKES_COMPLETE', completed_at = CURRENT_TIMESTAMP;
+                    """)
+            finally:
+                conn.autocommit = previous_autocommit
         logger.info("Full administrative data rebuild completed successfully.")
     except Exception as err:
         logger.error(f"Administrative database rebuild crashed: {err}")
@@ -244,4 +254,4 @@ if __name__ == "__main__":
         except Exception as err:
             log.event("ATTEMPT_FAILED", error=err)
             raise
-            
+

@@ -497,3 +497,39 @@ risk dispatcher, preserves per-domain locks/queues, and continues the second
 domain after first-domain failure. The combined job is covered by the
 commit-time tests above. No live classification/full load or database writes were
 run for this addition; deployment checks remain outstanding.
+
+
+### Server delivery compatibility — 2026-10-21
+
+Server-supplied uncommitted changes split the delta wrappers into
+watchlistDailyDeltaActionsGeneration.py and mediaDailyDeltaActionsGeneration.py,
+and extend postIngestionSpokesDeltas.py to generate both domains. Keep this split
+and the server's Docker Compose mount edits. Callers import the watchlist generator
+directly from watchlistDailyDeltaActionsGeneration; the old module is removed.
+
+Post-ingestion processing now attempts media even when watchlists are empty,
+already caught up, or fail spoke synchronization. It reports domain failures
+after attempting both domains. Incomplete spokes are an error and prevent search
+view refresh. The existing watchlist backfill and added media backfill remain
+available; no rebuild/backfill is executed by compatibility inspection.
+
+Delta and spoke execution wrappers and search-view refresh restore a pooled
+connection's previous autocommit setting before returning it, preventing delivery
+execution settings from leaking into risk/ingestion callers. Procedure names and
+generated spoke SQL behavior are unchanged. The media wrapper calls
+delivery.generate_media_daily_delta_actions; its server deployment and actual
+execution are not established by the presence of this Python wrapper.
+
+Commit-time verification on 2026-10-21 passed syntax, direct imports and diff
+checks. Focused delivery/risk/job tests: 52 passed, including 16 new delivery
+regressions. Full suite: 975 passed, 35 skipped in 170.40 seconds (1,010 collected).
+Database integration skipped because TEST_DATABASE_URL is unset. Delivery tests
+mock connection/procedure execution and cover independent media work, propagated
+watchlist errors, incomplete-spoke refresh prevention, correct procedure/date
+calls and autocommit restoration on success/failure.
+
+No live procedures were called/deployed, no view refreshed, and no live DB writes
+or full loads were run. Actual server procedure behavior remains unverified.
+Existing MAX(effective_date) watermarks retain limitations for empty days, same-day
+arrivals and a delta created before a later spoke-sync failure; they are not proof
+of a fully completed delivery date. These upstream rules were not redesigned here.
