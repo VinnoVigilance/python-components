@@ -30,6 +30,7 @@ class WatchlistRiskClassifier:
             self.student.artifact_version, self.student.policy_version,
             self.rules_version, self.runtime_version,
         )
+        self.lookup_calculation_version = calculation_version(self.rules_version, self.runtime_version)
 
     def classify(self, payload):
         """Return labels and passage decisions tied to the frozen model recipe."""
@@ -58,7 +59,12 @@ class WatchlistRiskClassifier:
         categories = {}
         for name in lookupRules.record_rule_labels(source, payload):
             label_id, display_name = self.labels[name]
-            categories[label_id] = {"riskCategoryId": label_id, "riskCategoryName": display_name}
+            categories[label_id] = {"riskCategoryId": label_id, "riskCategoryName": display_name,
+                                    "method": "lookup", "explanation": "",
+                                    "metadata": {
+                                        "rulesVersion": self.rules_version,
+                                        "calculationVersion": self.lookup_calculation_version,
+                                    }}
         lookup_ids = set(categories)
         review_required = {}
         auto_apply_ids = set(self.student.policy["auto_apply_text_label_ids"])
@@ -75,6 +81,12 @@ class WatchlistRiskClassifier:
                     "scoreType": "student_sigmoid",
                     "threshold": self.student.policy["text_threshold"],
                     "evidence": [],
+                    "explanation": "",
+                    "metadata": {
+                        "modelVersion": self.student.model_version,
+                        "calculationVersion": self.calculation_version,
+                        "victimThreshold": self.student.policy["victim_threshold"],
+                    },
                 })
                 item["score"] = max(item["score"], float(score))
                 item["evidence"].append({"field": units[index][0], "text": units[index][1]})
@@ -82,9 +94,5 @@ class WatchlistRiskClassifier:
             "assessmentStatus": "CLASSIFIED",
             "riskCategories": [categories[key] for key in sorted(categories)],
             "reviewRequired": [review_required[key] for key in sorted(review_required)],
-            "metadata": {
-                "modelVersion": self.student.manifest["model_id"],
-                "taxonomyVersion": self.student.contract.taxonomy_version,
-                "calculationVersion": self.calculation_version,
-            },
+            "taxonomyVersion": self.student.contract.taxonomy_version,
         }

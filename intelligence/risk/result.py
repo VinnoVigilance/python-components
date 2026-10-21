@@ -24,4 +24,4 @@ def calculation_version(*components):
 
 def build_assessment_payload(payload):
     """Add the schema version without duplicating database columns."""
-    return {"schemaVersion": "1.0", **payload}
+    return {**payload, "schemaVersion": "2.0"}

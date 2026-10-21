@@ -38,14 +38,15 @@ class MediaRiskClassifier:
                 "score": decision["score"],
                 "scoreType": decision["scoreType"],
                 "threshold": decision["threshold"],
+                "explanation": "",
+                "metadata": {
+                    "modelVersion": prediction["model_version"],
+                    "calculationVersion": self.calculation_version,
+                },
             })
         return {
             "assessmentStatus": prediction["status"],
             "riskCategories": sorted(risk_categories, key=lambda item: item["riskCategoryId"]),
             "reviewRequired": [],
-            "metadata": {
-                "modelVersion": prediction["model_version"],
-                "taxonomyVersion": prediction["taxonomy_version"],
-                "calculationVersion": self.calculation_version,
-            },
+            "taxonomyVersion": prediction["taxonomy_version"],
         }

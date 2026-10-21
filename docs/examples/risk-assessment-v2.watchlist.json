@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "2.0",
+  "assessmentStatus": "CLASSIFIED",
+  "taxonomyVersion": "sha256:<taxonomy-fingerprint>",
+  "riskCategories": [
+    {
+      "riskCategoryId": "SAN_GEN",
+      "riskCategoryName": "Sanctions",
+      "method": "lookup",
+      "explanation": "",
+      "metadata": {
+        "rulesVersion": "sha256:<lookup-rules-fingerprint>",
+        "calculationVersion": "sha256:<lookup-calculation-fingerprint>"
+      }
+    },
+    {
+      "riskCategoryId": "CR_FRAUD",
+      "riskCategoryName": "Crime-Fraud",
+      "method": "ml",
+      "score": 0.82,
+      "scoreType": "student_sigmoid",
+      "threshold": 0.5,
+      "evidence": [
+        {
+          "field": "Remarks",
+          "text": "Illustrative passage describing fraud."
+        }
+      ],
+      "explanation": "",
+      "metadata": {
+        "modelVersion": "watchlist-risk-e5small-v6:<weights-sha256>",
+        "calculationVersion": "sha256:<text-calculation-fingerprint>",
+        "victimThreshold": 0.5
+      }
+    }
+  ],
+  "reviewRequired": [
+    {
+      "riskCategoryId": "PEP_GEN",
+      "riskCategoryName": "PEP",
+      "method": "ml",
+      "score": 0.76,
+      "scoreType": "student_sigmoid",
+      "threshold": 0.5,
+      "evidence": [
+        {
+          "field": "Remarks",
+          "text": "Illustrative passage describing public office."
+        }
+      ],
+      "explanation": "",
+      "metadata": {
+        "modelVersion": "watchlist-risk-e5small-v6:<weights-sha256>",
+        "calculationVersion": "sha256:<text-calculation-fingerprint>",
+        "victimThreshold": 0.5
+      }
+    }
+  ]
+}
