@@ -48,6 +48,14 @@ class WatchlistStudent:
         if (not text_labels or len(set(text_labels)) != len(text_labels)
                 or not set(text_labels).issubset(self.contract.artifact_labels)):
             raise RiskModelError("Text labels must belong to the model label contract.")
+        auto_ids = self.policy.get("auto_apply_text_label_ids")
+        eligible_ids = {
+            label_id for name, label_id in zip(self.contract.artifact_labels, self.contract.label_ids)
+            if name in text_labels
+        }
+        if (not isinstance(auto_ids, list) or any(type(value) is not str for value in auto_ids)
+                or len(set(auto_ids)) != len(auto_ids) or not set(auto_ids).issubset(eligible_ids)):
+            raise RiskModelError("Automatic text labels must be unique IDs in the text label contract.")
         if threads < 1:
             raise ValueError("threads must be positive.")
         torch.set_num_threads(threads)

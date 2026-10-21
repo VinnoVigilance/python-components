@@ -24,6 +24,11 @@ maximum of 256 tokens, and uses 150 characters of neighboring evidence context.
 A text label is selected if any candidate passage score is >= 0.5, unless the
 victim/missing-person score is >= 0.5. Victim input excludes the source-list line
 and is limited to the original 1,200 characters. Lookup labels remain separate.
+The decision policy automatically publishes Fraud, Money Laundering, Trafficking
+& Smuggling, Violent Crime, Theft & Property Crime, Forgery & Counterfeiting,
+Terrorism / Financing, Proliferation / Financing, Human Rights / Atrocities, and
+Judicial / Court. The other five text labels remain review suggestions. A lookup
+label takes precedence when both methods select the same category.
 
 The model supports 15 text labels; three additional labels (Sanctions,
 Regulatory and Law Enforcement) come from lookup rules. The shared business
@@ -33,21 +38,23 @@ model for that label, not a scored negative.
 
 Inference uses the frozen weights without retraining or threshold optimization.
 The runtime requires the research-recorded torch 2.14.1 and transformers 5.19.0
-versions, pinned in the application requirements. These packages were absent
-from the local vv-env when this implementation was prepared; they have not been
-installed or exercised here. Model assets are checked against their manifest.
+versions, pinned in the application requirements. Both are installed in the
+Python 3.11.9 `vv-env`; local CPU inference has been exercised. Model assets are
+checked against their manifest.
 
 ## Interpretation and versions
 
 Scores are uncalibrated sigmoid outputs, not demonstrated probabilities of
 real-world wrongdoing. V6 is the latest frozen candidate and still needs a new,
-untouched evaluation export. The initial runtime marks text-only positive
-labels for review. A label independently supplied by lookup rules does not
+untouched evaluation export. Automatic publication of the ten text labels is a
+product decision at the existing 0.5 cutoff, not an independently proven
+precision claim. A label independently supplied by lookup rules does not
 require approval merely because the text model also supplies it.
 
-Stored assessments separate final lookup labels in `riskCategories` from selected
-text-model labels awaiting review in `reviewRequired`. Review events remain
-separate and do not automatically promote labels to the client-facing result.
+Stored assessments place final lookup and selected automatic text labels in
+`riskCategories`; the remaining selected text labels go to `reviewRequired`.
+Review events remain separate and do not automatically promote labels to the
+client-facing result.
 Metadata records model, artifact, decision-policy, taxonomy, rule and runtime
 versions. These values are part of the result hash.
 

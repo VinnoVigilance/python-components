@@ -59,12 +59,15 @@ class WatchlistRiskClassifier:
         for name in lookupRules.record_rule_labels(source, payload):
             label_id, display_name = self.labels[name]
             categories[label_id] = {"riskCategoryId": label_id, "riskCategoryName": display_name}
+        lookup_ids = set(categories)
         review_required = {}
+        auto_apply_ids = set(self.student.policy["auto_apply_text_label_ids"])
         for (index, name, _), score in zip(candidates, scores):
             label_id, display_name = self.labels[name]
             selected = score >= self.student.policy["text_threshold"] and not victim
-            if selected and label_id not in categories:
-                item = review_required.setdefault(label_id, {
+            if selected and label_id not in lookup_ids:
+                destination = categories if label_id in auto_apply_ids else review_required
+                item = destination.setdefault(label_id, {
                     "riskCategoryId": label_id,
                     "riskCategoryName": display_name,
                     "method": "ml",

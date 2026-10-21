@@ -96,7 +96,7 @@
     "Judicial / Court"
   ],
   "decision_policy": {
-    "version": "student-v6-frozen-1",
+    "version": "student-v6-auto-10",
     "text_threshold": 0.5,
     "victim_threshold": 0.5,
     "comparison": ">=",
@@ -104,7 +104,18 @@
     "context_chars": 150,
     "max_tokens": 256,
     "victim_record_chars": 1200,
-    "review_required_for_text": true
+    "auto_apply_text_label_ids": [
+      "CR_FRAUD",
+      "CR_ML",
+      "CR_TRAFFIC",
+      "CR_VIOLENT",
+      "CR_PROPERTY",
+      "CR_FORGE",
+      "TER_GEN",
+      "PF_GEN",
+      "HR_ALL",
+      "JUD_GEN"
+    ]
   },
   "environment": {
     "torch": "2.14.1",
