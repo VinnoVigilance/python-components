@@ -47,9 +47,11 @@ SAMPLES = {
     "PCIJ_INVESTIGATIVE_REPORTS": "PCIJ_INVESTIGATIVE_REPORTS_extracted_sample.jsonl",
     "UK_GOV_NEWS_COMMUNICATIONS": "UK_GOV_NEWS_COMMUNICATIONS_extracted_sample.jsonl",
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": "DTI_PH_FAIR_TRADE_PRESS_RELEASES_extracted_sample.jsonl",
+    "DTI_PH_FAIR_TRADE_UPDATES": "DTI_PH_FAIR_TRADE_UPDATES_extracted_sample.jsonl",
     "ADB_CASE_SUMMARIES": "ADB_CASE_SUMMARIES_extracted_sample.jsonl",
     "SEC_PH_ADVISORIES": "SEC_PH_ADVISORIES_extracted_sample.jsonl",
     "PTV_NEWS": "PTV_NEWS_extracted_sample.jsonl",
+    "INTERAKSYON_POLITICS_ISSUES": "INTERAKSYON_POLITICS_ISSUES_extracted_sample.jsonl",
 }
 
 # dataset_name -> the constant Sources[]/Publisher fields every record must carry.
@@ -57,50 +59,60 @@ SAMPLES = {
 # data/rules/mediaMapping.xlsx.
 GOLDEN = {
     "NBI_PRESS_RELEASES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "NBI_PRESS_RELEASES", "SourceName": "NBI",
         "PublisherName": "NBI",
     },
     "AMLC_NEWS_AND_ANNOUNCEMENTS": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "AMLC_NEWS_AND_ANNOUNCEMENTS", "SourceName": "AMLC",
         "PublisherName": "AMLC",
     },
     "PCIJ_CORRUPTION_WATCH": {
-        "SourceType": "Media", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "Media",
         "DatasetName": "PCIJ_CORRUPTION_WATCH", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
     "PCIJ_INVESTIGATIVE_REPORTS": {
-        "SourceType": "Media", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "Media",
         "DatasetName": "PCIJ_INVESTIGATIVE_REPORTS", "SourceName": "PCIJ",
         "PublisherName": "PCIJ",
     },
     # UK_GOV's Publisher.Name is a per-record `path` (the publishing org), not a
     # dataset constant, so it is not pinned here.
     "UK_GOV_NEWS_COMMUNICATIONS": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Media", "DatasetCategory": "Media",
         "DatasetName": "UK_GOV_NEWS_COMMUNICATIONS", "SourceName": "UK_GOV",
     },
     "DTI_PH_FAIR_TRADE_PRESS_RELEASES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "DTI_PH_FAIR_TRADE_PRESS_RELEASES", "SourceName": "DTI_PH",
         "PublisherName": "Department of Trade and Industry (Philippines)",
     },
+    "DTI_PH_FAIR_TRADE_UPDATES": {
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
+        "DatasetName": "DTI_PH_FAIR_TRADE_UPDATES", "SourceName": "DTI_PH",
+        "PublisherName": "Department of Trade and Industry (Philippines)",
+    },
     "ADB_CASE_SUMMARIES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
         "DatasetName": "ADB_CASE_SUMMARIES", "SourceName": "ADB",
         "PublisherName": "Asian Development Bank",
     },
     "SEC_PH_ADVISORIES": {
-        "SourceType": "Official", "DatasetCategory": "Press Release",
+        "SourceType": "Official", "DatasetCategory": "Regulatory",
         "DatasetName": "SEC_PH_ADVISORIES", "SourceName": "SEC_PH",
         "PublisherName": "Securities and Exchange Commission (Philippines)",
     },
     "PTV_NEWS": {
-        "SourceType": "Official", "DatasetCategory": "News Article",
+        "SourceType": "Official", "DatasetCategory": "Media",
         "DatasetName": "PTV_NEWS", "SourceName": "PTV",
         "PublisherName": "People's Television Network (Philippines)",
+    },
+    "INTERAKSYON_POLITICS_ISSUES": {
+        "SourceType": "Media", "DatasetCategory": "Media",
+        "DatasetName": "INTERAKSYON_POLITICS_ISSUES", "SourceName": "INTERAKSYON",
+        "PublisherName": "Interaksyon",
     },
 }
 
@@ -281,6 +293,27 @@ class TestDtiAttachments:
                 assert "fteb-staging" not in (a.get("URL") or ""), a
 
 
+class TestDtiUpdatesAttachments:
+    """A PDF-only update post keeps its PDF as a Document; a Drive link yields none."""
+
+    def _attachments(self, record_id):
+        for rec in _canonical_records("DTI_PH_FAIR_TRADE_UPDATES"):
+            if rec["Sources"][0]["SourceRecordId"] == record_id:
+                return rec["Attachments"]
+        raise AssertionError(f"no DTI update sample record with id {record_id!r}")
+
+    def test_body_pdf_becomes_document_attachment(self):
+        docs = [a["URL"] for a in self._attachments(5200) if a["Type"] == "Document"]
+        assert len(docs) == 1 and docs[0].endswith(".pdf"), docs
+
+    def test_body_images_become_images(self):
+        assert all(a["Type"] == "Image" for a in self._attachments(5435))
+        assert len(self._attachments(5435)) == 12
+
+    def test_drive_link_is_not_an_attachment(self):
+        assert self._attachments(3388) == []
+
+
 class TestAdbCaseSummaries:
     """Each table row maps to one record: case number, two-digit-year date, entity type tag."""
 
@@ -384,7 +417,89 @@ class TestPtvNews:
         docs = self._urls(self._by_id(235295), "Document")
         assert docs and docs[0].endswith(".pdf"), docs
 
-    def test_terms_go_to_tags_not_categories(self):
-        rec = self._by_id(252351)
-        assert "DTI Secretary Cristina Roque" in rec["Metadata"]["Tags"]
-        assert rec["Metadata"]["Categories"] == []
+    def test_categories_and_tags_are_split(self):
+        meta = self._by_id(252351)["Metadata"]
+        assert meta["Categories"] == ["ASEAN", "Business", "Nation"]
+        assert "DTI Secretary Cristina Roque" in meta["Tags"]
+        assert not set(meta["Categories"]) & set(meta["Tags"])
+
+    def test_non_ascii_tag_survives_the_split(self):
+        assert "Malacañang calls for peaceful and orderly Sept. 21 protests" in (
+            self._by_id(252337)["Metadata"]["Tags"]
+        )
+
+
+class TestInteraksyonPoliticsIssues:
+    """WordPress API post -> split categories/tags, decoded title, clean links, embeds."""
+
+    def _by_id(self, record_id):
+        for rec in _canonical_records("INTERAKSYON_POLITICS_ISSUES"):
+            if rec["Sources"][0]["SourceRecordId"] == record_id:
+                return rec
+        raise AssertionError(f"no INTERAKSYON sample record with id {record_id!r}")
+
+    def _urls(self, rec, attach_type):
+        return [a["URL"] for a in rec["Attachments"] if a["Type"] == attach_type]
+
+    def _related(self, rec):
+        return [u["URL"] for u in rec["URLs"] if u["URLType"] == "Related"]
+
+    def test_categories_and_tags_are_split(self):
+        meta = self._by_id(319235)["Metadata"]
+        assert meta["Categories"] == ["Business", "Politics + Issues", "Trends + Spotlights"]
+        assert meta["Tags"] == ["cash remittance", "cash remittances"]
+
+    def test_tag_with_apostrophe_is_kept_whole(self):
+        assert "women's rights" in self._by_id(124076)["Metadata"]["Tags"]
+
+    def test_title_entities_are_decoded(self):
+        title = self._by_id(320443)["Content"]["Title"]
+        assert title == "Lower house approves bill restricting minors’ social media access"
+
+    def test_api_author_becomes_author(self):
+        assert self._by_id(320481)["Authors"] == [{"Name": "Reuters"}]
+
+    def test_featured_media_becomes_thumbnail(self):
+        thumbs = self._urls(self._by_id(320481), "Thumbnail")
+        assert thumbs == ["https://media.interaksyon.com/wp-content/uploads/2026/10/Sara-Duterte-1.jpg"]
+
+    def test_no_featured_media_means_no_thumbnail(self):
+        assert self._urls(self._by_id(260834), "Thumbnail") == []
+
+    def test_image_url_ampersands_are_decoded(self):
+        images = self._urls(self._by_id(319994), "Image")
+        assert images and all("&amp;" not in u for u in images), images
+        assert "&q=45&" in images[0]
+
+    def test_tracking_pixel_is_not_an_image(self):
+        for rec in _canonical_records("INTERAKSYON_POLITICS_ISSUES"):
+            assert not any(".gif" in u for u in self._urls(rec, "Image")), rec["Attachments"]
+
+    def test_uppercase_extension_image_is_captured(self):
+        images = self._urls(self._by_id(176561), "Image")
+        assert any(".JPG?" in u for u in images), images
+
+    def test_local_file_link_is_not_a_document(self):
+        assert self._urls(self._by_id(144179), "Document") == []
+
+    def test_youtube_embeds_become_videos(self):
+        assert self._urls(self._by_id(318977), "Video") == [
+            "https://www.youtube.com/embed/WA8-KEnfWbQ",
+            "https://www.youtube.com/embed/1Gb-Pp_W2t4",
+            "https://www.youtube.com/embed/7sHxRcebDzM",
+        ]
+
+    def test_embedded_tweets_become_related_urls(self):
+        assert self._related(self._by_id(320295)) == [
+            "https://x.com/iampinglacson/status/2107353354376806525",
+            "https://x.com/iampinglacson/status/2107455869021790583",
+        ]
+
+    def test_embedded_facebook_post_becomes_related_url(self):
+        related = self._related(self._by_id(320118))
+        assert len(related) == 1 and "LTOPhilippines" in related[0], related
+
+    def test_article_link_is_always_first_url(self):
+        for rec in _canonical_records("INTERAKSYON_POLITICS_ISSUES"):
+            assert rec["URLs"][0]["URLType"] == "Article"
+            assert rec["URLs"][0]["URL"].startswith("https://interaksyon.philstar.com/")

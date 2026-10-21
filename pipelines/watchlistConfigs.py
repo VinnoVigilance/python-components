@@ -385,10 +385,22 @@ WATCHLIST_CONFIGS = {
         "list_name": "EU-TRAVEL-BAN",
         "download_method": "HTTPS",
         "versioning_strategy": "continuous",
-        "url": (
-            "https://www.sanctionsmap.eu/"
-            "api/v1/travelbans/file/101"
-        ),
+        "url_resolver": {
+            "type": "json_list_filter",
+            "source_url": (
+                "https://www.sanctionsmap.eu/api/v1/data"
+            ),
+            "list_path": "data.travelBansFiles",
+            "filter_field": "mimeType",
+            "filter_value": "text/xml",
+            "id_field": "id",
+            "sort_field": "id",
+            "url_template": (
+                "https://www.sanctionsmap.eu/"
+                "api/v1/travelbans/file/{id}"
+            ),
+            "timeout": 30,
+        },
         "file_type": "xml",
         "external_id_path": "logicalId",
         "root_tags": ["sanctionEntity"],
@@ -446,6 +458,64 @@ WATCHLIST_CONFIGS = {
         "external_id_path": "SSID",
         "schedule": "daily",
         "versioning_strategy": "continuous",
+    },
+
+    "CANADA_CONSOLIDATED_SANCTIONS": {
+        "source_name": "GAC",
+        "list_name": "CANADA_CONSOLIDATED_SANCTIONS",
+        "date_order": "DMY",
+        "download_method": "HTTPS",
+        "versioning_strategy": "continuous",
+        "url": (
+            "https://www.international.gc.ca/world-monde/assets/office_docs/"
+            "international_relations-relations_internationales/sanctions/sema-lmes.xml"
+        ),
+        "file_type": "xml",
+        "root_tags": ["record"],
+        "external_id_path": "unique_id",
+        "schedule": "daily",
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "Country-Pays",
+                        "Schedule-Annexe",
+                        "Item-NumeroDarticle",
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "GAC",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Vessel",
+                    "when_field": "ShipIMONumber-NumeroOMIDuNavire",
+                    "when_pattern": r"^\d{7}$",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                    "when_field": "EntityOrShip-EntiteOuNavire",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+        ],
     },
 
     "FBI-WANTED": {
@@ -1460,6 +1530,400 @@ WATCHLIST_CONFIGS = {
                 },
             },
         ],
+    },
+
+    "BIS-DPL": {
+        "source_name": "BIS",
+        "list_name": "BIS-DPL",
+        "date_order": "MDY",
+        "download_method": "HTTPS",
+        "url": (
+            "https://www.bis.gov/licensing/"
+            "end-user-guidance/denied-persons-list-dpl"
+        ),
+        "url_resolver": {
+            "type": "link_text",
+            "source_page_url": (
+                "https://www.bis.gov/licensing/"
+                "end-user-guidance/denied-persons-list-dpl"
+            ),
+            "value": "Export as CSV",
+        },
+        "file_type": "csv",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "Name_and_Address",
+                        "Effective_Date",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "BIS-DPL",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "Name_and_Address",
+                    "pattern": (
+                        r"(?i)^(?P<name>[^,]+"
+                        r"(?:,\s*(?:"
+                        r"INC(?:ORPORATED)?\.?|"
+                        r"CORP(?:ORATION)?\.?|"
+                        r"CO\.?|LTD\.?|LIMITED|"
+                        r"LLC|L\.L\.C\.|"
+                        r"JR\.?|SR\.?|"
+                        r"(?:II|III|IV|V|VI)\.?"
+                        r"))*"
+                        r")\s*,\s*(?P<full_address>.*)$"
+                    ),
+                    "outputs": {
+                        "name": "name",
+                        "full_address": "full_address",
+                    },
+                },
+            },
+            {
+                "handler": "detect_entity_type",
+                "level": "record",
+                "config": {
+                    "input_field": "name",
+                    "output_field": "entity_type",
+                },
+            },
+
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                    "overwrite": True,
+                    "when_field": "name",
+                    "when_pattern": (
+                        r"(?i)^\s*AVIASTAR\s*-\s*TU\s*$"
+                    ),
+                },
+            },
+        ],
+    },
+
+    "BIS_UNVERIFIED_LIST": {
+        "source_name": "BIS",
+        "list_name": "BIS_UNVERIFIED_LIST",
+        "download_method": "HTTPS",
+        "date_order": "MDY",
+        "url": (
+            "https://media.bis.gov/sites/default/files/"
+            "documents/unverified-list.csv"
+        ),
+        "file_type": "csv",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["COUNTRY", "NAME", "ADDRESS"],
+                    "output_field": "source_record_id",
+                    "prefix": "BIS_UNVERIFIED_LIST",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                    "overwrite": True,
+                },
+            },
+        ],
+    },
+
+    "BIS_MILITARY_END_USER_LIST": {
+        "source_name": "BIS",
+        "list_name": "BIS_MILITARY_END_USER_LIST",
+        "date_order": "MDY",
+        "download_method": "HTTPS",
+        "url": (
+            "https://media.bis.gov/sites/default/files/"
+            "documents/military-end-user-list.csv"
+        ),
+        "file_type": "csv",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "Country",
+                        "Name",
+                        "Effective Date",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "BIS_MILITARY_END_USER_LIST",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                    "overwrite": True,
+                },
+            },
+        ],
+    },
+
+    "EBRD_INELIGIBLE_ENTITIES": {
+        "source_name": "EBRD",
+        "list_name": "EBRD_INELIGIBLE_ENTITIES",
+        "date_order": "DMY",
+        "download_method": "API",
+        "url": "https://www.ebrd.com/bin/ebrd_dxp/filterlistservlet",
+        "file_type": "jsonl",
+        "external_id_path": "source_record_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "pagination": {
+                "type": "page",
+                "page_param": "currentPage",
+                "start_page": 1,
+            },
+            "items_path": "searchResult",
+            "params": {
+                "parentPath": (
+                    "/content/dam/ebrd_dxp/content-fragments/occo/"
+                    "ineligible-entities"
+                ),
+                "secondParentPath": "",
+                "cardType": "iecard",
+                "searchKey": "",
+                "eventSort": "",
+                "sortBy": "",
+                "filters": "",
+                "countryFilters": "",
+                "sectorFilters": "",
+                "topicFilters": "",
+                "statusFilters": "",
+                "noticeTypeFilters": "",
+                "pageTypeFilters": "",
+                "startDate": "",
+                "endDate": "",
+                "IsLoggedIn": "false",
+                "isAlumni": "false",
+                "isBeeps": "false",
+            },
+            "headers": {
+                "x-requested-with": "XMLHttpRequest",
+                "accept": "application/json",
+                "user-agent": "Mozilla/5.0",
+            },
+            "throttle_delay": 0.3,
+            "write_mode": "single_jsonl",
+        },
+        "preprocessing": [
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "title",
+                        "nationality",
+                        "address",
+                        "originatingInstitution",
+                        "ineligibleFromDate",
+                        "ineligibleUntilDate",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "EBRD",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "title",
+                    "pattern": (
+                        r"(?is)^(?P<primary_name>.+?)\s*"
+                        r"(?P<alias_blob>,?\s*\(?\s*"
+                        r"(?:(?:also|formerly|previously|now)\s+known\s+as"
+                        r"|(?:may\s+)?(?:also\s+)?(?:be\s+)?"
+                        r"doing\s+business\s+(?:as|under)"
+                        r"|formerly(?:\s+operating\s+as)?"
+                        r"|\baka\b|\bf/k/a)(?!\w).*)?$"
+                    ),
+                    "outputs": {
+                        "primary_name": "primary_name",
+                        "alias_blob": "alias_blob",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "subtitle",
+                    "pattern": (
+                        r"(?is)^\s*(?:(?P<sub_alias_blob>\(?\s*"
+                        r"(?:also|formerly|previously|now)\s+known\s+as\b.*)"
+                        r"|\(?\s*(?P<native_name>.*?)\s*\)?)\s*$"
+                    ),
+                    "outputs": {
+                        "sub_alias_blob": "sub_alias_blob",
+                        "native_name": "native_name",
+                    },
+                },
+            },
+        ],
+    },
+
+    "UN-DESIGNATED-VESSELS": {
+        "source_name": "UN",
+        "list_name": "UN-DESIGNATED-VESSELS",
+        "date_order": "DMY",
+        "download_method": "BYPASS",
+        "url": (
+            "https://main.un.org/securitycouncil/en/"
+            "sanctions/1718/materials/"
+            "1718-Designated-Vessels-List"
+        ),
+        "file_type": "pdf",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "headless": False,
+            "timeout_seconds": 90,
+            "success_criteria": [
+                "1718 Designated Vessels List",
+            ],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "a[href*="
+                        "'1718_designated_vessels_list_final.pdf']"
+                    ),
+                    "timeout": 60,
+                },
+                {
+                    "action": "save_pdf",
+                    "url": (
+                        "https://main.un.org/securitycouncil/"
+                        "sites/default/files/"
+                        "1718_designated_vessels_list_final.pdf"
+                    ),
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.pdf"
+                    ),
+                    "timeout_seconds": 60,
+                    "max_size_bytes": 10_000_000,
+                },
+            ],
+            "validation": {
+                "min_size_bytes": 10_000,
+            },
+        },
+
+        "parser_config": {
+            "expected_headers": [
+                "Vessel Name",
+                "IMO number",
+            ],
+            "column_names": [
+                "RecordNumber",
+                "VesselNameOrDetailLabel",
+                "DetailValue",
+                "IMOAndMMSI",
+                "DesignationDate",
+                "Measure_1718_8d_2270_12",
+                "Measure_2321_12a",
+                "Measure_2321_12d",
+                "Measure_2371_6_2375_6",
+                "Measure_OMM_EconomicResources",
+            ],
+        },
+
+        "preprocessing": [
+            {
+                "handler": "merge_un_designated_vessel_rows",
+                "level": "dataset",
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Vessel",
+                },
+            },
+        ],
+    },
+
+    "IDB_SANCTIONED_ENTITIES": {
+        "source_name": "IDB",
+        "list_name": "IDB_SANCTIONED_ENTITIES",
+        "date_order": "YMD",
+        "download_method": "API",
+        "url": "https://data.iadb.org/api/action/datastore_search",
+        "file_type": "jsonl",
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+
+        "api_config": {
+            "pagination": {
+                "type": "offset",
+                "offset_param": "offset",
+                "size_param": "limit",
+                "page_size": 500,
+                "start_page": 0,
+            },
+            "items_path": "result.records",
+            "params": {
+                "resource_id": "cd0bd9ac-18c6-44bc-8592-9be468c2efd9",
+                "sort": "_id asc",
+            },
+            "dedup_path": "_id",
+            "write_mode": "single_jsonl",
+        },
+
+       "preprocessing": [
+    {
+        "handler": "generate_composite_id",
+        "level": "record",
+        "config": {
+            "fields": [
+                "Title",
+                "Entity",
+                "Nationality",
+                "Country",
+                "From",
+                "Source",
+            ],
+            "output_field": "source_record_id",
+            "prefix": "IDB",
+        },
+    },
+],
     },
 
 }

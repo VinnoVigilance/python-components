@@ -1,0 +1,16 @@
+label,blind yes,recall,95% low,95% high
+PEP,107,0.8785046728971962,0.8031662162433888,0.9276063456828194
+Crime-Corruption,0,,,
+Crime-Fraud,1,,,
+Crime-Money Laundering,0,,,
+Crime-Trafficking & Smuggling,4,,,
+Crime-Cybercrime,0,,,
+Crime-Violent Crime,9,,,
+Crime-Theft & Property Crime,3,,,
+Crime-Forgery & Counterfeiting,0,,,
+Crime-Tax Crime,0,,,
+Crime-Organized Crime,2,,,
+Terrorism / Terrorist Financing,12,0.8333333333333334,0.5519636426153274,0.9530358523851776
+Proliferation / Proliferation Financing,2,,,
+Human Rights / Atrocities,7,,,
+Judicial / Court,4,,,

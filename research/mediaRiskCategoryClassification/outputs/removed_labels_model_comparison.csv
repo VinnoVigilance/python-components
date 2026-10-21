@@ -1,0 +1,43 @@
+﻿rank,label,model,run_id,split,support,tp,fp,fn,precision,recall,f1
+1,PEP,roberta_gpu_cal,20261018T104224_008876Z_roberta_gpu_cal,validation,50,32,12,18,0.7272727272727273,0.64,0.6808510638297872
+2,PEP,tfidf_svm,20261017T083700_566107Z_tfidf_svm,validation,50,30,12,20,0.7142857142857143,0.6,0.6521739130434783
+3,PEP,char_tfidf_svm,20261017T084741_797613Z_char_tfidf_svm,validation,50,32,19,18,0.6274509803921569,0.64,0.6336633663366337
+4,PEP,word_char_svm,20261017T085710_012539Z_word_char_svm,validation,50,30,15,20,0.6666666666666666,0.6,0.631578947368421
+5,PEP,char_svm_oof_thresholds,20261017T112012_038574Z_char_svm_oof_thresholds,validation,50,36,30,14,0.5454545454545454,0.72,0.6206896551724138
+6,PEP,tfidf_lr,20261017T083635_266238Z_tfidf_lr,validation,50,35,28,15,0.5555555555555556,0.7,0.6194690265486725
+7,PEP,char_tfidf_lr,20261017T090235_745076Z_char_tfidf_lr,validation,50,37,43,13,0.4625,0.74,0.5692307692307692
+8,PEP,char_svm_unweighted,20261017T111955_992685Z_char_svm_unweighted,validation,50,19,7,31,0.7307692307692307,0.38,0.5
+9,PEP,minilm_lr,20261017T100107_179500Z_minilm_lr,validation,50,40,85,10,0.32,0.8,0.45714285714285713
+10,PEP,e5_small_lr,20261017T102315_072359Z_e5_small_lr,validation,50,44,100,6,0.3055555555555556,0.88,0.4536082474226804
+11,PEP,lsa_lr,20261017T091125_148989Z_lsa_lr,validation,50,45,108,5,0.29411764705882354,0.9,0.4433497536945813
+12,PEP,setfit_minilm,20261018T081848_889121Z_setfit_minilm,validation,50,16,8,34,0.6666666666666666,0.32,0.43243243243243246
+13,PEP,deberta_gpu_cal,20261018T103321_198754Z_deberta_gpu_cal,validation,50,36,87,14,0.2926829268292683,0.72,0.4161849710982659
+14,PEP,tfidf_cnb,20261017T091153_931574Z_tfidf_cnb,validation,50,0,0,50,0.0,0.0,0.0
+1,Crime-Organized Crime,char_svm_oof_thresholds,20261017T112012_038574Z_char_svm_oof_thresholds,validation,10,6,5,4,0.5454545454545454,0.6,0.5714285714285714
+2,Crime-Organized Crime,char_tfidf_lr,20261017T090235_745076Z_char_tfidf_lr,validation,10,7,8,3,0.4666666666666667,0.7,0.56
+3,Crime-Organized Crime,char_tfidf_svm,20261017T084741_797613Z_char_tfidf_svm,validation,10,3,0,7,1.0,0.3,0.46153846153846156
+4,Crime-Organized Crime,tfidf_lr,20261017T083635_266238Z_tfidf_lr,validation,10,4,4,6,0.5,0.4,0.4444444444444444
+5,Crime-Organized Crime,word_char_svm,20261017T085710_012539Z_word_char_svm,validation,10,2,0,8,1.0,0.2,0.3333333333333333
+6,Crime-Organized Crime,lsa_lr,20261017T091125_148989Z_lsa_lr,validation,10,10,48,0,0.1724137931034483,1.0,0.29411764705882354
+7,Crime-Organized Crime,minilm_lr,20261017T100107_179500Z_minilm_lr,validation,10,10,61,0,0.14084507042253522,1.0,0.24691358024691357
+8,Crime-Organized Crime,tfidf_svm,20261017T083700_566107Z_tfidf_svm,validation,10,1,0,9,1.0,0.1,0.18181818181818182
+9,Crime-Organized Crime,e5_small_lr,20261017T102315_072359Z_e5_small_lr,validation,10,9,95,1,0.08653846153846154,0.9,0.15789473684210525
+10,Crime-Organized Crime,char_svm_unweighted,20261017T111955_992685Z_char_svm_unweighted,validation,10,0,0,10,0.0,0.0,0.0
+11,Crime-Organized Crime,deberta_gpu_cal,20261018T103321_198754Z_deberta_gpu_cal,validation,10,0,0,10,0.0,0.0,0.0
+12,Crime-Organized Crime,roberta_gpu_cal,20261018T104224_008876Z_roberta_gpu_cal,validation,10,0,0,10,0.0,0.0,0.0
+13,Crime-Organized Crime,setfit_minilm,20261018T081848_889121Z_setfit_minilm,validation,10,0,0,10,0.0,0.0,0.0
+14,Crime-Organized Crime,tfidf_cnb,20261017T091153_931574Z_tfidf_cnb,validation,10,0,0,10,0.0,0.0,0.0
+1,Crime-Theft & Property Crime,char_tfidf_lr,20261017T090235_745076Z_char_tfidf_lr,validation,17,12,12,5,0.5,0.7058823529411765,0.5853658536585366
+2,Crime-Theft & Property Crime,tfidf_lr,20261017T083635_266238Z_tfidf_lr,validation,17,10,10,7,0.5,0.5882352941176471,0.5405405405405406
+3,Crime-Theft & Property Crime,char_svm_oof_thresholds,20261017T112012_038574Z_char_svm_oof_thresholds,validation,17,9,8,8,0.5294117647058824,0.5294117647058824,0.5294117647058824
+4,Crime-Theft & Property Crime,roberta_gpu_cal,20261018T104224_008876Z_roberta_gpu_cal,validation,17,4,0,13,1.0,0.23529411764705882,0.38095238095238093
+5,Crime-Theft & Property Crime,word_char_svm,20261017T085710_012539Z_word_char_svm,validation,17,4,0,13,1.0,0.23529411764705882,0.38095238095238093
+6,Crime-Theft & Property Crime,char_tfidf_svm,20261017T084741_797613Z_char_tfidf_svm,validation,17,4,1,13,0.8,0.23529411764705882,0.36363636363636365
+7,Crime-Theft & Property Crime,char_svm_unweighted,20261017T111955_992685Z_char_svm_unweighted,validation,17,3,0,14,1.0,0.17647058823529413,0.3
+8,Crime-Theft & Property Crime,tfidf_svm,20261017T083700_566107Z_tfidf_svm,validation,17,3,0,14,1.0,0.17647058823529413,0.3
+9,Crime-Theft & Property Crime,minilm_lr,20261017T100107_179500Z_minilm_lr,validation,17,14,75,3,0.15730337078651685,0.8235294117647058,0.2641509433962264
+10,Crime-Theft & Property Crime,lsa_lr,20261017T091125_148989Z_lsa_lr,validation,17,16,95,1,0.14414414414414414,0.9411764705882353,0.25
+11,Crime-Theft & Property Crime,e5_small_lr,20261017T102315_072359Z_e5_small_lr,validation,17,16,97,1,0.1415929203539823,0.9411764705882353,0.24615384615384617
+12,Crime-Theft & Property Crime,deberta_gpu_cal,20261018T103321_198754Z_deberta_gpu_cal,validation,17,2,0,15,1.0,0.11764705882352941,0.21052631578947367
+13,Crime-Theft & Property Crime,setfit_minilm,20261018T081848_889121Z_setfit_minilm,validation,17,0,0,17,0.0,0.0,0.0
+14,Crime-Theft & Property Crime,tfidf_cnb,20261017T091153_931574Z_tfidf_cnb,validation,17,0,0,17,0.0,0.0,0.0

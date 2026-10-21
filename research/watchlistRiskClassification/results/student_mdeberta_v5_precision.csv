@@ -1,0 +1,16 @@
+label,teacher yes checked,student keeps,precision,95% low,decision,correct dropped
+PEP,100,0,,,review queue,88
+Crime-Corruption,0,0,,,review queue,0
+Crime-Fraud,60,0,,,review queue,45
+Crime-Money Laundering,24,0,,,review queue,22
+Crime-Trafficking & Smuggling,60,0,,,review queue,47
+Crime-Cybercrime,33,0,,,review queue,32
+Crime-Violent Crime,100,0,,,review queue,94
+Crime-Theft & Property Crime,60,0,,,review queue,54
+Crime-Forgery & Counterfeiting,4,0,,,review queue,4
+Crime-Tax Crime,0,0,,,review queue,0
+Crime-Organized Crime,45,0,,,review queue,39
+Terrorism / Terrorist Financing,100,0,,,review queue,94
+Proliferation / Proliferation Financing,58,0,,,review queue,55
+Human Rights / Atrocities,60,0,,,review queue,59
+Judicial / Court,100,0,,,review queue,92

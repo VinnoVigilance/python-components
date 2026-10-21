@@ -17,46 +17,19 @@ class PdfParser:
         - entity_type should be added later by preprocessing, not here.
         - Source-specific business logic must not be implemented here.
     """
-
     def parse(self, file_path, config=None):
         """
         Parse a PDF file and return table rows as raw records.
 
-        This method is compatible with WatchlistPipeline:
+        Optional parser_config settings:
+            expected_headers:
+                Labels used to locate the actual table header.
 
-            raw_records = self.parser.parse(
-                file_path=downloaded_file_path,
-                config=self.config
-            )
+            column_names:
+                Explicit names for physical table columns.
+                Useful when merged headers leave columns unnamed.
 
-        Args:
-            file_path:
-                Path to the downloaded PDF file.
-
-            config:
-                Optional pipeline config.
-
-                Supported parser configuration:
-
-                {
-                    "parser_config": {
-                        "expected_headers": [
-                            "REGION",
-                            "PROVINCE",
-                            "P/C/M",
-                            "POSITION",
-                            "NAME"
-                        ]
-                    }
-                }
-
-                If expected_headers is not provided, the parser keeps
-                the previous behavior and uses the first row of the
-                first detected table as the header.
-
-        Returns:
-            list[dict]:
-                Raw records extracted from PDF tables.
+        Without column_names, existing behavior is preserved.
         """
 
         pdf_path = Path(file_path)
@@ -93,6 +66,35 @@ class PdfParser:
             "expected_headers"
         )
 
+        column_names = parser_config.get(
+            "column_names"
+        )
+
+        if column_names is not None:
+            if (
+                not isinstance(column_names, list)
+                or not column_names
+                or any(
+                    not isinstance(name, str)
+                    or not name.strip()
+                    for name in column_names
+                )
+            ):
+                raise ValueError(
+                    "parser_config.column_names must be "
+                    "a non-empty list of non-empty strings."
+                )
+
+            column_names = self._build_headers(
+                column_names
+            )
+
+            if len(set(column_names)) != len(column_names):
+                raise ValueError(
+                    "parser_config.column_names must "
+                    "contain unique names."
+                )
+
         records = []
         global_headers = None
 
@@ -114,8 +116,20 @@ class PdfParser:
                     if not table:
                         continue
 
-                    if global_headers is None:
+                    if column_names is not None:
+                        has_extra_columns = any(
+                            len(row) > len(column_names)
+                            for row in table
+                        )
 
+                        if has_extra_columns:
+                            raise ValueError(
+                                "PDF table has more columns than "
+                                "parser_config.column_names; "
+                                "refusing to discard data."
+                            )
+
+                    if global_headers is None:
                         if expected_headers:
                             header_index = self._find_header_row(
                                 table=table,
@@ -126,17 +140,18 @@ class PdfParser:
                                 continue
 
                             global_headers = self._build_headers(
-                                table[header_index]
+                                column_names
+                                if column_names is not None
+                                else table[header_index]
                             )
 
                             rows = table[header_index + 1:]
 
                         else:
-                            # Backward-compatible behavior.
-                            # Sources such as DNFBP continue to work
-                            # exactly as before.
                             global_headers = self._build_headers(
-                                table[0]
+                                column_names
+                                if column_names is not None
+                                else table[0]
                             )
 
                             rows = table[1:]
@@ -169,6 +184,7 @@ class PdfParser:
         )
 
         return records
+
 
     def parse_text(self, file_path):
         """

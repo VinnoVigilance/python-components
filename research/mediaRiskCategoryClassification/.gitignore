@@ -1,0 +1,8 @@
+.venv/
+.venv-*/
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+outputs/*/
+outputs/model_comparison.csv

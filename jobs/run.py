@@ -1,4 +1,4 @@
-"""Numbered terminal menu for running the watchlist and Adverse Media jobs by hand.
+"""Numbered terminal menu for ingestion and risk jobs.
 
 Run with:
 
@@ -97,6 +97,17 @@ def _run_media() -> dict:
     )
 
 
+def _run_risk() -> dict:
+    """Run both risk domains in the selected mode."""
+    from jobs.riskCategoryJob import run_risk_job
+
+    mode = ("incremental", "initial")[_ask(
+        "Which risk mode?", ["INCREMENTAL - retry failures and process new dates",
+                             "INITIAL - classify current core records"],
+    )[0]]
+    return run_risk_job(mode=mode)
+
+
 def main() -> int:
     try:
         from dotenv import load_dotenv
@@ -105,10 +116,10 @@ def main() -> int:
     except ImportError:
         pass
 
-    pick = _ask("What do you want to run?", ["Watchlists", "Adverse media"])[0]
+    pick = _ask("What do you want to run?", ["Watchlists", "Adverse media", "Risk categories"])[0]
 
     try:
-        result = _run_watchlists() if pick == 0 else _run_media()
+        result = (_run_watchlists, _run_media, _run_risk)[pick]()
     except KeyboardInterrupt:
         print("\nStopped.")
         return 130
