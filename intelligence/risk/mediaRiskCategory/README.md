@@ -105,7 +105,7 @@ The standalone `predictor.py` returns `labelDecisions` with actual SVM margins,
 cutoffs and selection decisions for all 11 evaluated labels. These are not
 calibrated probabilities. The common pipeline uses `mediaRiskClassifier.py` to
 shape the stored assessment; see `docs/risk-pipeline-design.md` for database
-processing, initial/incremental/reprocess modes and persistent label review.
+processing, initial/incremental modes and persistent label review.
 
 Business taxonomy loading is shared in `intelligence/risk/labelContract.py`.
 The original contract module preserves its imports. The updated 30-test media

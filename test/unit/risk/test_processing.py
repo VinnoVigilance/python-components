@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from services.risk.processing import _process
+from services.risk.processing import _process, run
 
 
 class ProcessingTests(unittest.TestCase):
@@ -57,6 +57,10 @@ class ProcessingTests(unittest.TestCase):
         self.assertEqual(outcome, "superseded")
         self.classify.assert_not_called()
         self.repository.expire_current.assert_not_called()
+
+    def test_reprocess_mode_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "initial or incremental"):
+            run("watchlist", self.repository, 802156604, mode="reprocess")
 
 
 if __name__ == "__main__":

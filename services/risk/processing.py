@@ -52,10 +52,10 @@ def _process(connection, repository, item, mode, classify):
 def run(subject, repository, lock_id, mode="incremental", effective_date=None,
         source_name=None, model_path=None, batch_size=1000, max_rows=None,
         threads=4, classifier=None):
-    """Run initial, incremental or explicit risk-only reprocessing."""
+    """Run a full current-record scan or a selected delta batch."""
     mode = mode.lower()
-    if mode not in {"initial", "incremental", "reprocess"}:
-        raise ValueError("mode must be initial, incremental or reprocess.")
+    if mode not in {"initial", "incremental"}:
+        raise ValueError("mode must be initial or incremental.")
     if batch_size < 1 or (max_rows is not None and max_rows < 1):
         raise ValueError("batch_size and max_rows must be positive.")
     if mode != "incremental" and effective_date is not None:

@@ -15,7 +15,7 @@ def run_risk_category_etl(subject="watchlist", mode="incremental", initial_load=
     """Dispatch to one domain service while retaining the initial-load argument."""
     if initial_load:
         if mode not in {"incremental", "initial"}:
-            raise ValueError("initial_load cannot be combined with reprocess.")
+            raise ValueError("initial_load requires initial or incremental mode.")
         mode = "initial"
     if list_name and source_name and list_name != source_name:
         raise ValueError("list_name and source_name disagree.")
@@ -35,7 +35,7 @@ def _parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Versioned media/watchlist risk calculation.")
     parser.add_argument("--subject", choices=("media", "watchlist"), default="watchlist")
     modes = parser.add_mutually_exclusive_group()
-    modes.add_argument("--mode", choices=("initial", "incremental", "reprocess"))
+    modes.add_argument("--mode", choices=("initial", "incremental"))
     modes.add_argument("--initial-load", action="store_true")
     parser.add_argument("--effective-date", type=date.fromisoformat)
     parser.add_argument("--source", "--list", dest="source_name")
