@@ -3,7 +3,8 @@
 Implementation prepared on 2026-10-20. The media and watchlist paths share a
 small processing loop and use separate classifiers and SQL repositories.
 The schema and both packaged models passed a bounded local database smoke run on
-2026-10-20. The full test suite and deployment integration remain outstanding.
+2026-10-20. The automated suite passed on 2026-10-21; deployment integration
+remains outstanding.
 
 ## Structure and ownership
 
@@ -19,9 +20,11 @@ services/risk/mediaRiskService.py
 services/risk/watchlistRiskService.py
 services/risk/processing.py
 services/risk/reviewService.py
+jobs/riskCategoryJob.py
 repositories/risk/mediaRiskRepository.py
 repositories/risk/watchlistRiskRepository.py
 repositories/risk/riskReviewRepository.py
+repositories/risk/riskProgressRepository.py
 scripts/sql/PDG-95-risk-assessments.sql
 ```
 
@@ -58,60 +61,134 @@ this change does not install a scheduler or modify ingestion/delivery jobs.
 INITIAL scans current core records and never reads deltas. Run it for the first
 load or after a model, rule, policy or taxonomy change. Repeating it skips
 matching assessments; changed results create a new assessment even when the
-source record itself has not changed.
+source record itself has not changed. Risk REPROCESS is rejected because
+INITIAL already provides that operation. Ingestion REPROCESS remains unchanged.
 
-INCREMENTAL consumes ADD/UPDATE/DELETE from one required effective_date. Pass
-the date of the delta batch actually generated. Automatically choosing the latest
-date could skip an older failed batch. Process missed dates explicitly. The
-scanner fixes an upper ID boundary per run.
+Risk retries use the existing jobStateRepository file mechanism used by the
+adverse-media to-do list. No database checkpoint table or delta_effective_date
+column is added. Per-domain files are data/state/risk/media.json and watchlist.json.
+Human-readable diagnostics remain in the CLI job error logs.
 
-Incremental references are compared with the exact current physical source row.
-A superseded delta is counted and cannot overwrite a newer source assessment.
-DELETE expires the logical subject's current assessment unless its source has
-already been replaced with a newer non-deleted record. Historical backfills do
-not reconstruct old assessments for source rows that are no longer current.
+The state contains next_date (normal scan frontier), inflight_date (interrupted
+or row-limited date), and items (failed work keyed by mode and work ID). Each
+pending entry stores mode, effective_date, action/scan ID, logical subject ID,
+physical source-version ID for deltas, error type/message, accumulated attempts,
+and INITIAL source scope. An exhausted record failure is saved immediately.
+Successful retries remove only that work entry. Normal successful records do not
+rewrite the file. The shared temporary-file/rename mechanism and per-domain
+advisory lock protect updates. Preserve/share files across job hosts and reconcile
+them after database resets.
 
-Each record commits its old-result expiry and replacement together. Calculation
-failure rolls back that record, keeps the old assessment, logs the work identity,
-and increments failed_count. Rerunning the same selection retries failed work;
-completed identical results skip. Classifier initialization failures abort once.
-Deletion-only work does not require loading model dependencies.
+On the next run, retry pending items first, ordered by effective date and work ID,
+using their exact saved delta source versions. Each record gets up to three
+attempts, with one database transaction per attempt. Failed attempts preserve
+previous assessments and are logged with identifiers and traceback. The queue
+entry remains after exhausted retries; it does not prevent new dates processing.
+INITIAL entries use the normal current-core lookup on retry. A source-filtered
+INITIAL invocation retries only its scope; incremental can retry all saved items.
 
-There is one advisory job lock per domain, shared across both modes. The
-migration adds partial unique indexes for one current assessment per logical ID.
-Run status is SUCCESS, PARTIAL, FAILED or LIMIT_REACHED. These are implementation
-statuses, not statuses defined by the insertion guideline. The CLI exits nonzero
-for any status other than SUCCESS. A partial run logs and counts failed records,
-preserves each failed record's previous assessment, and continues with later
-records. The operator can retry by rerunning the same selected work. A bounded
-run reports `limit_reached` only when work remains, including when some records
-failed. A scheduler must not advance to a newer delta date after a partial or
-limited run without retrying the same effective date; the pipeline does not keep
-a durable queue of failed dates. After a `--max-rows` run, remove that cap (or
-raise it beyond the already scanned prefix) for the retry; the scan restarts
-from the beginning and skips matching completed assessments.
+After retries, scan only new dates from next_date through today or the optional
+--effective-date target. Ordinary queued failures do not move next_date backwards.
+Example: one October 2 record fails and October 3-20 complete. The next job retries
+only that failed work item, then scans October 21; it does not rerun October 2-20.
+Pending entries newer than an explicit target are retained for a later run.
+
+With no state frontier, use the latest existing risk created_at date in host
+local time and replay that date inclusively. This is a user-selected baseline,
+not proof of historical batch coverage. Without assessments or saved scan state,
+incremental returns INITIAL_REQUIRED; it never starts at the earliest delta date.
+Missing delta dates count as empty. Late actions for already passed dates are not
+automatically detected unless represented by a saved pending item.
+
+Save inflight_date before scanning a date and advance next_date only after its
+scan finishes and all exhausted failures have been persisted. An abrupt crash or
+row limit can repeat that one date, but does not rewind later dates due to an
+ordinary record failure. Existing legacy replay_from state is conservatively
+rescanned once to recover unknown failed IDs, then converted to the new queue.
+INITIAL has no scan frontier: after a crash, rerun INITIAL; its saved record
+failures are queued and successful matching assessments skip insertion.
+
+Incremental ADD/UPDATE loads the exact physical source row referenced by the
+delta. Compare it with the current core row. When they differ, classify the older
+row and insert its result with is_current=false and equal processing-time
+valid_from/valid_to timestamps. Do not expire or replace the current assessment.
+Thus fixing an October 2 historical version cannot displace October 20's current
+assessment, and October 20 does not need to be reclassified for restoration.
+Historical DELETE actions likewise cannot expire a newer current result.
+
+Record identity and assessment hashes prevent duplicate inserts. Queue retry
+success can be a new historical/current assessment or an identical skipped result.
+An identical hash never promotes an archived assessment. Current source deletion
+expires risk without inference. Missing exact source references remain queued;
+keep referenced core history available.
+
+Run statuses are SUCCESS, PARTIAL, FAILED, LIMIT_REACHED and INITIAL_REQUIRED.
+Remaining pending items yield PARTIAL even when outside a deliberately selected
+scope or date target. The CLI exits nonzero unless SUCCESS and reports pending_count
+and retried_count. --max-rows includes retries and normal work. A limited scan
+restarts its interrupted date; raise/remove the cap to finish a large prefix.
 
 ## Running
 
-Use the repository's Python 3.11.9 `vv-env` from the repository root. Install
-both requirements files into it before running the pipelines.
+Use the repository's Python 3.11.9 vv-env from the repository root. Install both
+requirements files first. The recommended combined job is:
 
 ```powershell
-./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --mode initial
-./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --mode incremental --effective-date 2026-10-20
-./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --mode initial --source SEC_PH_ADVISORIES
-./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject watchlist --mode initial --source OFAC-SDN
-./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject watchlist --mode initial --model-path intelligence/risk/watchlistRiskCategory/models/student-e5small-v6
+./vv-env/Scripts/python.exe -m jobs.riskCategoryJob --initial
+./vv-env/Scripts/python.exe -m jobs.riskCategoryJob --incremental
 ```
 
---source means media dataset name or watchlist ListName; it applies only to
-initial. --batch-size bounds reads; --max-rows deliberately limits a
-run. --initial-load and --list remain CLI aliases. The default subject and mode
-are watchlist/incremental, but that invocation requires --effective-date; the
-former hidden initial-load/Ollama block has been removed. --use-llm and the
-Ollama --model argument are no longer supported. Risk orchestration lives only
-under services/risk. Direct media prediction uses
-intelligence.risk.mediaRiskCategory.predictor.MediaRiskPredictor.
+Both commands run media first and watchlist second. Each domain retries only its
+queued failed IDs, then performs its selected mode. INITIAL scans current core
+rows; INCREMENTAL continues new delta dates through today. The classifiers,
+per-domain advisory locks and file-backed queues remain separate. A domain error
+does not prevent attempting the other domain; interruption stops the whole job.
+No flag defaults to incremental. --mode INITIAL/INCREMENTAL is also accepted.
+
+```powershell
+./vv-env/Scripts/python.exe -m jobs.riskCategoryJob --incremental --subject media
+./vv-env/Scripts/python.exe -m jobs.riskCategoryJob --initial --subject watchlist
+./vv-env/Scripts/python.exe -m jobs.riskCategoryJob --incremental --effective-date 2026-10-20
+./vv-env/Scripts/python.exe -m jobs.run
+```
+
+The menu now offers Risk categories and asks for INITIAL/INCREMENTAL. Running
+`python jobs/riskCategoryJob.py --incremental` from an activated vv-env is also
+supported. For an inactive environment use the explicit vv-env interpreter above.
+--batch-size bounds database reads; --max-rows limits each domain separately,
+including retries; --threads controls the watchlist CPU model. Omit row limits
+for a full run. --effective-date is an inclusive incremental target only.
+
+The combined job uses logs/risk/<run-id>.job.log, .errors.log, .full.log and
+.events.jsonl. Log entries identify media or watchlist; state stays in
+data/state/risk/media.json and watchlist.json. Its result contains domain
+outcomes and log paths. Exit 0 means both selected domains succeeded; exit 2
+means any domain failed, remains partial/pending, hit a row limit or needs INITIAL.
+Keyboard interruption exits 130. The summary prints a reason for INITIAL_REQUIRED.
+
+The job loads .env and uses WATCHLIST_JOB_TIMEZONE for log timestamps when set,
+as the media job does. Processing dates use the execution host's local timezone;
+configure it consistently with the business schedule. MEDIA_RISK_MODEL_DIR and
+WATCHLIST_RISK_MODEL_DIR continue selecting the packaged models independently.
+This job does not ingest sources, normalize raw files, generate delta actions,
+install a scheduler or alter the database schema. Run upstream work separately.
+
+The existing single-domain pipeline remains available for advanced source/model
+selection:
+
+```powershell
+./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --initial --source SEC_PH_ADVISORIES
+./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject watchlist --initial --source OFAC-SDN
+./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject watchlist --initial --model-path intelligence/risk/watchlistRiskCategory/models/student-e5small-v6
+```
+
+--source means media dataset name or watchlist ListName and applies to INITIAL.
+--initial-load and --list remain aliases. This older pipeline defaults to
+watchlist/incremental and writes per-domain logs under logs/risk-<subject>.
+Risk REPROCESS is rejected; ingestion REPROCESS is unchanged. --use-llm and the
+old Ollama --model option are unsupported. Risk orchestration stays under
+services/risk, and SQL stays under repositories/risk. Standalone media prediction
+uses intelligence.risk.mediaRiskCategory.predictor.MediaRiskPredictor.
 
 ## Model packaging and replacement
 
@@ -167,10 +244,20 @@ The stored payload uses one small shared shape:
 
 ```json
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "2.0",
   "assessmentStatus": "CLASSIFIED",
+  "taxonomyVersion": "sha256:<taxonomy-fingerprint>",
   "riskCategories": [
-    {"riskCategoryId": "LE_GEN", "riskCategoryName": "Law Enforcement"},
+    {
+      "riskCategoryId": "SAN_GEN",
+      "riskCategoryName": "Sanctions",
+      "method": "lookup",
+      "explanation": "",
+      "metadata": {
+        "rulesVersion": "sha256:<lookup-rules-fingerprint>",
+        "calculationVersion": "sha256:<lookup-calculation-fingerprint>"
+      }
+    },
     {
       "riskCategoryId": "CR_FRAUD",
       "riskCategoryName": "Crime-Fraud",
@@ -178,7 +265,18 @@ The stored payload uses one small shared shape:
       "score": 0.82,
       "scoreType": "student_sigmoid",
       "threshold": 0.5,
-      "evidence": [{"field": "Remarks", "text": "Illustrative fraud passage"}]
+      "evidence": [
+        {
+          "field": "Remarks",
+          "text": "Illustrative passage describing fraud."
+        }
+      ],
+      "explanation": "",
+      "metadata": {
+        "modelVersion": "watchlist-risk-e5small-v6:<weights-sha256>",
+        "calculationVersion": "sha256:<text-calculation-fingerprint>",
+        "victimThreshold": 0.5
+      }
     }
   ],
   "reviewRequired": [
@@ -186,47 +284,56 @@ The stored payload uses one small shared shape:
       "riskCategoryId": "PEP_GEN",
       "riskCategoryName": "PEP",
       "method": "ml",
-      "score": 0.82,
+      "score": 0.76,
       "scoreType": "student_sigmoid",
       "threshold": 0.5,
       "evidence": [
-        {"field": "Remarks", "text": "Illustrative passage"}
-      ]
+        {
+          "field": "Remarks",
+          "text": "Illustrative passage describing public office."
+        }
+      ],
+      "explanation": "",
+      "metadata": {
+        "modelVersion": "watchlist-risk-e5small-v6:<weights-sha256>",
+        "calculationVersion": "sha256:<text-calculation-fingerprint>",
+        "victimThreshold": 0.5
+      }
     }
-  ],
-  "metadata": {
-    "modelVersion": "watchlist-risk-e5small-v6",
-    "taxonomyVersion": "sha256:<taxonomy fingerprint>",
-    "calculationVersion": "sha256:<model assets, settings, and runtime fingerprint>"
-  }
+  ]
 }
 ```
 
-The example is illustrative. `riskCategories` contains labels eligible for
-client display. `reviewRequired` contains selected text-model labels awaiting
-human review. Media selected labels go directly to `riskCategories` with score
-and cutoff, and media `reviewRequired` is empty. Watchlist lookup labels and
-ten selected text labels go directly to `riskCategories` at the existing 0.5
-cutoff: Fraud, Money Laundering, Trafficking & Smuggling, Violent Crime, Theft &
-Property Crime, Forgery & Counterfeiting, Terrorism / Financing, Proliferation /
-Financing, Human Rights / Atrocities, and Judicial / Court. PEP, Corruption,
-Cybercrime, Tax Crime, and Organized Crime remain in `reviewRequired` when
-selected by the model alone. If a lookup already supports a label, that label
-is not duplicated or replaced by a text result. The human-review event is
-stored separately and does not yet promote labels into the client-facing array.
-This automatic text-label routing is a product decision; v6 still needs fresh
-independent evaluation before its precision can be claimed as proven.
+The example is illustrative, not a real inference result. Each emitted label
+in riskCategories or reviewRequired contains its own metadata and an empty
+explanation string. metadata identifies the model or lookup rules that generated
+that label. explanation is reserved for a future human explanation; no explanation
+is generated or written by the review service yet. Existing evidence remains
+machine-selected source passages, separate from the future human explanation.
+
+There is no separate labelMetadata map or metadata for unselected labels.
+The shared taxonomyVersion identifies the business label catalogue. Schema 2.0
+replaces the former record-level model metadata; existing schema-1.0 stored rows
+are preserved. Review validation accepts either taxonomy location. Consumers must
+support schema 2.0 before rollout. Current classifiers retain their existing models;
+the payload permits a different model identity on each emitted label.
+
+riskCategories contains final labels; reviewRequired contains labels awaiting
+human review. Media selected labels are final. Watchlist lookup labels and ten
+text labels are final; PEP, Corruption, Cybercrime, Tax Crime, and Organized Crime
+remain pending when selected by the text model alone. Lookup takes precedence
+when both methods support a label, so it is emitted only once.
 
 The payload does not repeat the assessment row's source ID or `version_no`.
 `assessmentStatus` is `CLASSIFIED` or, for media without usable body text,
 `SKIPPED_EMPTY_BODY`. Failures are run outcomes, not stored assessments. The
-watchlist victim check remains part of the frozen decision recipe, but its
-diagnostic is not serialized. Full negative-label diagnostics and
+watchlist victim check remains part of the frozen decision recipe; its cutoff is recorded in ML-label metadata. Full negative-label scores and
 `supportedLabelIds` are not stored in the assessment JSON.
 
-Metadata records a readable model name/version, a label-catalogue fingerprint,
-and one calculation fingerprint covering model assets, decision settings,
-and relevant runtime code (including watchlist lookup rules).
+Each emitted label's metadata records the relevant model or rule identity and calculation
+fingerprint (an identifier derived from exact assets, settings and runtime code).
+The shared taxonomyVersion fingerprints the label catalogue. Lookup provenance
+does not name the student model; ML provenance identifies its actual weights.
 The hash covers the canonical assessment JSON, and skipping also requires the
 assessment-table `version_no` to match the source row. A new source version
 therefore receives a new assessment even if its calculated labels are unchanged.
@@ -234,8 +341,8 @@ therefore receives a new assessment even if its calculated labels are unchanged.
 | Version | Meaning |
 | --- | --- |
 | Table version_no | Source-content version being assessed |
-| modelVersion | Named training run/model; media includes its training run ID |
-| calculationVersion | One SHA-256 fingerprint of exact model assets, decision settings, and classifier/rule code |
+| label.metadata.modelVersion | Named model/weights; media includes its training run ID |
+| label.metadata.calculationVersion | SHA-256 fingerprint of relevant model assets, settings, and classifier/rule code |
 | taxonomyVersion | Fingerprint of label IDs, names and descriptions |
 
 Example: source row 101/version 1 has Fraud pending review under v6. An address
@@ -332,12 +439,61 @@ delta records. The sample's `LIMIT_REACHED` statuses are expected because the
 runs were capped; they do not indicate full data coverage. No full-corpus run or
 accuracy evaluation was performed.
 
+Read-only local checks on 2026-10-21 found zero rows in both delta-action
+tables and zero completed dates in `core.spoke_run_log`. The watchlist delta
+procedure exists in PostgreSQL; no media delta-generation procedure was found.
+The risk tables held only the four media and three watchlist smoke assessments,
+whose `created_at` dates cannot establish a delta checkpoint.
+
 Before deployment, verify actual delta generation and scheduler wiring, then
 exercise dated ADD/UPDATE/DELETE batches and retry behavior. No scheduler was
 activated here. Before any commit, follow docs/agent/tests-and-deps.md: update
 affected tests and run the suite. The old rule-engine/service tests were retired;
-30 updated media contract tests and four processing tests passed. The full suite
-has not completed: `vv-env` lacks scikit-learn for media test collection, and a
-separate run of the other tests was interrupted during slow browser tests. The
-migration must also be reviewed and applied in
-each target environment.
+30 updated media contract tests and four processing tests passed. With the
+rebuilt Python 3.11 `vv-env`, 37 focused risk tests passed and both packaged
+models loaded. An earlier full-suite attempt was stopped; the final 2026-10-21
+commit-time result below supersedes that incomplete run. The existing migration
+must still be reviewed and applied in each target environment.
+
+
+### Catch-up implementation status — latest revision
+
+Failed-record queue recovery replaces the prior date-range replay implementation.
+Only failed work IDs are retried; later successfully processed dates are untouched.
+Database checkpoint and assessment-date-column proposals remain removed; local
+read-only inspection confirmed they do not exist. Final verification performed no
+live database writes or full loads. Research decision logic/assets remain unchanged.
+
+Commit-time validation on 2026-10-21 used Python 3.11.9 vv-env:
+
+- Focused risk/model-contract/combined-job tests: 66 passed.
+- Full pytest suite: 959 passed, 35 skipped (994 collected, 157.00 seconds).
+- The 35 database integration tests skipped because TEST_DATABASE_URL is unset.
+- CLI help and git diff --check passed. No dependency or Excel files changed.
+
+Recovery tests now cover exact-ID retries without replaying later successful
+records, persistent failure counts, interrupted/limited dates, retry row budgets,
+future pending items, queue write failures, isolated domain queues, empty-day
+progress, INITIAL_REQUIRED, historical/current preservation and duplicate skipping.
+Job tests verify both mode flags, domain selection, error isolation, logging,
+incomplete status, interruption and invalid initial date arguments. Victim-gate
+and label-routing tests preserve the existing research decision behavior.
+
+Tests use temporary state/log files and mocked database/model execution. Live
+PostgreSQL retry/crash behavior, concurrent ingestion, full-corpus inference and
+media delta generation remain unverified. File state must remain persistent and
+shared across hosts, and late deltas for already scanned dates need manual replay.
+
+Schema 2.0 keeps metadata and an empty explanation inside emitted labels. A complete
+illustrative JSON is in examples/risk-assessment-v2.watchlist.json. Only selected
+labels retain model provenance; empty outputs can hash identically across models.
+
+
+### Combined risk job
+
+jobs/riskCategoryJob.py provides both domains under one INITIAL/INCREMENTAL
+command and is exposed through jobs/run.py. It reuses JobLog and the existing
+risk dispatcher, preserves per-domain locks/queues, and continues the second
+domain after first-domain failure. The combined job is covered by the
+commit-time tests above. No live classification/full load or database writes were
+run for this addition; deployment checks remain outstanding.
