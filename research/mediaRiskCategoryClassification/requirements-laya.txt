@@ -1,9 +1,0 @@
-# Install in a separate .venv-laya environment. See README.md.
--r requirements.txt
-torch==2.6.0
-transformers==4.48.3
-tokenizers==0.21.4
-huggingface-hub==0.36.2
-safetensors==0.8.0
-laya==0.4.11
-tqdm==4.70.1
