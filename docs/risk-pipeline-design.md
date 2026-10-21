@@ -37,7 +37,7 @@ media contract module retains compatibility imports. No Excel file was edited.
 
 ## Tables and source references
 
-| Domain | Initial/reprocess input | Incremental input | Results | Logical identity | Physical source/version |
+| Domain | Initial input | Incremental input | Results | Logical identity | Physical source/version |
 | --- | --- | --- | --- | --- | --- |
 | Watchlist | core.watchlist_member | delivery.watchlist_daily_delta_actions | core.member_risk_category | vv_member_id | watchlist_member_id, version_no |
 | Media | core.media_record | delivery.media_daily_delta_actions | core.media_risk_category | vv_media_id | media_record_id, version_no |
@@ -53,12 +53,12 @@ media deltas. The supplied SQL defines tables, not delta-generation procedures.
 Media delta production and scheduler configuration are external prerequisites;
 this change does not install a scheduler or modify ingestion/delivery jobs.
 
-## Initial, incremental and reprocess
+## Initial and incremental
 
-INITIAL populates assessments from current core records and never reads deltas.
-REPROCESS deliberately reassesses those current records after a model, rule,
-policy or taxonomy change. They share the same bounded scanner and persistence
-rules. Repeating initial is safe, but reprocess expresses the operational intent.
+INITIAL scans current core records and never reads deltas. Run it for the first
+load or after a model, rule, policy or taxonomy change. Repeating it skips
+matching assessments; changed results create a new assessment even when the
+source record itself has not changed.
 
 INCREMENTAL consumes ADD/UPDATE/DELETE from one required effective_date. Pass
 the date of the delta batch actually generated. Automatically choosing the latest
@@ -77,7 +77,7 @@ and increments failed_count. Rerunning the same selection retries failed work;
 completed identical results skip. Classifier initialization failures abort once.
 Deletion-only work does not require loading model dependencies.
 
-There is one advisory job lock per domain, shared across all three modes. The
+There is one advisory job lock per domain, shared across both modes. The
 migration adds partial unique indexes for one current assessment per logical ID.
 Run status is SUCCESS, PARTIAL, FAILED or LIMIT_REACHED. These are implementation
 statuses, not statuses defined by the insertion guideline. The CLI exits nonzero
@@ -93,20 +93,19 @@ from the beginning and skips matching completed assessments.
 
 ## Running
 
-Use the repository's Python 3.11.9 `.venv` from the repository root. Both models
-ran with its pinned dependencies. The older `vv-env` uses Python 3.12.7 and does
-not match the packaged media model's environment.
+Use the repository's Python 3.11.9 `vv-env` from the repository root. Install
+both requirements files into it before running the pipelines.
 
 ```powershell
-./.venv/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --mode initial
-./.venv/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --mode incremental --effective-date 2026-10-20
-./.venv/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --mode reprocess --source SEC_PH_ADVISORIES
-./.venv/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject watchlist --mode initial --source OFAC-SDN
-./.venv/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject watchlist --mode reprocess --model-path intelligence/risk/watchlistRiskCategory/models/student-e5small-v6
+./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --mode initial
+./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --mode incremental --effective-date 2026-10-20
+./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject media --mode initial --source SEC_PH_ADVISORIES
+./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject watchlist --mode initial --source OFAC-SDN
+./vv-env/Scripts/python.exe -m pipelines.riskCategoryPipeline --subject watchlist --mode initial --model-path intelligence/risk/watchlistRiskCategory/models/student-e5small-v6
 ```
 
 --source means media dataset name or watchlist ListName; it applies only to
-initial/reprocess. --batch-size bounds reads; --max-rows deliberately limits a
+initial. --batch-size bounds reads; --max-rows deliberately limits a
 run. --initial-load and --list remain CLI aliases. The default subject and mode
 are watchlist/incremental, but that invocation requires --effective-date; the
 former hidden initial-load/Ollama block has been removed. --use-llm and the
@@ -129,7 +128,7 @@ preserved, not retuned. V6 still needs untouched independent evaluation.
 
 The application requirements pin torch 2.14.1 and transformers 5.19.0 from
 the research environment. Both and the media model's exact dependencies were
-installed in `.venv`. Real CPU inference succeeded for both packaged models;
+installed in `vv-env`. Real CPU inference succeeded for both packaged models;
 `pip check` reported no broken requirements. Media retains the recorded
 Python/scikit-learn/NumPy/SciPy/Joblib environment checks.
 
@@ -140,11 +139,10 @@ requirements. Official PyPI metadata confirms the selected torch/Transformers
 releases and Windows Python 3.11 wheels for torch and scikit-learn. Local
 dependency resolution and model execution were verified on 2026-10-20.
 
-Local vv-env also has NumPy 2.5.1 and SciPy 1.18.0, differing from the media pins,
-and lacks scikit-learn, Joblib, torch and Transformers. Installing into a separate
-Python 3.11 `.venv` preserved that environment and supplied the model-required
-pins. The user authorized this runtime verification before the usual commit-time
-test suite.
+The previous Python 3.12 `vv-env` had incompatible package versions and missing
+model dependencies. It was replaced with a Python 3.11.9 `vv-env`; both
+requirements files install together and `pip check` passes. The user authorized
+runtime verification before the usual commit-time test suite.
 
 To replace a model:
 
@@ -153,7 +151,7 @@ To replace a model:
 2. Record the new identity, asset hashes, label order, environment and actual
    decision settings. Do not just rename a folder or edit a version string.
 3. Select the directory with --model-path (or the domain model-directory
-   environment variable) and run risk REPROCESS over current records.
+   environment variable) and run risk INITIAL over current records.
 4. Resolve failures and rerun. Assessments for completed records retain their new
    model identity; failed records retain old assessments. Inspect versions before
    claiming complete rollout. The next incremental run must select the same model.
@@ -172,12 +170,21 @@ The stored payload uses one small shared shape:
   "schemaVersion": "1.0",
   "assessmentStatus": "CLASSIFIED",
   "riskCategories": [
-    {"riskCategoryId": "LE_GEN", "riskCategoryName": "Law Enforcement"}
-  ],
-  "reviewRequired": [
+    {"riskCategoryId": "LE_GEN", "riskCategoryName": "Law Enforcement"},
     {
       "riskCategoryId": "CR_FRAUD",
       "riskCategoryName": "Crime-Fraud",
+      "method": "ml",
+      "score": 0.82,
+      "scoreType": "student_sigmoid",
+      "threshold": 0.5,
+      "evidence": [{"field": "Remarks", "text": "Illustrative fraud passage"}]
+    }
+  ],
+  "reviewRequired": [
+    {
+      "riskCategoryId": "PEP_GEN",
+      "riskCategoryName": "PEP",
       "method": "ml",
       "score": 0.82,
       "scoreType": "student_sigmoid",
@@ -198,10 +205,17 @@ The stored payload uses one small shared shape:
 The example is illustrative. `riskCategories` contains labels eligible for
 client display. `reviewRequired` contains selected text-model labels awaiting
 human review. Media selected labels go directly to `riskCategories` with score
-and cutoff, and media `reviewRequired` is empty. Watchlist lookup labels
-go directly to `riskCategories`. If a lookup already supports a label, the same
-label is not duplicated in `reviewRequired`. The human-review event is stored
-separately and does not yet promote labels into the client-facing array.
+and cutoff, and media `reviewRequired` is empty. Watchlist lookup labels and
+ten selected text labels go directly to `riskCategories` at the existing 0.5
+cutoff: Fraud, Money Laundering, Trafficking & Smuggling, Violent Crime, Theft &
+Property Crime, Forgery & Counterfeiting, Terrorism / Financing, Proliferation /
+Financing, Human Rights / Atrocities, and Judicial / Court. PEP, Corruption,
+Cybercrime, Tax Crime, and Organized Crime remain in `reviewRequired` when
+selected by the model alone. If a lookup already supports a label, that label
+is not duplicated or replaced by a text result. The human-review event is
+stored separately and does not yet promote labels into the client-facing array.
+This automatic text-label routing is a product decision; v6 still needs fresh
+independent evaluation before its precision can be claimed as proven.
 
 The payload does not repeat the assessment row's source ID or `version_no`.
 `assessmentStatus` is `CLASSIFIED` or, for media without usable body text,
@@ -307,7 +321,7 @@ models loaded and inferred from canonical PostgreSQL payloads. The first three
 media samples had no selected labels; article 113 selected `CR_FORGE` and
 `REG_GEN` into `riskCategories`. All three sampled UN-SANCTIONS members selected
 rule-backed `SAN_GEN`; one also selected `PEP_GEN` into `reviewRequired`.
-Repeating INITIAL and bounded REPROCESS skipped identical assessments. Source
+Repeating bounded full scans skipped identical assessments. Source
 version and single-current-row checks passed for all seven assessments. A
 review insert passed the database constraints and was rolled back.
 
