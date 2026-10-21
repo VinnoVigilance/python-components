@@ -3,7 +3,8 @@ from datetime import date, timedelta
 import sys
 import os
 from pathlib import Path
-from services.watchlistDelivery.dailyDeltaActionsGeneration import generate_watchlist_delta_actions 
+from services.watchlistDelivery.watchlistDailyDeltaActionsGeneration import generate_watchlist_delta_actions
+from services.watchlistDelivery.mediaDailyDeltaActionsGeneration import generate_media_delta_actions
 from services.watchlistDelivery.spokeSyncEngine import execute_daily_sync, deploy_database_procedures, execute_full_rebuild
 #sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from infrastructure.database.connection import get_db_connection
@@ -25,24 +26,36 @@ def _generate_date_range(start_date: date, end_date: date):
 def get_watermark_dates():
     """
     Queries the database to find the last processed delta and the core data boundaries.
-    Returns: (last_processed_date, latest_available_core_date, genesis_core_date)                                                          
+    Returns: (watchlist_last_processed_date, watchlist_latest_available_core_date, watchlist_genesis_core_date, media_last_processed_date, media_latest_available_core_date, media_genesis_core_date)
     """
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # 1. Find the last date we successfully built a delta for
                 cur.execute("SELECT MAX(effective_date) FROM delivery.watchlist_daily_delta_actions;")
-                last_processed = cur.fetchone()[0]
+                watchlist_last_processed = cur.fetchone()[0]
                 
                 # 2. Find the newest date in core
                 cur.execute("SELECT MAX(DATE(created_at)) FROM core.watchlist_member;")
-                latest_core = cur.fetchone()[0]
+                watchlist_latest_core = cur.fetchone()[0]
                 
                 # 3. Find the absolute oldest date in core (Genesis Date)
                 cur.execute("SELECT MIN(DATE(created_at)) FROM core.watchlist_member;")
-                genesis_core = cur.fetchone()[0]
+                watchlist_genesis_core = cur.fetchone()[0]
                 
-        return last_processed, latest_core, genesis_core
+                # 4. Find the last date we successfully built a delta for
+                cur.execute("SELECT MAX(effective_date) FROM delivery.media_daily_delta_actions;")
+                media_last_processed = cur.fetchone()[0]
+
+                # 5. Find the newest date in core
+                cur.execute("SELECT MAX(DATE(created_at)) FROM core.media_record;")
+                media_latest_core = cur.fetchone()[0]
+
+                # 6. Find the absolute oldest date in core (Genesis Date)
+                cur.execute("SELECT MIN(DATE(created_at)) FROM core.media_record;")
+                media_genesis_core = cur.fetchone()[0]
+
+        return watchlist_last_processed, watchlist_latest_core, watchlist_genesis_core, media_last_processed, media_latest_core, media_genesis_core
     except Exception as err:
         logger.error(f"Failed to retrieve watermark dates from database: {err}")
         raise
@@ -88,7 +101,7 @@ def rebuild_all_spokes():
         
         # 2. Wipes all tables and rebuilds directly from core.watchlist_member
         execute_full_rebuild()
-        logger.info("!!! HISTORICAL REBUILD COMPLETED SUCCESSFULLY !!!")
+        logger.info("!!! SPOKE HISTORICAL REBUILD COMPLETED SUCCESSFULLY !!!")
     except Exception as err:
         logger.critical(f"Historical rebuild crashed: {err}")
         sys.exit(1)        
@@ -96,84 +109,73 @@ def rebuild_all_spokes():
 # =====================================================================
 # 2. THE SELF-HEALING AUTOMATED PIPELINE (RUNS POST-INGESTION)
 # =====================================================================
-def run_automated_pipeline():
-    """
-    Detects gaps between the last processed date and the newest ingested data, handles day-zero starts natively, and sequentially processes data.
-    Sequentially backfills all missing days up to the present.                                                          
-    """
-    logger.info("=== WAKING UP: CHECKING PIPELINE WATERMARKS ===")
-    
-    # Automatically compile and deploy stored procedures on every run.
-    # This ensures any new tables or attributes added to SPOKE_MAPPING are instantly pushed to Postgres.
-    logger.info("Deploying/Verifying dynamic PostgreSQL Spoke Procedures...")
-    deploy_database_procedures()
-    
-    last_processed, latest_core, genesis_core = get_watermark_dates()
-    
+def _run_watchlist_pipeline(last_processed, latest_core, genesis_core):
+    """Generate watchlist deltas and synchronize their search spokes."""
     if not latest_core:
-        logger.warning("No data found in core.watchlist_member. Pipeline sleeping.")
+        logger.info("No watchlist core data; skipping watchlist delivery.")
         return
+    if last_processed and last_processed >= latest_core:
+        logger.info("Watchlist deltas are up to date through %s.", last_processed)
+        return
+    start_date = last_processed + timedelta(days=1) if last_processed else genesis_core
+    deploy_database_procedures()
+    for target_date in _generate_date_range(start_date, latest_core):
+        generate_watchlist_delta_actions(from_date=target_date, to_date=target_date)
+        execute_daily_sync(target_date)
+    if not check_spokes_finished(latest_core):
+        raise RuntimeError(f"Watchlist spokes are incomplete for {latest_core}.")
+    _refresh_search_view()
 
-    # If the database is brand new (Day Zero), auto-set the start date to the Genesis Date
-    if not last_processed:
-        logger.info(f"Day Zero detected. Commencing initial pipeline build from {genesis_core}.")
-        start_date = genesis_core
-    else:
-        # If the delta is already caught up, do nothing
-        if last_processed >= latest_core:
-            logger.info(f"Pipeline is fully up to date (Watermark: {last_processed}). Sleeping.")
-            return
-        
-        # Calculate the gap (e.g., if last processed was the 10th, start on the 11th)
-        start_date = last_processed + timedelta(days=1)
-        
-    end_date = latest_core
-    logger.info(f"Processing backlog sequentially from {start_date} to {end_date}")
-    
-    try:
-        # Sequentially process each missing day to maintain strict chronological state                                                                              
-        for target_date in _generate_date_range(start_date, end_date):
-            logger.info(f"--- Generating Delta Actions for Date: {target_date} ---")
-            
-            # Step 1: Calculate the Delta
-            generate_watchlist_delta_actions(from_date=target_date, to_date=target_date)
-            
-            # Step 2: Push the Delta to the Spoke Tables
-            # Spokes only care about the latest state, so we sync directly to end_date.
-            logger.info(f"Delta actions complete. Syncing search spokes to state: {target_date}")
-            execute_daily_sync(target_date)
-        
-        # Step 3: THE GATEKEEPER - Verify spoke execution before proceeding
-        logger.info("=== PIPELINE CAUGHT UP, VERIFYING SPOKES ===")
-        if not check_spokes_finished(end_date):
-            logger.warning("Aborting post-ingestion delivery tasks: Spoke tables are not fully synced yet.")
-            return
-        
-        # Refresh the Materialized View ONCE, after all data is safely in the Spoke tables
-        logger.info("Refreshing Screening Materialized View...")
-        with get_db_connection() as conn:
-            conn.autocommit = True
+
+def _run_media_pipeline(last_processed, latest_core, genesis_core):
+    """Generate media deltas independently of watchlist delivery readiness."""
+    if not latest_core:
+        logger.info("No media core data; skipping media delta generation.")
+        return
+    if last_processed and last_processed >= latest_core:
+        logger.info("Media deltas are up to date through %s.", last_processed)
+        return
+    start_date = last_processed + timedelta(days=1) if last_processed else genesis_core
+    for target_date in _generate_date_range(start_date, latest_core):
+        generate_media_delta_actions(from_date=target_date, to_date=target_date)
+
+
+def _refresh_search_view():
+    """Refresh screening search without leaking autocommit into pooled callers."""
+    with get_db_connection() as conn:
+        previous_autocommit = conn.autocommit
+        conn.autocommit = True
+        try:
             with conn.cursor() as cur:
                 cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY core.mv_screening_member_search;")
-        logger.info("Materialized View successfully refreshed.")
-        
-        # Step 4: Proceed with extraction tasks
-        #logger.info("Proceeding with data extraction and delivery tasks...")
-        # Add your extraction/queue logic here (e.g., export_customer_files(end_date))
-        
-        logger.info("=== PIPELINE FULLY COMPLETED AND SYNCHRONIZED ===")
-        
-    except Exception as err:
-        print(f"!!! AIRFLOW UI CATCH: FATAL ERROR during pipeline execution: {err} !!!")
-        logger.critical(f"FATAL ERROR during pipeline execution. Halted: {err}")
-        sys.exit(1)
+        finally:
+            conn.autocommit = previous_autocommit
+
+
+def run_automated_pipeline():
+    """Attempt both delivery domains and propagate any incomplete execution."""
+    watermarks = get_watermark_dates()
+    failures = []
+    for domain, runner, dates in (
+        ("watchlist", _run_watchlist_pipeline, watermarks[:3]),
+        ("media", _run_media_pipeline, watermarks[3:]),
+    ):
+        try:
+            runner(*dates)
+        except Exception as error:
+            failures.append((domain, error))
+            logger.exception("Post-ingestion %s processing failed.", domain)
+    if failures:
+        domains = ", ".join(domain for domain, _ in failures)
+        raise RuntimeError(f"Post-ingestion processing failed for: {domains}.") from failures[0][1]
+    logger.info("Post-ingestion watchlist and media processing completed.")
 
 # =====================================================================
 # 3. DISASTER RECOVERY & HISTORICAL BACKFILL
 # =====================================================================
 def execute_historical_backfill(from_date: date, to_date: date):
     """
-    Administrative tool to force a sequential rebuild of both the Delta 
+    Administrative tool to force a sequential rebuild of both the Watchlist Delta
     and the Spoke tables for a specific date range.
     """
     if from_date > to_date:
@@ -183,9 +185,9 @@ def execute_historical_backfill(from_date: date, to_date: date):
     logger.warning(f"!!! INITIATING HISTORICAL REBUILD FROM {from_date} TO {to_date} !!!")
     
     try:
-        # Loop: Rebuild the daily deltas sequentially                                               
+        # Loop: Rebuild the watchlist daily deltas sequentially
         for target_date in _generate_date_range(from_date, to_date):
-            logger.info(f"Rebuilding delta action state for: {target_date}")
+            logger.info(f"Rebuilding watchlist delta action state for: {target_date}")
             generate_watchlist_delta_actions(from_date=target_date, to_date=target_date)
         
         # Sync the spokes once to the final targeted state.
@@ -198,16 +200,37 @@ def execute_historical_backfill(from_date: date, to_date: date):
         
         # Refresh the Materialized View ONCE, after all data is safely in the Spoke tables
         logger.info("Refreshing Screening Materialized View...")
-        with get_db_connection() as conn:
-            conn.autocommit = True
-            with conn.cursor() as cur:
-                cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY core.mv_screening_member_search;")
+        _refresh_search_view()
         logger.info("Materialized View successfully refreshed.")
             
         logger.info("!!! HISTORICAL REBUILD COMPLETED SUCCESSFULLY !!!")
     except Exception as err:
         logger.critical(f"Historical rebuild crashed on {target_date}: {err}")
         sys.exit(1)
+
+
+def execute_media_historical_backfill(from_date: date, to_date: date):
+    """
+    Administrative tool to force a sequential rebuild of both the Media Delta for a specific date range.
+    """
+    if from_date > to_date:
+        logger.error("Backfill media failed: from_date cannot be later than to_date.")
+        return
+
+    logger.warning(f"!!! INITIATING MEDIA HISTORICAL REBUILD FROM {from_date} TO {to_date} !!!")
+
+    try:
+        # Loop: Rebuild the media daily deltas sequentially
+        for target_date in _generate_date_range(from_date, to_date):
+            logger.info(f"Rebuilding media delta action state for: {target_date}")
+            generate_media_delta_actions(from_date=target_date, to_date=target_date)
+
+
+        logger.info("!!! MEDIA HISTORICAL REBUILD COMPLETED SUCCESSFULLY !!!")
+    except Exception as err:
+        logger.critical(f"Media Historical rebuild crashed on {target_date}: {err}")
+        sys.exit(1)
+
 
     
 if __name__ == "__main__":
@@ -222,7 +245,8 @@ if __name__ == "__main__":
         
         try:
             run_automated_pipeline()
-            #execute_historical_backfill(date(2026, 8, 1), date(2026, 8, 7))
+            #execute_historical_backfill(date(2026, 10, 4), date(2026, 10, 13))
+            #execute_media_historical_backfill(date(2026, 10, 4), date(2026, 10, 13))
             log.event("JOB_FINISHED", status="SUCCESS")
             
         except Exception as err:

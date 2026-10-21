@@ -61,6 +61,7 @@ __pycache__/
 # Personal / local working docs (not shared)
 # ============================================
 CLAUDE.md
+AGENTS.md
 .claudeignore
 docs/field-mapper-guide.md
 docs/server-and-pgadmin-guide.md

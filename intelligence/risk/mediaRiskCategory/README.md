@@ -64,9 +64,9 @@ Custom model directories can still be selected through MEDIA_RISK_MODEL_DIR or
 ## Use
 
 ```python
-from services.adverseMediaPipeline.mediaRiskCategoryService import MediaRiskCategoryService
+from intelligence.risk.mediaRiskCategory.predictor import MediaRiskPredictor
 
-service = MediaRiskCategoryService()  # once per worker
+service = MediaRiskPredictor()
 result = service.classify(title=news_title, body=news_body)
 labels = result["labels"]
 label_ids = result["label_ids"]
@@ -85,11 +85,7 @@ empty labels and IDs. Wrong types raise TypeError. Scores are not probabilities;
 the rule is still score >= the saved threshold. Empty CLASSIFIED results only
 cover evaluated labels. The 12 unsupported taxonomy labels remain unassessed.
 
-```powershell
-python -m services.adverseMediaPipeline.mediaRiskCategoryService --title "News title" --body "Full plain-text news article."
-```
-
-Use --body-file for a UTF-8 text file. classify_many preserves input order;
+`classify_many` preserves input order;
 use bounded batches for large corpora. The existing historical Joblib class
 adapter and exact runtime checks remain. Only load trusted model files.
 
@@ -103,10 +99,18 @@ Thirty focused tests cover the actual workbook structure, 23-to-11 scope,
 ordering, stable IDs, content version, malformed contracts, preserved scoring
 and dependencies. They use synthetic estimators and a substituted artifact
 reader, never the supplied original pickle. They are not an accuracy evaluation.
-A real-model smoke test is still needed in the recorded environment.
+A bounded real-model smoke run passed in the local Python 3.11 environment.
 
-The service remains independent of pipeline invocation, DB persistence and retry.
-Those areas and the watchlist risk engine were not changed by this patch.
+The standalone `predictor.py` returns `labelDecisions` with actual SVM margins,
+cutoffs and selection decisions for all 11 evaluated labels. These are not
+calibrated probabilities. The common pipeline uses `mediaRiskClassifier.py` to
+shape the stored assessment; see `docs/risk-pipeline-design.md` for database
+processing, initial/incremental modes and persistent label review.
+
+Business taxonomy loading is shared in `intelligence/risk/labelContract.py`.
+The original contract module preserves its imports. The updated 30-test media
+contract suite passed under the local Python 3.11 environment. The full project
+suite has not completed.
 
 If the first patch was applied, remove its now-unused requirements-media-risk.txt
 and intelligence/risk/mediaRiskCategory/models/nbsvm-v1/taxonomy.v1.json.

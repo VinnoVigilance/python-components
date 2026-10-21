@@ -19,6 +19,11 @@ ENV/
 
 # Large Dynamic Data & Downloads
 data/
+!data/
+data/*
+!data/rules/
+data/rules/*
+!data/rules/VV_RiskCategory_Labels.xlsx
 downloaded_files/
 debug_screenshots/
 

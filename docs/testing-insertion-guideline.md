@@ -61,7 +61,7 @@ matrix maps each one to its implementation and test status.
 | 5 | `core.watchlist_member` — canonical record, versioning, delete detection | 29–39 | ✅ Yes | ✅ Yes | [§5.4](#54-canonical-record-versioning--delete-detection-corewatchlist_member) |
 | 6 | Watchlist Daily Delta Generation — `delivery.watchlist_daily_delta` | 40–50 | ◑ DB procedure | ◑ Table only | [§8](#8-not-yet-covered) |
 | 7 | Core Spoke Table Synchronization — `core.member_*` spoke tables | 50–58 | ❌ No | — | [§8](#8-not-yet-covered) |
-| 8 | Member Risk Category Calculation & Versioning — `core.member_risk_category` | 59–66 | ✅ Yes | ✅ Yes | [§5.5](#55-member-risk-category-calculation--versioning-coremember_risk_category) |
+| 8 | Member Risk Category Calculation & Versioning — `core.member_risk_category` | 59–66 | Pending update | Pending update | [§5.5](#55-member-risk-category-calculation--versioning-coremember_risk_category) |
 | 9 | Data Export & XML Generation | 67–75 | ❌ No (spec is TODO) | — | [§8](#8-not-yet-covered) |
 
 Legend: ✅ done · ◑ partial · ⚠️ gap · ❌ not started
@@ -185,27 +185,13 @@ that renames or drops something fails immediately with a clear message.
 > DELETE, hash-based change detection, and the one-active-row invariant. Risk
 > classifications are versioned exactly like core members (SCD Type-2).
 
-**Engine bridge** — `test_riskEngine.py`, adapts one member's `full_payload` into the `risk_details` object:
-
-| Scenario | What the test proves | Test |
-| --- | --- | --- |
-| The authoritative list name is used | The primary list name is read from the first `Sources[]` entry and forwarded to the classifier. | `test_primary_list_name_reads_first_source`, `test_primary_list_name_none_when_absent` |
-| Rule labels become `risk_details` | Classifier output is shaped into the stored `risk_details`; an unclassifiable member yields empty categories. | `test_classify_wraps_rule_labels_into_risk_details`, `test_classify_empty_when_no_labels` |
-
-**ETL versioning** — `test_watchlistRiskCategoryService.py`, database mocked:
-
-| Scenario | Guideline | What the test proves | Test |
-| --- | --- | --- | --- |
-| First-ever population of the table | Initial Load | Every current member runs through the ADD workflow and is inserted; nothing is expired. | `test_initial_load_inserts_new_member` |
-| Re-running the Initial Load | Initial Load / Idempotency | A member whose active hash already matches is skipped — no expire, no insert. | `test_initial_load_is_idempotent_on_matching_hash` |
-| A member with no risk classification | Data Integrity | An empty classification (e.g. an excluded DNFBP list) is **never written** and is counted as empty. | `test_initial_load_skips_empty_classification`, `test_add_empty_classification_is_not_inserted` |
-| A new member in the daily delta | ADD | Retrieved from the latest `effective_date` and inserted as a new active risk row. | `test_add_new_member_is_versioned` |
-| An updated member, risk unchanged | UPDATE Scenario 1 | Same hash → skipped (no insert, no expire). | `test_update_same_hash_is_skipped` |
-| An updated member, risk changed | UPDATE Scenario 2 | Current version expired (`is_current=false`, `valid_to` set), new version inserted with the matching `version_no`. | `test_update_changed_hash_expires_then_inserts` |
-| One-active-row invariant | Data Integrity | Even an ADD expires any pre-existing active row first, so two current rows can never coexist. | `test_add_with_existing_active_row_still_expires_first` |
-| A deleted member | DELETE | All active risk rows are expired; nothing new is inserted. | `test_delete_expires_active_rows_without_insert` |
-| The delta references a member that is gone | (robustness) | Counted as missing and non-fatal; processing continues. | `test_missing_member_is_counted_not_fatal` |
-| The delta table is empty | No Changes Scenario | Completes cleanly with no work done. | `test_no_delta_data_completes_cleanly` |
+The former service and rule-engine tests describe retired code and do not prove
+the new pipeline. The new watchlist and media risk paths need tests for explicit
+delta dates, source/model versioning, completed empty results, tombstones,
+per-record rollback, and retry after partial or limited runs. Update and run
+those tests during the commit flow. Four new processing decision tests cover
+source-version replacement, identical reruns, deletion, and superseded deltas.
+They do not provide full database or failure-retry coverage.
 
 ### 5.6 Attachment management (`raw.attachment` / `list_attachment` / `member_attachment`)
 
@@ -276,7 +262,7 @@ completeness rather than repeated in full.
 | `raw.unparsed_watchlist_payload` (raw preservation) | 6 | Unit |
 | `core.watchlist_member` (versioning + delete detection) | 6 unit + 9 real-DB + 16 schema checks | Unit + Integration |
 | Attachments (`raw.attachment` / `list_attachment` / `member_attachment`) | 7 service + 8 repository (fake cursor) + 6 real-DB | Unit + Integration |
-| `core.member_risk_category` (risk ETL) | 4 engine + 11 ETL | Unit |
+| `core.member_risk_category` (risk ETL) | 4 new processing decision tests; database delta-path tests pending | Unit / pending integration |
 | Pipeline orchestration (wiring, duplicate short-circuit) | 3 | e2e |
 | Canonical payload (parsing/mapping/normalization) | see [Section 6](#6-supporting-coverage-the-canonical-payload) | Unit |
 
@@ -322,11 +308,8 @@ All tests run through the project's `vv-env` interpreter.
 vv-env/Scripts/python.exe -m pytest
 ```
 
-**Only one guideline area**, e.g. the risk-category ETL:
-
-```bash
-vv-env/Scripts/python.exe -m pytest test/unit/services/test_watchlistRiskCategoryService.py -v
-```
+**Risk-category ETL:** four new processing decision tests passed. Database
+delta-path and failure-retry tests remain pending.
 
 **The real-database tests** (the 35 that run in CI) — point them at a disposable
 test database whose name contains `test`:

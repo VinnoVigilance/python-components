@@ -1,5 +1,6 @@
 # Python dependencies for the watchlist / python-components pipeline.
-# Versions pinned to what is installed and verified in the vv-env venv.
+# Use Python 3.11.x for the packaged media model.
+# Risk-model pins come from recorded environments and passed local Python 3.11 verification.
 # Install:  pip install -r requirements.txt
 # Standard-library modules (json, re, pathlib, unicodedata, ...) are not listed.
 
@@ -36,8 +37,9 @@ tzdata; sys_platform == "win32"  # IANA zones for watchlist schedules on Windows
 PyYAML==6.0.3           # YAML source configs; >=6.0.3 required by seleniumbase
 elasticsearch==9.5.0
 
-# --- LLM (risk classification / extraction) ---
-ollama==0.6.2
+# --- Watchlist CPU student (versions recorded by the frozen research model) ---
+torch==2.14.1           # CPU inference for the watchlist student
+transformers==5.19.0    # load the packaged student and tokenizer
 
 # --- Analyst UI (utils/vvAnalystApp.py) ---
 streamlit==1.59.2
