@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 from pprint import pprint
 
-from config.loggingConfig import configure_logging
+from config.loggingConfig import JobLog, configure_logging
 
 
 def run_risk_category_etl(subject="watchlist", mode="incremental", initial_load=False,
@@ -36,8 +36,11 @@ def _parse_args(argv=None):
     parser.add_argument("--subject", choices=("media", "watchlist"), default="watchlist")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--mode", choices=("initial", "incremental"))
+    modes.add_argument("--initial", dest="mode", action="store_const", const="initial")
+    modes.add_argument("--incremental", dest="mode", action="store_const", const="incremental")
     modes.add_argument("--initial-load", action="store_true")
-    parser.add_argument("--effective-date", type=date.fromisoformat)
+    parser.add_argument("--effective-date", type=date.fromisoformat,
+                        help="Catch up chronologically through this date (default: today).")
     parser.add_argument("--source", "--list", dest="source_name")
     parser.add_argument("--model-path", type=Path)
     parser.add_argument("--batch-size", type=int, default=1000)
@@ -49,16 +52,22 @@ def _parse_args(argv=None):
 def main(argv=None):
     configure_logging()
     arguments = _parse_args(argv)
-    try:
-        result = run_risk_category_etl(
-            subject=arguments.subject, mode=arguments.mode or "incremental",
-            initial_load=arguments.initial_load, effective_date=arguments.effective_date,
-            source_name=arguments.source_name, model_path=arguments.model_path,
-            batch_size=arguments.batch_size, max_rows=arguments.max_rows, threads=arguments.threads,
-        )
-    except Exception:
-        logging.getLogger(__name__).exception("Risk pipeline failed.")
-        raise
+    with JobLog(f"risk-{arguments.subject}", Path(__file__).resolve().parents[1] / "logs") as job:
+        job.event("JOB_STARTED", subject=arguments.subject)
+        try:
+            result = run_risk_category_etl(
+                subject=arguments.subject, mode=arguments.mode or "incremental",
+                initial_load=arguments.initial_load, effective_date=arguments.effective_date,
+                source_name=arguments.source_name, model_path=arguments.model_path,
+                batch_size=arguments.batch_size, max_rows=arguments.max_rows, threads=arguments.threads,
+            )
+        except Exception as error:
+            job.event("JOB_ABORTED", level=logging.ERROR, error=error)
+            raise
+        result["error_log"] = str(job.error_path)
+        job.event("JOB_FINISHED", status=result["run_status"],
+                  last_scanned_date=result["last_scanned_date"],
+                  pending_count=result["pending_count"], retried_count=result["retried_count"], error_log=result["error_log"])
     pprint(result)
     return 0 if result["run_status"] == "SUCCESS" else 2
 

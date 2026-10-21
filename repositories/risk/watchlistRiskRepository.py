@@ -3,6 +3,12 @@
 from psycopg2.extras import Json, RealDictCursor
 
 
+def latest_risk_date(cursor):
+    cursor.execute("SELECT MAX(created_at) FROM core.member_risk_category")
+    value = cursor.fetchone()[0]
+    return value.astimezone().date() if value else None
+
+
 def find_scan_end(cursor, mode, effective_date=None):
     if mode == "incremental":
         cursor.execute("SELECT COALESCE(MAX(id), 0) FROM delivery.watchlist_daily_delta_actions WHERE effective_date = %s", (effective_date,))
@@ -45,14 +51,33 @@ def find_current_source(connection, subject_id):
         return dict(row) if row else None
 
 
+def find_source_version(connection, source_record_id):
+    with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, vv_member_id AS subject_id, version_no, full_payload AS payload, change_type
+            FROM core.watchlist_member WHERE id = %s
+        """, (source_record_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
 def find_current_risk(cursor, subject_id):
     cursor.execute("""
-        SELECT risk_details_hash, version_no FROM core.member_risk_category
+        SELECT risk_details_hash, version_no, watchlist_member_id FROM core.member_risk_category
         WHERE vv_member_id = %s AND is_current = TRUE
         ORDER BY id DESC LIMIT 1 FOR UPDATE
     """, (subject_id,))
     row = cursor.fetchone()
-    return {"risk_details_hash": row[0], "version_no": row[1]} if row else None
+    return {"risk_details_hash": row[0], "version_no": row[1], "source_record_id": row[2]} if row else None
+
+
+def has_assessment(cursor, subject_id, source_record_id, result_hash):
+    cursor.execute("""
+        SELECT 1 FROM core.member_risk_category
+        WHERE vv_member_id = %s AND watchlist_member_id = %s AND risk_details_hash = %s
+        LIMIT 1
+    """, (subject_id, source_record_id, result_hash))
+    return cursor.fetchone() is not None
 
 
 def expire_current(cursor, subject_id):
@@ -63,11 +88,13 @@ def expire_current(cursor, subject_id):
     return cursor.rowcount
 
 
-def insert_risk(cursor, record, details, result_hash):
+def insert_risk(cursor, record, details, result_hash, current=True):
     cursor.execute("""
         INSERT INTO core.member_risk_category (
             vv_member_id, watchlist_member_id, version_no, risk_details, risk_details_hash,
             valid_from, valid_to, is_current
-        ) VALUES (%s, %s, %s, %s, %s, NOW(), NULL, TRUE) RETURNING id
-    """, (record["subject_id"], record["id"], record["version_no"], Json(details), result_hash))
+        ) VALUES (%s, %s, %s, %s, %s, NOW(), CASE WHEN %s THEN NULL ELSE NOW() END, %s)
+        RETURNING id
+    """, (record["subject_id"], record["id"], record["version_no"], Json(details),
+          result_hash, current, current))
     return cursor.fetchone()[0]

@@ -16,6 +16,7 @@ class ProcessingTests(unittest.TestCase):
         self.source = {"id": 205, "subject_id": "member-1", "version_no": 2,
                        "change_type": "UPDATED", "payload": {"name": "Example"}}
         self.repository.find_current_source.return_value = self.source
+        self.repository.find_source_version.return_value = self.source
         self.classify = MagicMock(return_value={"assessmentStatus": "CLASSIFIED",
                                                   "riskCategories": [], "reviewRequired": []})
 
@@ -32,7 +33,7 @@ class ProcessingTests(unittest.TestCase):
 
     def test_identical_result_and_source_version_skips(self):
         self.repository.find_current_risk.return_value = {
-            "risk_details_hash": "same-hash", "version_no": 2,
+            "risk_details_hash": "same-hash", "version_no": 2, "source_record_id": 205,
         }
         with patch("services.risk.processing.calculate_record_hash", return_value="same-hash"):
             outcome = _process(self.connection, self.repository, self.item,
@@ -43,6 +44,7 @@ class ProcessingTests(unittest.TestCase):
 
     def test_delete_expires_without_loading_classifier(self):
         self.item["action"] = "DELETE"
+        self.repository.find_current_risk.return_value = {"version_no": 2}
         outcome = _process(self.connection, self.repository, self.item,
                            "incremental", self.classify)
         self.assertEqual(outcome, "deleted")
@@ -50,13 +52,38 @@ class ProcessingTests(unittest.TestCase):
         self.repository.expire_current.assert_called_once_with(self.cursor, "member-1")
         self.repository.insert_risk.assert_not_called()
 
-    def test_superseded_delta_does_not_replace_current_assessment(self):
+    def test_historical_delta_is_classified_without_replacing_current_assessment(self):
         self.item["source_record_id"] = 204
+        self.repository.find_source_version.return_value = {**self.source, "id": 204, "version_no": 1}
+        self.repository.has_assessment.return_value = False
         outcome = _process(self.connection, self.repository, self.item,
                            "incremental", self.classify)
-        self.assertEqual(outcome, "superseded")
-        self.classify.assert_not_called()
+        self.assertEqual(outcome, "historical")
+        self.classify.assert_called_once()
         self.repository.expire_current.assert_not_called()
+        self.assertFalse(self.repository.insert_risk.call_args.kwargs["current"])
+
+    def test_historical_delete_preserves_current_assessment(self):
+        self.item["action"] = "DELETE"
+        self.repository.find_source_version.return_value = {**self.source, "id": 204, "version_no": 1}
+        self.repository.find_current_risk.return_value = {"version_no": 2}
+        self.assertEqual(_process(self.connection, self.repository, self.item,
+                                  "incremental", self.classify), "deleted")
+        self.repository.expire_current.assert_not_called()
+        self.classify.assert_not_called()
+
+    def test_matching_historical_result_skips_insertion(self):
+        self.repository.find_source_version.return_value = {**self.source, "id": 204, "version_no": 1}
+        self.repository.has_assessment.return_value = True
+        self.assertEqual(_process(self.connection, self.repository, self.item,
+                                  "incremental", self.classify), "skipped")
+        self.repository.insert_risk.assert_not_called()
+
+    def test_mismatched_source_fails_instead_of_classifying_other_subject(self):
+        self.repository.find_source_version.return_value = {**self.source, "subject_id": "other"}
+        with self.assertRaises(LookupError):
+            _process(self.connection, self.repository, self.item, "incremental", self.classify)
+        self.classify.assert_not_called()
 
     def test_reprocess_mode_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "initial or incremental"):
