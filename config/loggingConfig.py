@@ -14,11 +14,22 @@ from zoneinfo import ZoneInfo
 _source = ContextVar("job_source", default="-")
 _attempt = ContextVar("job_attempt", default=0)
 _stage = ContextVar("job_stage", default="JOB")
+_RISK_EVENT_FIELDS = {
+    "RISK_JOB_STARTED": ("mode", "subjects", "started_at", "errors_file"),
+    "RISK_DOMAIN_STARTED": ("subject", "mode", "started_at"),
+    "RISK_DOMAIN_FINISHED": (
+        "subject", "mode", "status", "started_at", "ended_at", "duration_seconds",
+        "processed", "failed", "pending", "retried", "reason",
+    ),
+    "RISK_JOB_FINISHED": (
+        "status", "started_at", "ended_at", "duration_seconds", "incomplete_domains", "errors_file",
+    ),
+}
 _MAIN_EVENTS = {
     "JOB_STARTED", "ATTEMPT_STARTED", "ATTEMPT_FAILED", "RETRY_WAIT",
     "SOURCE_SETUP_FAILED", "SOURCE_FINISHED", "JOB_FINISHED",
     "JOB_ALREADY_RUNNING", "JOB_ABORTED",
-}
+} | _RISK_EVENT_FIELDS.keys()
 
 
 def _quiet_dependencies() -> None:
@@ -84,7 +95,9 @@ class _IssueOnly(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         if (record.levelno < logging.WARNING or
-                getattr(record, "event", None) in {"SOURCE_FINISHED", "JOB_FINISHED"}):
+                getattr(record, "event", None) in {
+                    "SOURCE_FINISHED", "JOB_FINISHED", "RISK_DOMAIN_FINISHED", "RISK_JOB_FINISHED",
+                }):
             return False
         source = _source.get()
         if source != "-":
@@ -110,7 +123,18 @@ class _Readable(logging.Formatter):
             detail = ""
         elif detail.startswith(event + " "):
             detail = detail[len(event) + 1:]
-        if self.main and event == "SOURCE_FINISHED":
+        # Incomplete legacy events retain their original message. Formatting must
+        # not require ingestion fields from another kind of job.
+        source_fields = {
+            "status", "started_at", "ended_at", "duration_seconds", "attempts",
+            "warnings", "errors", "needs_review", "next_action",
+        }
+        if self.main and event in _RISK_EVENT_FIELDS:
+            detail = " ".join(
+                f"{key}={data[key] if data.get(key) is not None else 'unknown'}"
+                for key in _RISK_EVENT_FIELDS[event]
+            )
+        elif self.main and event == "SOURCE_FINISHED" and source_fields <= data.keys():
             status = data["status"]
             if status == "FAILED":
                 counts = "core_written=unknown counts=unavailable"
@@ -145,7 +169,8 @@ class _Readable(logging.Formatter):
                 f"error_type={data.get('error_type')} error={data.get('error')} "
                 f"details={self._error_label(record.job_run_id)}"
             )
-        elif self.main and event == "JOB_STARTED":
+        elif (self.main and event == "JOB_STARTED"
+              and {"started_at", "sources", "timezone"} <= data.keys()):
             detail = (f"start={data['started_at']} sources={data['sources']} "
                       f"timezone={data['timezone']} errors={record.job_run_id}.errors.log "
                       f"events={record.job_run_id}.events.jsonl")

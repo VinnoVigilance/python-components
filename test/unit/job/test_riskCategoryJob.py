@@ -1,11 +1,13 @@
 """Verify combined risk execution without database access or model loading."""
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from jobs import riskCategoryJob as job
+from config.loggingConfig import JobLog
 
 
 @pytest.fixture
@@ -79,3 +81,42 @@ def test_initial_rejects_delta_date_before_dispatch(dispatch):
         job.main(["--initial", "--effective-date", "2026-10-20"])
     assert error.value.code == 2
     dispatch.assert_not_called()
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_real_logging_renders_risk_events(dispatch, capsys, fails):
+    if fails:
+        dispatch.side_effect = RuntimeError("classifier unavailable")
+    result = job.run_risk_job(subject="media")
+    captured = capsys.readouterr()
+    assert "--- Logging error ---" not in captured.err
+    events = [json.loads(line) for line in Path(result["json_log_path"]).read_text().splitlines()]
+    lifecycle = [entry for entry in events if entry["event"].startswith("RISK_")]
+    assert [entry["event"] for entry in lifecycle] == [
+        "RISK_JOB_STARTED", "RISK_DOMAIN_STARTED", "RISK_DOMAIN_FINISHED", "RISK_JOB_FINISHED",
+    ]
+    finished = lifecycle[2]["data"]
+    assert finished["status"] == ("FAILED" if fails else "SUCCESS")
+    assert finished["started_at"] and finished["ended_at"]
+    assert finished["duration_seconds"] >= 0
+    text = Path(result["log_path"]).read_text()
+    assert "RISK_DOMAIN_FINISHED" in text
+    assert ("processed=unknown" if fails else "processed=2") in text
+    assert ("status=FAILED" if fails else "status=SUCCESS") in captured.out
+
+
+def test_incomplete_events_and_unknown_events_keep_logging(tmp_path, capsys):
+    log = JobLog("risk", tmp_path)
+    with log:
+        log.event("RISK_DOMAIN_FINISHED", status="SUCCESS", processed=0)
+        log.event("JOB_STARTED", mode="initial")
+        log.event("SOURCE_FINISHED", status="SUCCESS", processed=2)
+        log.event("CUSTOM_EVENT", extra_detail="preserved")
+    captured = capsys.readouterr()
+    assert "--- Logging error ---" not in captured.err
+    text = log.text_path.read_text()
+    assert "duration_seconds=unknown" in text
+    assert "processed=0" in text
+    assert "JOB_STARTED mode=initial" in text
+    assert "SOURCE_FINISHED status=SUCCESS processed=2" in text
+    assert "CUSTOM_EVENT extra_detail=preserved" in log.full_path.read_text()
