@@ -6,6 +6,7 @@ import os
 import sys
 from datetime import date
 from pathlib import Path
+from time import monotonic
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -33,12 +34,16 @@ def run_risk_job(mode="incremental", subject="both", effective_date=None,
                   error_log_path=str(log.error_path), full_log_path=str(log.full_path),
                   json_log_path=str(log.json_path))
     with log:
-        log.event("JOB_STARTED", mode=mode, subjects=",".join(domains),
+        job_started_at, job_clock = log.stamp(), monotonic()
+        log.event("RISK_JOB_STARTED", mode=mode, subjects=",".join(domains),
+                  started_at=job_started_at,
                   errors_file=str(log.error_path))
         try:
             for domain in domains:
                 with log.bind(source=domain, attempt=1, stage="RISK"):
-                    log.event("ATTEMPT_STARTED", mode=mode)
+                    domain_started_at, domain_clock = log.stamp(), monotonic()
+                    log.event("RISK_DOMAIN_STARTED", mode=mode, subject=domain,
+                              started_at=domain_started_at)
                     try:
                         outcome = run_risk_category_etl(
                             subject=domain, mode=mode, effective_date=effective_date,
@@ -51,12 +56,14 @@ def run_risk_job(mode="incremental", subject="both", effective_date=None,
                     result["domains"][domain] = outcome
                     incomplete = outcome["run_status"] != "SUCCESS"
                     result["failed"] += int(incomplete)
-                    log.event("SOURCE_FINISHED", level=logging.WARNING if incomplete else logging.INFO,
+                    log.event("RISK_DOMAIN_FINISHED", level=logging.WARNING if incomplete else logging.INFO,
+                              subject=domain, mode=mode, started_at=domain_started_at,
+                              ended_at=log.stamp(), duration_seconds=round(monotonic() - domain_clock, 3),
                               status=outcome["run_status"],
-                              processed=outcome.get("processed_count", 0),
-                              failed=outcome.get("failed_count", 0),
-                              pending=outcome.get("pending_count", 0),
-                              retried=outcome.get("retried_count", 0),
+                              processed=outcome.get("processed_count"),
+                              failed=outcome.get("failed_count"),
+                              pending=outcome.get("pending_count"),
+                              retried=outcome.get("retried_count"),
                               reason=outcome.get("no_work_reason", outcome.get("error", "")))
             result["status"] = ("SUCCESS" if not result["failed"] else
                                 "FAILED" if result["failed"] == len(domains) else "PARTIAL")
@@ -67,7 +74,9 @@ def run_risk_job(mode="incremental", subject="both", effective_date=None,
         finally:
             level = (logging.ERROR if result["status"] == "ABORTED" else
                      logging.WARNING if result["failed"] else logging.INFO)
-            log.event("JOB_FINISHED", level=level,
+            log.event("RISK_JOB_FINISHED", level=level,
+                      started_at=job_started_at, ended_at=log.stamp(),
+                      duration_seconds=round(monotonic() - job_clock, 3),
                       status=result["status"], incomplete_domains=result["failed"],
                       errors_file=str(log.error_path))
         lines = ["", "RISK SUMMARY"]
