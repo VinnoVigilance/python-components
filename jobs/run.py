@@ -98,14 +98,17 @@ def _run_media() -> dict:
 
 
 def _run_risk() -> dict:
-    """Run both risk domains in the selected mode."""
+    """Choose a risk domain before selecting its processing mode."""
     from jobs.riskCategoryJob import run_risk_job
 
+    subject = ("media", "watchlist")[_ask(
+        "Which risk categories?", ["Adverse media", "Watchlists"],
+    )[0]]
     mode = ("incremental", "initial")[_ask(
         "Which risk mode?", ["INCREMENTAL - retry failures and process new dates",
                              "INITIAL - classify current core records"],
     )[0]]
-    return run_risk_job(mode=mode)
+    return run_risk_job(mode=mode, subject=subject)
 
 
 def main() -> int:
