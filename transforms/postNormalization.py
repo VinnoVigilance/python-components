@@ -25,6 +25,7 @@ from transforms.searchEnrichment import (
     detect_script,
     canonicalize_script,
     country_to_iso2,
+    country_code_to_name,
     normalize_number,
 )
 
@@ -344,6 +345,7 @@ _SEARCH_TRANSFORMS = {
     "SCRIPT": detect_script,
     "CANONICAL_SCRIPT": canonicalize_script,
     "COUNTRY_CODE": country_to_iso2,
+    "COUNTRY_NAME": country_code_to_name,
     "NORMALIZE_NUMBER": normalize_number,
     "GENERATE_MEDIA_SUMMARY": generate_media_summary_handler,
 }

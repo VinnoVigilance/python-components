@@ -139,6 +139,25 @@ def test_split_array_path():
 
 
 class TestSearchEnrichHandler:
+    def test_country_name_enrichment_preserves_existing_names(self, monkeypatch):
+        monkeypatch.setattr("transforms.searchEnrichment._load_valid_iso2",
+                            lambda: {"SD", "NA"})
+        entity = {"Countries": [
+            {"CountryCode": "SD", "CountryName": ""},
+            {"CountryCode": "NA"},
+            {"CountryCode": "SD", "CountryName": "Source-provided name"},
+            {"CountryCode": "ZZ", "CountryName": ""},
+        ]}
+        search_enrich_handler(entity, {
+            "condition_path": "Countries[].CountryCode",
+            "condition": "IF_EMPTY",
+            "target_path": "Countries[].CountryName",
+            "action": "COUNTRY_NAME",
+        })
+        assert [c["CountryName"] for c in entity["Countries"]] == [
+            "Sudan", "Namibia", "Source-provided name", "",
+        ]
+
     def test_normalize_writes_computed_field(self):
         entity = {"Names": [{"Name": "Frank Müller"}]}
         rule = {

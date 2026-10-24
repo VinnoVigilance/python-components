@@ -50,6 +50,7 @@ SAMPLES = {
     "FBI-WANTED": "FBI-WANTED_raw_sample.jsonl",
     "DMW-RECRUITMENT-AGENCIES": "DMW-RECRUITMENT-AGENCIES_raw_sample.jsonl",
     "INTERPOL-RED-NOTICES": "INTERPOL-RED-NOTICES_raw_sample.jsonl",
+    "INTERPOL_UNSC_SPECIAL_NOTICES": "INTERPOL_UNSC_SPECIAL_NOTICES_raw_sample.jsonl",
     "GPPB-BLACKLISTED-ENTITIES": "GPPB-BLACKLISTED-ENTITIES_raw_sample.jsonl",
     "COMELEC-2025-SENATORS": "COMELEC-2025-SENATORS_raw_sample.jsonl",
     "DILG-LOCAL-OFFICIALS": "DILG-LOCAL-OFFICIALS_raw_sample.jsonl",
@@ -78,6 +79,10 @@ SAMPLES = {
 # "Crime" and "Sanctions" respectively. A set expects that spread across the
 # entries; a plain string expects that single value on every entry.
 GOLDEN = {
+    "INTERPOL_UNSC_SPECIAL_NOTICES": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "INTERPOL_UNSC_SPECIAL_NOTICES", "SourceName": "INTERPOL",
+    },
     "OFAC-SDN": {
         "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "OFAC-SDN", "SourceName": "OFAC",

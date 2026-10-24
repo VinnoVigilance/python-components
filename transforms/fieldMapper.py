@@ -602,6 +602,8 @@ class ListExpandHandler(BaseHandler):
 
 
 class ConcatPathHandler(BaseHandler):
+    """Join literals and paths, suppressing labels when every path is empty."""
+
     def handle(self, rule, raw_json, item=None, anchor=None):
         if not rule.source_value:
             return ""
@@ -613,6 +615,8 @@ class ConcatPathHandler(BaseHandler):
         ]
 
         values = []
+        has_path = False
+        has_path_value = False
 
         for part in parts:
             # Check if it's a literal string (enclosed in quotes)
@@ -624,15 +628,20 @@ class ConcatPathHandler(BaseHandler):
                     values.append(literal_value)
             else:
                 # It's a path - resolve it from context
+                has_path = True
                 value = resolve_in_context(raw_json, part, item, anchor)
                 
-                if value is None:
+                if is_empty_value(value):
                     continue
                 
                 value = str(value).strip()
                 
                 if value:
+                    has_path_value = True
                     values.append(value)
+
+        if has_path and not has_path_value:
+            return ""
 
         return " ".join(values)
 
