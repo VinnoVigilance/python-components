@@ -1925,5 +1925,114 @@ WATCHLIST_CONFIGS = {
     },
 ],
     },
+    "SC_PH_INCUMBENT_JUSTICES": {
+        "source_name": "SC-PH",
+        "list_name": "SC_PH_INCUMBENT_JUSTICES",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://sc.judiciary.gov.ph/incumbent-justices/"
+        ),
+        "file_type": "html",
+        "source_config": (
+            "config/watchlistSources/"
+            "sc_ph_incumbent_justices.yaml"
+        ),
+        "external_id_path": "source_record_id",
+        "minimum_record_count": 10,
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "navigation_mode": "uc_open",
+            "headless": False,
+            "timeout_seconds": 120,
+            "success_criteria": [
+                "Incumbent Justices",
+            ],
+            "actions": [
+                {
+                    "action": "collect_popup_profiles",
+                    "link_selector": (
+                        "article a[href*='elementor-action']"
+                        "[href*='popup']"
+                    ),
+                    "key_attribute": "href",
+                    "click_mode": "javascript",
+                    "profile_selector": (
+                        "div[data-elementor-type='popup']"
+                    ),
+                    "close_selector": ".dialog-close-button",
+                    "required_selectors": [
+                        "h2",
+                        ".elementor-widget-text-editor",
+                        "img[src^='https://']",
+                    ],
+                    "container_id": "sc-ph-collected-profiles",
+                    "minimum_count": 15,
+                    "minimum_text_length": 100,
+                    "timeout_per_profile": 15,
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "Incumbent Justices",
+                    'id="sc-ph-collected-profiles"',
+                    'data-collection-complete="true"',
+                ],
+                "min_size_bytes": 50000,
+            },
+        },
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "list.name_raw",
+                    "pattern": (
+                        r"^(?P<title>Chief Justice|Justice)"
+                        r"\s+(?P<name>.+)$"
+                    ),
+                    "outputs": {
+                        "title": "position_title",
+                        "name": "primary_name",
+                    },
+                },
+            },
+                        {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["primary_name"],
+                    "output_field": "source_record_id",
+                    "prefix": "SC-PH-JUSTICE",
+                },
+            },
+                        {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "jurisdiction_country",
+                    "value": "Philippines",
+                },
+            },
+            
+        ],
+    },
 
 }

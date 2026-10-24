@@ -199,12 +199,16 @@ class BypassCollector:
                 headless=bypassConfig.get("headless", False),
                 successCriteria=bypassConfig.get(
                     "success_criteria",
-                    []
+                    [],
                 ),
                 timeoutSeconds=bypassConfig.get(
                     "timeout_seconds",
-                    90
-                )
+                    90,
+                ),
+                navigationMode=bypassConfig.get(
+                    "navigation_mode",
+                    "safe_get",
+                ),
             )
         
         elif engineType == "playwright":

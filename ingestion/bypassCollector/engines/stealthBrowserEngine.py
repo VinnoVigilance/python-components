@@ -43,7 +43,9 @@ class StealthBrowserEngine(BaseEngine):
         successCriteria: Optional[list] = None,
         timeoutSeconds: int = 90,
         driverVersion: str = "mlatest",
-        binaryLocation: Optional[str] = None
+        binaryLocation: Optional[str] = None,
+        navigationMode: str = "safe_get"
+
     ):
         """
         Initialize StealthBrowserEngine.
@@ -63,6 +65,7 @@ class StealthBrowserEngine(BaseEngine):
         self.binaryLocation = binaryLocation
         self._bot = None
         self.sb = None
+        self.navigationMode = navigationMode
     
     def __enter__(self):
         """Initialize StealthBot."""
@@ -123,7 +126,20 @@ class StealthBrowserEngine(BaseEngine):
         logger.info(f"Navigating to: {url}")
 
         try:
-            self._bot.safe_get(url)
+            if self.navigationMode == "uc_open":
+                self.sb.driver.set_page_load_timeout(
+                    self.timeoutSeconds
+                )
+                self.sb.driver.uc_open(url)
+
+            elif self.navigationMode == "safe_get":
+                self._bot.safe_get(url)
+
+            else:
+                raise ValueError(
+                    f"Unsupported navigation mode: "
+                    f"{self.navigationMode}"
+                )
             logger.info("Navigation completed successfully")
 
             if settle_seconds > 0:
@@ -361,6 +377,38 @@ class StealthBrowserEngine(BaseEngine):
     def evaluateAwait(self, expression: str) -> Any:
         """Evaluate a Promise-returning JS expression and return its value (CDP
         ``await_promise``); falls back to ``executeScript`` without CDP."""
+        if self.navigationMode == "uc_open":
+            self.sb.driver.set_script_timeout(
+                self.timeoutSeconds
+            )
+
+            script = """
+                const done = arguments[arguments.length - 1];
+
+                Promise.resolve()
+                    .then(() => (
+            """ + expression + """
+                    ))
+                    .then(
+                        value => done({
+                            ok: true,
+                            value: value
+                        }),
+                        error => done({
+                            ok: false,
+                            error: String(error)
+                        })
+                    );
+            """
+
+            result = self.sb.driver.execute_async_script(script)
+
+            if not isinstance(result, dict) or not result.get("ok"):
+                raise RuntimeError(
+                    f"Async JavaScript failed: {result}"
+                )
+
+            return result.get("value")
         cdp = getattr(self.sb, "cdp", None)
 
         if cdp is None:

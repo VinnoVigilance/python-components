@@ -1,0 +1,39 @@
+fetch_strategy: saved_html
+
+record_mode: listing_only
+
+discovery:
+  selector_type: xpath
+  row_selector: >-
+    //div[@id='sc-ph-collected-profiles']
+    /div[@data-elementor-type='popup']
+
+list_fields:
+  popup_id:
+    selector_type: xpath
+    selector: "./@data-elementor-id"
+    value: text
+
+  name_raw:
+    selector_type: xpath
+    selector: "normalize-space(string((.//h2)[1]))"
+    value: text
+
+  biography:
+    selector_type: xpath
+    selector: >-
+      .//div[
+        contains(concat(' ', normalize-space(@class), ' '),
+                 ' elementor-widget-text-editor ')
+      ]//text()[not(ancestor::script) and not(ancestor::style)]
+    value: text
+    join: " "
+
+  photo_url:
+    selector_type: xpath
+    selector: "(.//img)[1]/@src"
+    value: text
+
+storage:
+  save_listing_page: false
+  save_detail_pages: false
