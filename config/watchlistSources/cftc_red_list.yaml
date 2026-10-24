@@ -1,5 +1,18 @@
 fetch_strategy: direct
 
+crawler_settings:
+  concurrent_requests_per_domain: 1
+  download_delay: 2
+  randomize_download_delay: true
+  retry_times: 3
+  retry_http_codes:
+    - 408
+    - 429
+    - 500
+    - 502
+    - 503
+    - 504
+
 record_mode: list_detail
 
 discovery:
