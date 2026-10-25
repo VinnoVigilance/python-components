@@ -1,0 +1,113 @@
+fetch_strategy: saved_html
+
+record_mode: list_optional_detail
+
+detail_fetch_strategy: direct
+
+discovery:
+  selector_type: xpath
+  row_selector: >-
+    //div[@id='linkpagestyling']//div[
+      (
+        contains(concat(' ', normalize-space(@class), ' '), ' divbg ')
+        and (.//strong or .//b)
+      )
+      or (not(@class) and a/span/strong)
+    ]
+  detail_link_selector_type: xpath
+  detail_link_selector: ".//a[@href][.//strong or .//b][1]"
+  detail_link_attribute: href
+
+list_fields:
+  name:
+    selector_type: xpath
+    selector: "normalize-space(translate(string((.//strong | .//b)[1]), '\u00a0\u200b\ufeff', ' '))"
+    value: text
+
+  category:
+    selector_type: xpath
+    selector: "normalize-space(translate(string((preceding::h3[normalize-space(translate(., '\u200b', ''))] | preceding::span[normalize-space(.)='Deputy Governors'])[last()]), '\u00a0\u200b\ufeff', ' '))"
+    value: text
+
+  office:
+    selector_type: xpath
+    selector: "normalize-space(translate(substring-after(string(.), string((.//strong | .//b)[1])), '\u00a0\u200b\ufeff', ' '))"
+    value: text
+
+  photo_url:
+    selector_type: xpath
+    selector: >-
+      (.//img/@src
+        | preceding-sibling::div[1][not(.//strong or .//b)]//img/@src
+      )[last()]
+    value: text
+
+detail_fields:
+  photo_url:
+    selector_type: xpath
+    selector: >-
+      (//div[@id='page']//section//img/@src
+        | //div[@id='linkpagestyling']//img/@src
+      )[1]
+    value: text
+
+  profile_name:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string((
+        //div[@id='page']//section//h2
+        | //div[@id='linkpagestyling']//h4[not(.//h4)]
+      )[1]))
+    value: text
+
+  affiliation:
+    selector_type: xpath
+    selector: >-
+      //div[@id='page']//section//p[
+        contains(concat(' ', normalize-space(@class), ' '), ' affiliation ')
+      ]//text()
+      | //div[@id='linkpagestyling']//td[.//h4]/p[
+        contains(@style, 'text-align:center')
+      ]//text()
+    value: text
+    join: " | "
+
+  biography:
+    selector_type: xpath
+    selector: >-
+      //div[@id='page']//section//h2/parent::div//text()[
+        not(ancestor::h2) and not(ancestor::script) and not(ancestor::style)
+        and not(ancestor::p[
+          contains(concat(' ', normalize-space(@class), ' '), ' affiliation ')
+          or contains(concat(' ', normalize-space(@class), ' '), ' speaker ')
+        ])
+      ]
+      | //div[@id='linkpagestyling']//td[.//h4]/p[@dir='ltr']//text()
+    value: text
+    join: " "
+
+attachments:
+  - type: Profile
+    role: detail_page
+  - type: Photograph
+    selector: "#page section img, #linkpagestyling img"
+    attribute: src
+    multiple: true
+
+record_id:
+  strategy: field
+  source: name
+
+pagination:
+  type: none
+
+storage:
+  save_listing_page: false
+  save_detail_pages: true
+
+crawler_settings:
+  user_agent: "python-requests/2.34.2"
+  concurrent_requests_per_domain: 2
+  download_delay: 0.25
+  retry_times: 3
+  download_timeout: 45

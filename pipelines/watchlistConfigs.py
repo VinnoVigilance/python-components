@@ -2157,4 +2157,54 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+
+    "BSP_SENIOR_OFFICIALS": {
+        "source_name": "BSP",
+        "list_name": "BSP_SENIOR_OFFICIALS",
+        "date_order": "DMY",
+        "download_method": "HTTPS",
+        "download_headers": {
+            "User-Agent": "python-requests/2.34.2",
+        },
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.bsp.gov.ph/Pages/AboutTheBank/WhoWeAre/"
+            "OrganizationAndGovernance/GovernanceOfTheBank.aspx"
+        ),
+        "file_type": "html",
+        "source_config": (
+            "config/watchlistSources/bsp_senior_officials.yaml"
+        ),
+        "external_id_path": "source_record_id",
+        "minimum_record_count": 20,
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["list.name"],
+                    "output_field": "source_record_id",
+                    "prefix": "BSP-SENIOR-OFFICIAL",
+                },
+            },
+        ],
+    },
 }

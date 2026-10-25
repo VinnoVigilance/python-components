@@ -36,6 +36,7 @@ FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "sources"
 
 # list_name -> committed sample file (mirrors test_source_conformance.SAMPLES).
 SAMPLES = {
+    "BSP_SENIOR_OFFICIALS": "BSP_SENIOR_OFFICIALS_raw_sample.jsonl",
     "OFAC-SDN": "OFAC-SDN_raw_sample.jsonl",
     "OFAC-NON-SDN": "OFAC-NON-SDN_raw_sample.jsonl",
     "UKSL": "UKSL_raw_sample.jsonl",
@@ -79,6 +80,10 @@ SAMPLES = {
 # "Crime" and "Sanctions" respectively. A set expects that spread across the
 # entries; a plain string expects that single value on every entry.
 GOLDEN = {
+    "BSP_SENIOR_OFFICIALS": {
+        "SourceType": "Official", "DatasetCategory": "PEP",
+        "ListName": "BSP_SENIOR_OFFICIALS", "SourceName": "BSP",
+    },
     "INTERPOL_UNSC_SPECIAL_NOTICES": {
         "SourceType": "Official", "DatasetCategory": "Law Enforcement",
         "ListName": "INTERPOL_UNSC_SPECIAL_NOTICES", "SourceName": "INTERPOL",
