@@ -4,6 +4,7 @@ JSONL snapshot under ``data/downloads``. Acquisition only."""
 import json
 import logging
 import time
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, List, Optional
@@ -32,6 +33,9 @@ DOWNLOAD_ROOT = ROOT_DIR / "data" / "downloads"
 
 def collect_source(task: ApiCollectorTask) -> str:
     """Collect every page of an API source and return the snapshot path."""
+
+    if task.endpoints and task.write_mode != "list_detail":
+        raise ValueError("Multiple endpoints require write_mode=list_detail")
 
     collected_at = datetime.now()
     transport = _build_transport(task)
@@ -95,6 +99,8 @@ def _collect_list_detail(
     record under ``attachments/members/{id}.json``. Returns the overview path."""
 
     base_dir = _list_detail_base_dir(task, collected_at)
+    if task.endpoints:
+        base_dir = base_dir / f"run={collected_at:%Y%m%d_%H%M%S_%f}"
     timestamp = collected_at.strftime("%Y%m%d_%H%M%S")
     overview_name = task.filename or f"{task.list_name}_{timestamp}.jsonl"
     overview_path = base_dir / overview_name
@@ -102,18 +108,24 @@ def _collect_list_detail(
 
     overview_path.parent.mkdir(parents=True, exist_ok=True)
 
-    total_hint = _startup_probe(task, transport)
+    total_hint = 0 if task.endpoints else _startup_probe(task, transport)
 
     overview_dedup_path = task.record_shape.get("id_path") or task.dedup_path
 
-    pages = _iter_pages(task, transport)
+    pages = (
+        _iter_endpoint_pages(task, transport)
+        if task.endpoints else _iter_pages(task, transport)
+    )
 
     if overview_dedup_path:
         pages = _dedup_pages(pages, overview_dedup_path)
 
     pages = _log_progress(pages, total_hint, f"{task.list_name} overview")
 
-    written = _write_single_jsonl(pages, overview_path)
+    pending_path = (
+        overview_path.with_suffix(".jsonl.partial") if task.endpoints else overview_path
+    )
+    written = _write_single_jsonl(pages, pending_path)
 
     logger.info(
         f"{task.list_name}: overview wrote {written} unique records to "
@@ -122,11 +134,59 @@ def _collect_list_detail(
 
     _check_completeness(task, written, total_hint)
 
-    saved = _fetch_profiles(task, overview_path, members_dir, transport)
+    saved = _fetch_profiles(task, pending_path, members_dir, transport)
+
+    if task.endpoints:
+        pending_path.replace(overview_path)
 
     logger.info(f"{task.list_name}: saved {saved} profiles under {members_dir}")
 
     return str(overview_path)
+
+
+def _iter_endpoint_pages(task: ApiCollectorTask, transport: Any) -> Iterator[List[Any]]:
+    """Combine complete endpoint snapshots, preserving declared feed fields."""
+
+    seen = set()
+
+    for endpoint in task.endpoints:
+        endpoint_task = replace(task, url=endpoint["url"], endpoints=[])
+        query = build_query(endpoint_task.pagination, endpoint_task.params, 1)
+        size_param = endpoint_task.pagination.get("size_param")
+        if size_param:
+            query[size_param] = 1
+        payload = _get_json_with_retry(
+            endpoint_task, endpoint_task.url, query, transport
+        )
+        expected = read_path(payload, endpoint_task.faceting.get("total_path", "total"))
+        if type(expected) is not int or expected < 0:
+            raise ValueError(f"Invalid endpoint total from {endpoint_task.url}")
+        pages = _iter_pages(endpoint_task, transport)
+        id_path = task.record_shape.get("id_path") or task.dedup_path
+
+        if not id_path:
+            raise ValueError("Multiple endpoints require a record ID path")
+
+        pages = _dedup_pages(pages, id_path)
+        count = 0
+
+        for items in pages:
+            for item in items:
+                record_id = read_path(item, id_path)
+                if record_id is None:
+                    raise ValueError(f"Missing record ID from {endpoint_task.url}")
+                if not _detail_url_for(item, task.detail):
+                    raise ValueError(f"Missing profile URL from {endpoint_task.url}")
+                if record_id in seen:
+                    raise ValueError(f"Duplicate record ID across endpoints: {record_id}")
+                seen.add(record_id)
+            count += len(items)
+            yield [{**item, **endpoint.get("record_fields", {})} for item in items]
+
+        if count != expected:
+            raise RuntimeError(
+                f"Incomplete endpoint {endpoint_task.url}: collected {count} of {expected}"
+            )
 
 
 def _collect_record_files(
@@ -207,6 +267,9 @@ def _fetch_profiles(
                 continue
 
             profile = _get_json_with_retry(task, url, None, transport)
+
+            if task.endpoints and read_path(profile, id_path) != record_id:
+                raise ValueError(f"Profile ID does not match overview record: {record_id}")
 
             file_path.write_text(
                 json.dumps(profile, ensure_ascii=False),

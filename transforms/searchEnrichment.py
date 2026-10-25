@@ -346,6 +346,24 @@ def _pycountry_iso2(name: str):
         return None
 
 
+def country_code_to_name(code, valid_codes=None) -> str:
+    """Resolve an allowed ISO2 code exactly; never infer a country from text."""
+    if not isinstance(code, str):
+        return ""
+
+    code = code.strip().upper()
+    if len(code) != 2:
+        return ""
+
+    if valid_codes is None:
+        valid_codes = _load_valid_iso2()
+    if code not in valid_codes:
+        return ""
+
+    country = pycountry.countries.get(alpha_2=code)
+    return country.name if country is not None else ""
+
+
 def country_to_iso2(name, valid_codes=None) -> str:
     """Resolve a free-text country name to a picklist-valid ISO2 code, or "".
 

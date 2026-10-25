@@ -1323,6 +1323,82 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "INTERPOL_UNSC_SPECIAL_NOTICES": {
+        "source_name": "INTERPOL",
+        "list_name": "INTERPOL_UNSC_SPECIAL_NOTICES",
+        "date_order": "YMD",
+        "download_method": "API",
+        "url": "https://ws-public.interpol.int/notices/v1/un/persons",
+        "file_type": "jsonl",
+        "external_id_path": "source_record_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "enrich_from_attachment",
+                "level": "record",
+                "relative_path_fields": ["attachments_dir"],
+                "config": {
+                    "attachments_dir": "attachments/members",
+                    "key_field": "entity_id",
+                },
+            },
+        ],
+        "api_config": {
+            "transport": "browser",
+            "bypass_config": {
+                "headless": False,
+                "warmup_url": "https://www.interpol.int/How-we-work/Notices/View-UN-Notices-Individuals",
+                "timeout_seconds": 90,
+                "min_request_interval": 0.3,
+            },
+            "endpoints": [
+                {
+                    "url": "https://ws-public.interpol.int/notices/v1/un/persons",
+                    "record_fields": {"record_type": "Individual"},
+                },
+                {
+                    "url": "https://ws-public.interpol.int/notices/v1/un/entities",
+                    "record_fields": {"record_type": "Entity"},
+                },
+            ],
+            "pagination": {
+                "type": "page",
+                "page_param": "page",
+                "size_param": "resultPerPage",
+                "page_size": 160,
+                "start_page": 1,
+            },
+            "faceting": {
+                "enabled": True,
+                "cap": 160,
+                "total_path": "total",
+                "facets": [
+                    {
+                        "type": "enum",
+                        "param": "unResolution",
+                        "values": [
+                            "1267", "1533", "1591", "1970", "1988", "2048",
+                            "2127", "2140", "2206", "2653", "2713", "751",
+                        ],
+                    },
+                    {
+                        "type": "enum",
+                        "param": "unReference",
+                        "values": list("0123456789"),
+                        "disjoint": False,
+                    },
+                ],
+            },
+            "items_path": "_embedded.notices",
+            "detail": {"url_path": "_links.self.href"},
+            "record_shape": {"id_path": "entity_id"},
+            "dedup_path": "source_record_id",
+            "throttle_delay": 0.3,
+            "write_mode": "list_detail",
+        },
+    },
+
      "INTERPOL-RED-NOTICES": {
             "source_name": "INTERPOL",
             "list_name": "INTERPOL-RED-NOTICES",

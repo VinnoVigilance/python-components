@@ -40,6 +40,7 @@ class ApiCollectorTask:
     dedup_path: Optional[str] = None
     faceting: Dict[str, Any] = field(default_factory=dict)
     record_id_path: Optional[str] = None
+    endpoints: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "ApiCollectorTask":
@@ -84,4 +85,5 @@ class ApiCollectorTask:
             record_shape=api_config.get("record_shape", {}),
             dedup_path=api_config.get("dedup_path"),
             record_id_path=api_config.get("record_id_path"),
+            endpoints=api_config.get("endpoints", []),
         )
