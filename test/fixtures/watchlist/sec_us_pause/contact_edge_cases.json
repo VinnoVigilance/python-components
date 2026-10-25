@@ -1,0 +1,345 @@
+{
+  "cases": [
+    {
+      "name": "Caspian Trading, Inc., a.k.a. Caspian Investments",
+      "text": "184 Fisher Avenue Boston, MA 02120 Phone: 617-513-9550, 917-300-0430 Website: http://www.fixed-investments.com/",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/caspian-trading-inc-aka-caspian-investments",
+      "entity_id": "SEC-US-PAUSE-83b98117c2cf5341235de033009b1a756310561633810a0e5849875f0d76d2e4",
+      "expected": {
+        "phones": [
+          "617-513-9550",
+          "917-300-0430"
+        ],
+        "faxes": [],
+        "emails": [],
+        "websites": [
+          "http://www.fixed-investments.com/"
+        ],
+        "address": "184 Fisher Avenue Boston, MA 02120"
+      }
+    },
+    {
+      "name": "Whitman Law Group",
+      "text": "132 Franklin Street Boston, MA 02110 Phone: 1-617-341-8169 Fax: None Email: info.whitmanlg.com Website: www.whitmanlg.com",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/whitman-law-group",
+      "entity_id": "SEC-US-PAUSE-ec56fca10a233c2d798a55c121269a3d0c51424d00e0894b065f7b9f7e07d6ad",
+      "expected": {
+        "phones": [
+          "1-617-341-8169"
+        ],
+        "faxes": [],
+        "emails": [],
+        "websites": [
+          "www.whitmanlg.com"
+        ],
+        "address": "132 Franklin Street Boston, MA 02110"
+      }
+    },
+    {
+      "name": "TCM Financial",
+      "text": "56 Liberty Street, Suite 1249 New York, NY 10005 Phone: 646-328-1096, ext. 719 805 Marion Street Seattle, WA 98104 Phone: 206-299-0763, ext. 643 Fax: 206-338-0979 Website: http://tcmfinancial.us/",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/tcm-financial",
+      "entity_id": "SEC-US-PAUSE-15803b1413e778b479c613660d3b3401a8dc8164d284e18b95049c1e61a20d3d",
+      "expected": {
+        "phones": [
+          "646-328-1096, ext. 719",
+          "206-299-0763, ext. 643"
+        ],
+        "faxes": [
+          "206-338-0979"
+        ],
+        "emails": [],
+        "websites": [
+          "http://tcmfinancial.us/"
+        ],
+        "address": "56 Liberty Street, Suite 1249 New York, NY 10005"
+      }
+    },
+    {
+      "name": "SmartfxMasters",
+      "text": "Los Angeles, CA Phone: None Fax: None Email: info@smartfxmasters.online Website: smartfxmasters.online",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/smartfxmasters",
+      "entity_id": "SEC-US-PAUSE-a76bbd393c2a9e664b1d9079bcbc7b9b6b753fc091349ab2d3090975547cb489",
+      "expected": {
+        "phones": [],
+        "faxes": [],
+        "emails": [
+          "info@smartfxmasters.online"
+        ],
+        "websites": [
+          "smartfxmasters.online"
+        ],
+        "address": "Los Angeles, CA"
+      }
+    },
+    {
+      "name": "Severn Funding and Investment Limited",
+      "text": "1230 S. Main Street Ann Arbor, MI 48104 Phone: 1-662-618-3030 Fax: 1-662-602-2730 Email: info@severnfundingninvestment.com Website: http://www. severnfundingninvestment.com",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/severn-funding-investment-limited",
+      "entity_id": "SEC-US-PAUSE-fe5fa689db04961f3c133d65c0819e70065bb1212bde6beeaf47de464798cc9a",
+      "expected": {
+        "phones": [
+          "1-662-618-3030"
+        ],
+        "faxes": [
+          "1-662-602-2730"
+        ],
+        "emails": [
+          "info@severnfundingninvestment.com"
+        ],
+        "websites": [
+          "severnfundingninvestment.com"
+        ],
+        "address": "1230 S. Main Street Ann Arbor, MI 48104"
+      }
+    },
+    {
+      "name": "Secure Insurance",
+      "text": "The Grace Building 32nd Floor, 1114 Avenue of the Americas New York, NY 10036-7798 Tel +1 646 837 7192 / Fax +1 646 417 5481 Website: ins-secure.com",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/secure-insurance",
+      "entity_id": "SEC-US-PAUSE-b6fa40b99ebd12d3a185860a4c798b4b0442b88822135c0636df01edbf284bab",
+      "expected": {
+        "phones": [
+          "+1 646 837 7192"
+        ],
+        "faxes": [
+          "+1 646 417 5481"
+        ],
+        "emails": [],
+        "websites": [
+          "ins-secure.com"
+        ],
+        "address": "The Grace Building 32nd Floor, 1114 Avenue of the Americas New York, NY 10036-7798"
+      }
+    },
+    {
+      "name": "Prime Solutions, Inc.",
+      "text": "100 West 57th Street New York, NY Phone: 646-810-3935 Fax: 646-224-4191 Fax: 646-365-3422 (from website) Website: http://primesolutions.us/",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/prime-solutions-inc",
+      "entity_id": "SEC-US-PAUSE-1f6ee60d90f47f16017df1f46538b5d802307dc33732005bcea95fe8f04eae88",
+      "expected": {
+        "phones": [
+          "646-810-3935"
+        ],
+        "faxes": [
+          "646-224-4191",
+          "646-365-3422"
+        ],
+        "emails": [],
+        "websites": [
+          "http://primesolutions.us/"
+        ],
+        "address": "100 West 57th Street New York, NY"
+      }
+    },
+    {
+      "name": "Morgan Premier Group",
+      "text": "785 Broad Street New York, NY 10004 Phone Number: 518-430-0332 Fax Number: 518-935-1354 Website: http://morganpremiergrp.com/",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/morgan-premier-group",
+      "entity_id": "SEC-US-PAUSE-cbf3cf28de17715d0d181662bb35ba13b333e22bf1a966c7e407268c018f9a22",
+      "expected": {
+        "phones": [
+          "518-430-0332"
+        ],
+        "faxes": [
+          "518-935-1354"
+        ],
+        "emails": [],
+        "websites": [
+          "http://morganpremiergrp.com/"
+        ],
+        "address": "785 Broad Street New York, NY 10004"
+      }
+    },
+    {
+      "name": "LLCI Limited International / LLCI Capital",
+      "text": "40 Wall Street New York, NY 10005 Phone: +1 888 LLCI Fax: None Email: support@llcicapital.com / support@llcilimited.com Website: https://llcicapital.com/ / https://llcilimited.com/",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/llci-limited-international-llci-capital",
+      "entity_id": "SEC-US-PAUSE-155ac2a39572e8356794e96cd49f39b70201daa4151ae22cb68f1fb9b8d0c2d5",
+      "expected": {
+        "phones": [
+          "+1 888 LLCI"
+        ],
+        "faxes": [],
+        "emails": [
+          "support@llcicapital.com",
+          "support@llcilimited.com"
+        ],
+        "websites": [
+          "https://llcicapital.com/",
+          "https://llcilimited.com/"
+        ],
+        "address": "40 Wall Street New York, NY 10005"
+      }
+    },
+    {
+      "name": "Kenilworth Mergers & Acquisitions Inc.",
+      "text": "130 S Juniper Street 11th Floor Philadelphia, PA 19107 Phone: 1-215-254-6397 Fax: 1-215-754-4296 Email: info.kenilworthma.com Website: www.kenilworthma.com",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/kenilworth-mergers-acquisitions-inc",
+      "entity_id": "SEC-US-PAUSE-d101d4e1594842090ae665db3cbd3f87fe11927535ee2222531fc7abce772c95",
+      "expected": {
+        "phones": [
+          "1-215-254-6397"
+        ],
+        "faxes": [
+          "1-215-754-4296"
+        ],
+        "emails": [],
+        "websites": [
+          "www.kenilworthma.com"
+        ],
+        "address": "130 S Juniper Street 11th Floor Philadelphia, PA 19107"
+      }
+    },
+    {
+      "name": "FX Globalminer",
+      "text": "Oswego, NY Phone: +14704FXGM Fax: None Email: support@fxglobalminer.com Website: https://fxglobalminer.com",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/fx-globalminer",
+      "entity_id": "SEC-US-PAUSE-05e5a56ea761ebcd7cf93d25b1242ac0baf24a81d95e5d341e529b2b4ff27596",
+      "expected": {
+        "phones": [
+          "+14704FXGM"
+        ],
+        "faxes": [],
+        "emails": [
+          "support@fxglobalminer.com"
+        ],
+        "websites": [
+          "https://fxglobalminer.com"
+        ],
+        "address": "Oswego, NY"
+      }
+    },
+    {
+      "name": "Expeke",
+      "text": "453 7th Street Des Moines, IA 50309 Phone: None Fax: None Email: support@expeke.net Website: wallet.expeke.net",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/expeke",
+      "entity_id": "SEC-US-PAUSE-74edcc55e80fe08e360573cdc93e34ee83e99f78a1c635950df9800902f76bb0",
+      "expected": {
+        "phones": [],
+        "faxes": [],
+        "emails": [
+          "support@expeke.net"
+        ],
+        "websites": [
+          "wallet.expeke.net"
+        ],
+        "address": "453 7th Street Des Moines, IA 50309"
+      }
+    },
+    {
+      "name": "Europa Commodities, a.k.a. Europa Capital LLC",
+      "text": "Three Embarcadero Center 155 Clay Street, Suite 2216 San Francisco CA, 94111 Phone: 415-800-4282, +81 3-4496-5010, +852-3010-1215 Fax: 415-520-1927, +81 3-4496 5011, +852-3010-1219 Website: http://europa-capital.com/",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/europa-commodities-aka-europa-capital-llc",
+      "entity_id": "SEC-US-PAUSE-51953d11e6713833619c0aa0b1cda15afb0b2110616521106919c23af3a202c8",
+      "expected": {
+        "phones": [
+          "415-800-4282",
+          "+81 3-4496-5010",
+          "+852-3010-1215"
+        ],
+        "faxes": [
+          "415-520-1927",
+          "+81 3-4496 5011",
+          "+852-3010-1219"
+        ],
+        "emails": [],
+        "websites": [
+          "http://europa-capital.com/"
+        ],
+        "address": "Three Embarcadero Center 155 Clay Street, Suite 2216 San Francisco CA, 94111"
+      }
+    },
+    {
+      "name": "Division of Securities",
+      "text": "Chicago Illinois 230 South Dearborn Street Chicago, IL Website: dos-ci.org",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/division-securities",
+      "entity_id": "SEC-US-PAUSE-3467e8ad7a9f6613c1b09877a284281c5aedbdb64d8f13102e3b208e0071fc70",
+      "expected": {
+        "phones": [],
+        "faxes": [],
+        "emails": [],
+        "websites": [
+          "dos-ci.org"
+        ],
+        "address": "Chicago Illinois 230 South Dearborn Street Chicago, IL"
+      }
+    },
+    {
+      "name": "Colbert & Welling LLP",
+      "text": "State House, Room 373 Boston, MA 02133 Phone: 857-302-4191 Website: http://www.colbert-welling.org",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/colbert-welling-llp",
+      "entity_id": "SEC-US-PAUSE-f4d39dcd2e27edfcaba7433bb0881ac9abb68aa3d75100dbdb4ffa25057050e4",
+      "expected": {
+        "phones": [
+          "857-302-4191"
+        ],
+        "faxes": [],
+        "emails": [],
+        "websites": [
+          "http://www.colbert-welling.org"
+        ],
+        "address": "State House, Room 373 Boston, MA 02133"
+      }
+    },
+    {
+      "name": "205fx.com",
+      "text": "40 Wall Street, #28 New York, NY 10005 Phone: None Fax: None Email: support@205fx.com Website: 205fx.com",
+      "url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/205fxcom",
+      "entity_id": "SEC-US-PAUSE-65f4280b45c373ee9e3d4639389c72f20dc0f5fcfed45411feb5507f8241828f",
+      "expected": {
+        "phones": [],
+        "faxes": [],
+        "emails": [
+          "support@205fx.com"
+        ],
+        "websites": [
+          "205fx.com"
+        ],
+        "address": "40 Wall Street, #28 New York, NY 10005"
+      }
+    }
+  ],
+  "placeholder_addresses": [
+    {
+      "name": "Hostfx, Inc.",
+      "text": "No Address Identified Phone: None Fax: None Email: None Website: https://hfxoptions.com/"
+    },
+    {
+      "name": "StockF Limited",
+      "text": "No Address Located Phone: +1 (888) 828-0618 Fax: None Email: info@stockf.com Website: https://stockf.com/"
+    },
+    {
+      "name": "Stock Access Inc.",
+      "text": "No Address Identified Phone: None Fax: None Email: None Website: www.stockaccessinc.com"
+    },
+    {
+      "name": "Icarlatam",
+      "text": "No Address Identified Phone: +61 485 971 203 Fax: None Email: info@icarlatam.com Website: https://icarlatam.com/"
+    },
+    {
+      "name": "Hillton Stock Investment Limited, a.k.a. Hillton Stocks Investments",
+      "text": "No contact details provided Website: http://www.hilltonstock.com/"
+    },
+    {
+      "name": "Elongate Coin Financial",
+      "text": "No Address Listed Phone: None Fax: None Email: info@elongatecoinstraders.com Website: www.elongatecoinstraders.com/"
+    },
+    {
+      "name": "Capital Trade, LLC",
+      "text": "No Address Identified Phone: None Fax: None Email: None Website: http://www.capital-trade.eu/en"
+    },
+    {
+      "name": "Burkette Trade",
+      "text": "No Address Listed Phone: None Fax: None Email: support@burkettetrade.com Website: https://burkettetrade.com/"
+    },
+    {
+      "name": "Alliance Finance Union Investor Services LLC",
+      "text": "No Address Identified Phone: None Fax: None Email: None Website: https://alliancefin-union.com"
+    },
+    {
+      "name": "2139 Ltd",
+      "text": "No Address Identified Phone: None Fax: None Email: 2139ex@gmail.com Website: https://2139.ltd/h5/#/home & https://2139.ltd/pc/#/home"
+    }
+  ]
+}

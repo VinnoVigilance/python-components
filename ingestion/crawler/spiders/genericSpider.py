@@ -1,15 +1,19 @@
 import re
+from html import escape
+from urllib.parse import urldefrag
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit, urljoin
 
 import scrapy
+
+from ingestion.crawler.pagination import PaginationError, resolve_next_page_url
 
 
 class GenericSpider(scrapy.Spider):
     name = "generic_source_spider"
     PERMANENT_HTTP_STATUSES = {404, 410}
 
-    def __init__(self, task, crawler_config, storage, records, expected_details=None, *args, **kwargs):
+    def __init__(self, task, crawler_config, storage, records, expected_details=None, pagination_state=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.task = task
         self.config = crawler_config
@@ -17,6 +21,12 @@ class GenericSpider(scrapy.Spider):
         self.records = records
         self.expected_details = [] if expected_details is None else expected_details
         self._expected_by_id = {}
+        self.pagination_state = (
+            pagination_state if pagination_state is not None
+            else {"complete": False, "error": None}
+        )
+        self._visited_listing_urls = set()
+        self._listing_pages = []
 
     async def start(self):
         if self.task.detail_items:
@@ -24,7 +34,14 @@ class GenericSpider(scrapy.Spider):
                 yield request
             return
 
-        yield scrapy.Request(url=self._build_start_url(), callback=self.parse, dont_filter=True)
+        request_options = {
+            "url": self._build_start_url(),
+            "callback": self.parse,
+            "dont_filter": True,
+        }
+        if self._uses_next_link_pagination():
+            request_options["errback"] = self.listing_failed
+        yield scrapy.Request(**request_options)
 
     def _expect_detail(self, record_id, detail_url, list_data):
         item = {"record_id": record_id, "detail_url": detail_url, "list_data": dict(list_data)}
@@ -64,11 +81,119 @@ class GenericSpider(scrapy.Spider):
 
         self.logger.error("Detail page failed. url=%s error=%s", request.url, message)
 
+    def _uses_next_link_pagination(self):
+        return str(
+            self.config.get("pagination", {}).get("type", "none")
+        ).strip().lower() == "next_link"
+
+    def listing_failed(self, failure):
+        self.pagination_state["complete"] = False
+        self.pagination_state["error"] = (
+            f"{failure.request.url}: {failure.getErrorMessage()}"
+        )
+        self.logger.error(
+            "Listing page failed: %s", self.pagination_state["error"]
+        )
+
     def parse(self, response):
+        if not self._uses_next_link_pagination():
+            yield from self._parse_listing_records(response)
+            return
+
+        try:
+            current_url = urldefrag(response.url)[0]
+            if current_url in self._visited_listing_urls:
+                raise PaginationError("A listing page was visited twice")
+            self._visited_listing_urls.add(current_url)
+
+            if self.config.get("storage", {}).get("save_listing_page", False):
+                body = "".join(response.xpath("//body/node()").getall())
+                if not response.xpath("//body"):
+                    raise PaginationError("Listing page has no HTML body")
+                self._listing_pages.append((response.url, body))
+
+            yield from self._parse_listing_records(response)
+            next_url = self._next_listing_url(response)
+
+            if next_url:
+                self.logger.info(
+                    "Listing page %s parsed; next: %s",
+                    len(self._visited_listing_urls), next_url,
+                )
+                yield scrapy.Request(
+                    url=next_url,
+                    callback=self.parse,
+                    errback=self.listing_failed,
+                )
+                return
+
+            if self._listing_pages:
+                sections = [
+                    '<section data-listing-url="' + escape(url, quote=True)
+                    + '">' + body + '</section>'
+                    for url, body in self._listing_pages
+                ]
+                self.storage.save_source_html(
+                    "<!DOCTYPE html><html><body>"
+                    + "".join(sections) + "</body></html>"
+                )
+
+            self.pagination_state["complete"] = True
+            self.logger.info(
+                "Listing pagination completed: %s pages",
+                len(self._visited_listing_urls),
+            )
+        except Exception as error:
+            self.pagination_state["complete"] = False
+            self.pagination_state["error"] = (
+                f"{response.url}: {type(error).__name__}: {error}"
+            )
+            raise
+
+    def _next_listing_url(self, response):
+        pagination = self.config.get("pagination", {})
+        selector = pagination.get("next_link_selector")
+        if not selector:
+            raise PaginationError("pagination.next_link_selector is required")
+
+        selector_type = pagination.get("next_link_selector_type", "css")
+        if selector_type == "css":
+            nodes = response.css(selector)
+        elif selector_type == "xpath":
+            nodes = response.xpath(selector)
+        else:
+            raise PaginationError("Unsupported next-link selector type")
+
+        if not nodes:
+            return None
+
+        urls = set()
+        for node in nodes:
+            href = node.xpath("@href").get()
+            if href is None:
+                raise PaginationError("Next-page element has no href")
+            urls.add(resolve_next_page_url(
+                response.url, href,
+                visited_urls=self._visited_listing_urls,
+            ))
+
+        if len(urls) != 1:
+            raise PaginationError("Multiple different next-page links found")
+
+        max_pages = int(pagination.get("max_pages", 100))
+        if max_pages < 1 or len(self._visited_listing_urls) >= max_pages:
+            raise PaginationError("Pagination max_pages reached before the end")
+
+        return urls.pop()
+
+    def _parse_listing_records(self, response):
         self.current_url = response.url
         storage_config = self.config.get("storage", {})
 
-        if storage_config.get("save_listing_page", False):
+        if (
+            storage_config.get("save_listing_page", False)
+            and not self._uses_next_link_pagination()
+        ):
             self.storage.save_source_html(response.text)
 
         row_selector = self.config.get("discovery", {}).get("row_selector")
