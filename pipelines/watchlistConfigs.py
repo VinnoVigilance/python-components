@@ -2111,4 +2111,50 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "SEC_US_PAUSE": {
+        "source_name": "SEC-US",
+        "list_name": "SEC_US_PAUSE",
+        "date_order": "MDY",
+        "download_method": "CRAWLER",
+        "url": (
+            "https://www.sec.gov/enforcement-litigation/"
+            "public-alerts-unregistered-soliciting-entities"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "source_config": (
+            "config/watchlistSources/sec_us_pause.yaml"
+        ),
+        "minimum_record_count": 1000,
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["detail_url"],
+                    "output_field": "source_record_id",
+                    "prefix": "SEC-US-PAUSE",
+                },
+            },
+        ],
+    },
+
 }

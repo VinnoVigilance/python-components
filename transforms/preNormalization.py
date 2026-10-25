@@ -186,6 +186,11 @@ class RegexExtractAllHandler(RegexExtractHandler):
     the engine's optional target_field column so the list lands on a new
     field instead of overwriting the field it was read from.
 
+    A list input is processed recursively and all matches are collected in
+    one flat list. This lets a second rule extract values from multiple text
+    sections produced by a first rule. Scalar inputs keep their original
+    matching behavior.
+
     Example (DTI-FTEB press releases):
 
     field "content.rendered" = '<p><img src="a.jpg"></p><p><img src="b.png"></p>'
@@ -195,6 +200,16 @@ class RegexExtractAllHandler(RegexExtractHandler):
     """
 
     def normalize(self, value, rule):
+
+        # A previous rule may have extracted several text sections. Apply
+        # this rule to every section and collect matches without serializing
+        # the Python list into text. String inputs retain the original path.
+        if isinstance(value, list):
+            return [
+                match
+                for item in value
+                for match in self.normalize(item, rule)
+            ]
 
         return self._find_matches(value, rule)
 

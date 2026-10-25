@@ -1,4 +1,5 @@
 import logging
+import os
 
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import (
@@ -30,6 +31,33 @@ from ingestion.crawler.spiders.savedHtmlSpider import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_user_agent(crawler_settings: dict) -> str | None:
+    """Resolve an optional source-specific HTTP identity without changing defaults."""
+    direct = "user_agent" in crawler_settings
+    from_env = "user_agent_env" in crawler_settings
+    if direct and from_env:
+        raise ValueError("Configure only one of user_agent or user_agent_env")
+    if not direct and not from_env:
+        return None
+
+    if from_env:
+        name = crawler_settings["user_agent_env"]
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("user_agent_env must name an environment variable")
+        name = name.strip()
+        value = os.environ.get(name)
+        if value is None or not value.strip():
+            raise ValueError(f"Required User-Agent environment variable is missing or empty: {name}")
+    else:
+        value = crawler_settings["user_agent"]
+
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Configured User-Agent must be a non-empty string")
+    if "\r" in value or "\n" in value:
+        raise ValueError("Configured User-Agent must be a single line")
+    return value.strip()
 
 
 def _finalize_media_completion(
@@ -328,6 +356,19 @@ def crawl_source(
     records = []
     expected_details = []
 
+    # Direct next-link listings must reach their final page.
+    # Detail-only retries and other acquisition modes retain their behavior.
+    pagination_state = None
+    if (
+        not is_media
+        and spider_class is GenericSpider
+        and str(
+            crawler_config.get("pagination", {}).get("type", "none")
+        ).strip().lower() == "next_link"
+        and not getattr(task, "detail_items", None)
+    ):
+        pagination_state = {"complete": False, "error": None}
+
     # =====================================================
     # 6. SCRAPY SETTINGS
     # =====================================================
@@ -339,23 +380,26 @@ def crawl_source(
         "INFO",
     )
 
+    crawler_settings = (
+        acquisition_config if is_media else crawler_config
+    ).get("crawler_settings", {})
+    user_agent = _resolve_user_agent(crawler_settings)
+
     settings.set(
         "USER_AGENT",
-        "Mozilla/5.0 "
-        "(Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "(KHTML, like Gecko) "
-        "Chrome/126.0.0.0 "
-        "Safari/537.36",
+        user_agent or (
+            "Mozilla/5.0 "
+            "(Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 "
+            "(KHTML, like Gecko) "
+            "Chrome/126.0.0.0 "
+            "Safari/537.36"
+        ),
     )
 
     # =====================================================
     # 7. PER-SOURCE HTTP SETTINGS
     # =====================================================
-
-    crawler_settings = (
-        acquisition_config if is_media else crawler_config
-    ).get("crawler_settings", {})
 
     if crawler_settings:
 
@@ -495,20 +539,33 @@ def crawl_source(
     else:
 
         # Preserve existing Watchlist parameter names.
-        process.crawl(
-            spider_class,
-            task=task,
-            crawler_config=crawler_config,
-            storage=storage,
-            records=records,
-            expected_details=expected_details,
-        )
+        watchlist_options = {
+            "task": task,
+            "crawler_config": crawler_config,
+            "storage": storage,
+            "records": records,
+            "expected_details": expected_details,
+        }
+        if pagination_state is not None:
+            watchlist_options["pagination_state"] = pagination_state
+
+        process.crawl(spider_class, **watchlist_options)
 
     # =====================================================
     # 10. START
     # =====================================================
 
     process.start()
+
+    if pagination_state is not None:
+        if pagination_state.get("error") or not pagination_state.get("complete"):
+            reason = (
+                pagination_state.get("error")
+                or "The final listing page was not reached."
+            )
+            raise RuntimeError(
+                f"Incomplete listing pagination: {reason}"
+            )
 
     # =====================================================
     # 11. RESULT SOURCE FILE
