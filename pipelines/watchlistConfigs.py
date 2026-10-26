@@ -2207,4 +2207,41 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
+    "CRIMESTOPPERS_UK_MOST_WANTED": {
+        "source_name": "CRIMESTOPPERS-UK",
+        "list_name": "CRIMESTOPPERS_UK_MOST_WANTED",
+        "download_method": "CRAWLER",
+        "url": (
+            "https://crimestoppers-uk.org/"
+            "give-information/most-wanted"
+        ),
+        "file_type": "html",
+        "date_order": "DMY",
+        "external_id_path": "source_record_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "crimestoppers_uk_most_wanted.yaml"
+        ),
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+        ],
+    },
 }

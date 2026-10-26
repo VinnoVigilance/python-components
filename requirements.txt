@@ -28,6 +28,7 @@ inscriptis==2.7.3
 
 # --- Ingestion / infrastructure ---
 requests==2.34.2         # source file downloads
+curl_cffi==0.17.0
 sb-stealth-wrapper==0.5.0  # stealth browser engine for bypassCollector (Cloudflare-protected sources)
 seleniumbase==4.54.10    # SeleniumBase driver, pinned to a device-matched chromedriver (compatibleDriver.py)
 psycopg2-binary==2.9.12  # PostgreSQL access

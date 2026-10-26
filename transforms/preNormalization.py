@@ -379,6 +379,39 @@ class FlattenDictHandler(BaseHandler):
 # Language Name Handler
 # =========================================================
 
+class FirstNonEmptyHandler(BaseHandler):
+
+    """Choose the first populated path in a ``|``-separated priority list.
+
+    The input must be an object. Paths are relative to that object; a rule
+    whose field is "$" reads the whole record. Always use target_field
+    to preserve the input object.
+    Only structural emptiness is tested. Placeholder words remain available
+    for the existing mapping cleanup. False and zero are real values.
+    """
+
+    def normalize(self, value, rule):
+        if not isinstance(value, dict):
+            return ""
+
+        paths = [part.strip() for part in str(rule or "").split("|")
+                 if part.strip()]
+        if not paths:
+            raise ValueError("first_non_empty requires at least one field path")
+
+        for path in paths:
+            for _, _, candidate in get_nested_values(value, path):
+                if candidate is None:
+                    continue
+                if isinstance(candidate, str) and not candidate.strip():
+                    continue
+                if isinstance(candidate, (list, dict)) and not candidate:
+                    continue
+                return candidate
+
+        return ""
+
+
 class LanguageNameHandler(BaseHandler):
 
     """Resolve an ISO 639-2 language code (e.g. FRE) to its English name via
@@ -409,6 +442,7 @@ HANDLERS = {
     "split_pattern": SplitPatternHandler(),
     "flatten_dict": FlattenDictHandler(),
     "language_name": LanguageNameHandler(),
+    "first_non_empty": FirstNonEmptyHandler(),
 }
 
 
@@ -716,10 +750,15 @@ class PreNormalizationEngine:
             # Find Matches
             # -----------------------------------------
 
-            matches = get_nested_values(
-                normalized_json,
-                field,
-            )
+            if field == "$":
+                if not target_field:
+                    raise ValueError("A whole-record rule requires target_field")
+                matches = [(None, None, normalized_json)]
+            else:
+                matches = get_nested_values(
+                    normalized_json,
+                    field,
+                )
 
             if not matches:
 

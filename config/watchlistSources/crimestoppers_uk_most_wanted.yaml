@@ -1,0 +1,210 @@
+# Direct Scrapy. Requires access from the machine running the job.
+# Pagination uses numeric attributes; no browser or JavaScript execution is required.
+# Raw age/height/appearance and location roles are preserved; mapping is a later step.
+fetch_strategy: direct
+record_mode: list_detail
+discovery:
+  row_selector: form.most-wanted-form .wanted-gallery .boxshadow
+  detail_link_selector: figure a[href*="/most-wanted/appeal?ID="]
+  detail_link_attribute: href
+list_fields:
+  headline:
+    selector_type: xpath
+    selector: normalize-space(string((.//span[not(contains(concat(' ', normalize-space(@class), ' '), ' location
+      '))])[1]))
+    value: text
+  crime_type:
+    selector_type: css
+    selector: a.tag
+    value: text
+  whereabouts:
+    selector_type: xpath
+    selector: .//span[contains(concat(' ', normalize-space(@class), ' '), ' location ')]//text()
+    value: text
+    join: ' '
+  thumbnail_url:
+    selector_type: css
+    selector: figure img
+    value: attribute
+    attribute: src
+detail_fields:
+  page_title:
+    selector_type: xpath
+    selector: normalize-space(string((//main//h1)[1]))
+    value: text
+  suspect_name:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Suspect name:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  nickname:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Nickname:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  cs_reference:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='CS reference:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  crime_type:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Crime type:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  crime_location:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Crime location:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  police_force:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Police force:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  people_involved:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Number of people involved:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  whereabouts:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Whereabouts:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  sex:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Sex:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  age_raw:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Age:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  height_raw:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Height:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  build:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Build:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  hair_colour:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Hair colour:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  hair_type:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Hair type:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  hair_length:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Hair length:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  facial_hair:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Facial hair:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  eye_colour:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Eye colour:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  ethnic_appearance:
+    selector_type: xpath
+    selector: (//main//li[strong[normalize-space()='Ethnic appearance:']])[1]/strong[1]/following-sibling::node()/descendant-or-self::text()
+    value: text
+    join: ' '
+  summary:
+    selector_type: xpath
+    selector: //main//h2[normalize-space()='Summary']/following-sibling::node()[not(self::h2) and preceding-sibling::h2[1][normalize-space()='Summary']]/descendant-or-self::text()[not(ancestor::script)
+      and not(ancestor::style)]
+    value: text
+    join: ' '
+  full_details:
+    selector_type: xpath
+    selector: //main//h2[normalize-space()='Full Details']/following-sibling::node()[not(self::h2) and preceding-sibling::h2[1][normalize-space()='Full
+      Details']]/descendant-or-self::text()[not(ancestor::script) and not(ancestor::style)]
+    value: text
+    join: ' '
+  additional_information:
+    selector_type: xpath
+    selector: //main//h2[normalize-space()='Additional Information']/following-sibling::node()[not(self::h2) and
+      preceding-sibling::h2[1][normalize-space()='Additional Information']]/descendant-or-self::text()[not(ancestor::script)
+      and not(ancestor::style)]
+    value: text
+    join: ' '
+  case_attributes:
+    selector_type: xpath
+    selector: //main//div[contains(concat(' ', normalize-space(@class), ' '), ' wanted-intro ')]//li[strong]
+    fields:
+      label:
+        selector_type: xpath
+        selector: normalize-space(string(strong[1]))
+        value: text
+      value:
+        selector_type: xpath
+        selector: strong[1]/following-sibling::node()/descendant-or-self::text()
+        value: text
+        join: ' '
+  description_attributes:
+    selector_type: xpath
+    selector: //main//ul[preceding-sibling::h2[1][normalize-space()='Suspect description']]/li[strong]
+    fields:
+      label:
+        selector_type: xpath
+        selector: normalize-space(string(strong[1]))
+        value: text
+      value:
+        selector_type: xpath
+        selector: strong[1]/following-sibling::node()/descendant-or-self::text()
+        value: text
+        join: ' '
+  photo_urls:
+    selector_type: xpath
+    selector: //main//div[contains(concat(' ', normalize-space(@class), ' '), ' wanted-intro ')]//div[contains(concat('
+      ', normalize-space(@class), ' '), ' boxshadow ')]//img/@src
+    value: text
+    multiple: true
+record_id:
+  strategy: url_regex
+  source: detail_url
+  pattern: (?:\?|&)ID=([0-9]+)(?:[&#]|$)
+pagination:
+  type: next_link
+  next_link_selector_type: xpath
+  next_link_selector: //form[contains(concat(' ', normalize-space(@class), ' '), ' most-wanted-form ')]//li[contains(concat('
+    ', normalize-space(@class), ' '), ' active ')]/following-sibling::li[1]/a
+  next_link_attribute: value
+  next_link_query_param: page
+  required_page_selector: form.most-wanted-form input#CurrentPage
+  max_pages: 100
+attachments:
+- type: Profile
+  role: detail_page
+- type: Photograph
+  selector: main .wanted-intro .boxshadow img[src]
+  attribute: src
+  multiple: true
+storage:
+  save_listing_page: true
+  save_detail_pages: true
+  detail_directory: attachments/members
+crawler_settings:
+  concurrent_requests_per_domain: 2
+  download_delay: 0.5
+  randomize_download_delay: false
+  retry_times: 2
+  retry_http_codes:
+  - 429
+  - 500
+  - 502
+  - 503
+  - 504

@@ -6,7 +6,9 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit, urljoin
 
 import scrapy
 
-from ingestion.crawler.pagination import PaginationError, resolve_next_page_url
+from ingestion.crawler.pagination import (
+    PaginationError, resolve_next_page_url, resolve_numbered_page_url,
+)
 
 
 class GenericSpider(scrapy.Spider):
@@ -152,6 +154,9 @@ class GenericSpider(scrapy.Spider):
 
     def _next_listing_url(self, response):
         pagination = self.config.get("pagination", {})
+        required_selector = pagination.get("required_page_selector")
+        if required_selector and not response.css(required_selector):
+            raise PaginationError("Required listing-page marker was not found")
         selector = pagination.get("next_link_selector")
         if not selector:
             raise PaginationError("pagination.next_link_selector is required")
@@ -167,15 +172,25 @@ class GenericSpider(scrapy.Spider):
         if not nodes:
             return None
 
+        attribute = pagination.get("next_link_attribute", "href")
+        if not isinstance(attribute, str) or not attribute.strip():
+            raise PaginationError("next_link_attribute must be a non-empty string")
+        query_param = pagination.get("next_link_query_param")
         urls = set()
         for node in nodes:
-            href = node.xpath("@href").get()
+            href = node.attrib.get(attribute)
             if href is None:
-                raise PaginationError("Next-page element has no href")
-            urls.add(resolve_next_page_url(
-                response.url, href,
-                visited_urls=self._visited_listing_urls,
-            ))
+                raise PaginationError(f"Next-page element has no {attribute}")
+            if query_param is not None:
+                urls.add(resolve_numbered_page_url(
+                    response.url, href, query_param,
+                    visited_urls=self._visited_listing_urls,
+                ))
+            else:
+                urls.add(resolve_next_page_url(
+                    response.url, href,
+                    visited_urls=self._visited_listing_urls,
+                ))
 
         if len(urls) != 1:
             raise PaginationError("Multiple different next-page links found")
