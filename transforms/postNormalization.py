@@ -599,22 +599,14 @@ def _hold_override(entity, cfg):
 
 
 def _strip_html(value):
-    """Remove HTML tags and unescape entities from a single string.
-
-    Order matters: entities are unescaped **first** (``&amp;`` -> ``&``), then
-    tags are stripped. Some sources double-encode markup (a literal
-    ``&lt;p&gt;`` sitting inside real ``<p>`` tags); unescaping first turns that
-    back into a ``<p>`` tag so the strip catches it too -- stripping first would
-    leave the resurrected tag behind. Tags become a space (not "") so block
-    boundaries like ``</p><p>`` don't glue words together; runs of whitespace
-    then collapse to one. Anything that isn't a string passes through untouched.
-    """
+    """Decode entities, strip markup and invisible artifacts, and normalize spaces."""
     if not isinstance(value, str):
         return value
 
     unescaped = html.unescape(value)
     without_tags = re.sub(r"<[^>]+>", " ", unescaped)
-    collapsed = re.sub(r"\s+", " ", without_tags)
+    without_formatting = without_tags.replace("\u200b", "").replace("\ufeff", "")
+    collapsed = re.sub(r"\s+", " ", without_formatting)
     return collapsed.strip()
 
 

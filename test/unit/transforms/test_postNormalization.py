@@ -321,6 +321,17 @@ class TestEmptyDependencyHandler:
 
 
 class TestSanitizeHtmlHandler:
+    @pytest.mark.parametrize(
+        "text",
+        ["<p>Central\u200b Bank\ufeff</p>", "<p>Central&#8203; Bank&#65279;</p>"],
+    )
+    def test_removes_literal_and_entity_encoded_invisible_artifacts(self, text):
+        assert _strip_html(text) == "Central Bank"
+
+    def test_preserves_language_significant_joiners(self):
+        text = "می\u200cرود ا\u200dب"
+        assert _strip_html(f"<p>{text}</p>") == text
+
     def test_removes_tags_and_unescapes_entities(self):
         assert (
             _strip_html("<p>Wanted for <b>fraud</b> &amp; theft.</p>")

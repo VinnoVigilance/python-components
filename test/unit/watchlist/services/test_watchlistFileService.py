@@ -32,6 +32,32 @@ from services.watchlistPipeline import watchlistFileService as fs  # noqa: E402
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("headers", [None, {"User-Agent": "source-client/1.0"}])
+def test_https_acquisition_passes_optional_headers_to_downloader(tmp_path, headers):
+    source_file = tmp_path / "listing.html"
+    source_file.write_text("<html>Officials</html>", encoding="utf-8")
+    downloader = MagicMock()
+    downloader.download.return_value = str(source_file)
+    config = {
+        "source_name": "BSP",
+        "list_name": "BSP_SENIOR_OFFICIALS",
+        "download_method": "HTTPS",
+        "url": "https://example.test/officials",
+        "file_type": "html",
+    }
+    if headers is not None:
+        config["download_headers"] = headers
+
+    result = fs.acquire_source_file(config, downloader)
+
+    assert result == source_file.resolve()
+    task = downloader.download.call_args.args[0]
+    assert task.headers == (headers or {})
+    assert task.url == config["url"]
+    assert task.source_name == "BSP"
+    assert task.list_name == "BSP_SENIOR_OFFICIALS"
+
+
 def _patch_latest_file(monkeypatch, return_value):
     monkeypatch.setattr(fs, "connection_pool", MagicMock())
     monkeypatch.setattr(
