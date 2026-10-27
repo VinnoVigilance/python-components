@@ -37,6 +37,7 @@ FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "sources"
 # list_name -> committed sample file (mirrors test_source_conformance.SAMPLES).
 SAMPLES = {
     "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY_raw_sample.jsonl",
+    "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES": "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES_raw_sample.jsonl",
     "BSP_SENIOR_OFFICIALS": "BSP_SENIOR_OFFICIALS_raw_sample.jsonl",
     "OFAC-SDN": "OFAC-SDN_raw_sample.jsonl",
     "OFAC-NON-SDN": "OFAC-NON-SDN_raw_sample.jsonl",
@@ -84,6 +85,10 @@ GOLDEN = {
     "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": {
         "SourceType": "Official", "DatasetCategory": "Law Enforcement",
         "ListName": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY", "SourceName": "HKPF",
+    },
+    "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES", "SourceName": "HKPF",
     },
     "BSP_SENIOR_OFFICIALS": {
         "SourceType": "Official", "DatasetCategory": "PEP",

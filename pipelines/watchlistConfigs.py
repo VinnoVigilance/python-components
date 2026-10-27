@@ -1363,6 +1363,152 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES": {
+        "source_name": "HKPF",
+        "list_name": "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES",
+        "date_order": "DMY",
+        "download_method": "HTTPS",
+        "url": "https://www.police.gov.hk/info/appeals_public/wanted_persons/w_en.xml",
+        "file_type": "xml",
+        "root_tags": ["case"],
+        "external_id_path": "source_record_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "expand_regex_records",
+                "level": "dataset",
+                "config": {
+                    "input_field": "other",
+                    "pattern": (
+                        r"(?i)(?P<person_text>(?:Wanted Person(?:\s*\(\d+\)|\s+No\.\s*\d+)?"
+                        r"\s*:\s*(?:Male\s+)?|A\s+(?:Chinese\s+)?male\s+)"
+                        r"(?P<person_name>[^,;<\r\n]+),[^<]*)"
+                    ),
+                    "reference_field": "item",
+                    "reference_key": "name",
+                    "match_key": "person_name",
+                    "boundary_pattern": (
+                        r"(?i)(?:Wanted Person(?:\s*\(\d+\)|\s+No\.\s*\d+)?"
+                        r"\s*:\s*(?:Male\s+)?|A\s+(?:Chinese\s+)?male\s+)"
+                    ),
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["id", "person_name"],
+                    "output_field": "source_record_id",
+                    "prefix": "HKPF",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {"output_field": "entity_type", "value": "Individual"},
+            },
+            {
+                "handler": "resolve_reference",
+                "level": "record",
+                "config": {
+                    "key_field": "person_name",
+                    "list_field": "item",
+                    "item_key": "name",
+                    "outputs": {"img": "photo_path", "nameDesc": "person_label"},
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "output_field": "profile_url",
+                    "template": "https://www.police.gov.hk/ppp_en/06_appeals_public/wanted/{url}",
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "when_field": "photo_path",
+                    "output_field": "photo_url",
+                    "template": "https://www.police.gov.hk{photo_path}",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "person_text",
+                    "pattern": r"(?is).*?(?:born\s+(?:on|in)|Date of Birth)\s+(?P<dob>\d{1,2}\s+[A-Za-z]+\s+\d{4}|[A-Za-z]+\s+\d{4})",
+                    "outputs": {"dob": "birth_date_raw"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "person_text",
+                    "pattern": r"(?is).*?\balias\s+(?P<aliases>[^,<]+)",
+                    "outputs": {"aliases": "aliases_raw"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "person_text",
+                    "pattern": r"(?is).*?(?:Hong Kong Identity Card|HK Identity Card|HKID)\s+No\.?\s*:?\s*(?P<number>[^,<]+)",
+                    "outputs": {"number": "identity_card_raw"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "person_text",
+                    "pattern": r"(?is).*?\babout\s+(?P<height>\d+(?:\.\d+)?m)\s+tall",
+                    "outputs": {"height": "height_raw"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "reward",
+                    "pattern": r"(?i).*?(?P<amount>HK(?:D)?\$\s*[\d,]+(?:\.\d{2})?)",
+                    "outputs": {"amount": "reward_amount"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "other",
+                    "pattern": r"(?is).*?Case Reference:\s*(?P<reference>[^<\r\n]+)",
+                    "outputs": {"reference": "case_reference"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "other",
+                    "pattern": r"(?is).*?(?P<notice>Reward No\.\s*\d+\s+of\s+\d{4}(?:\s*\(Renewal\))?)",
+                    "outputs": {"notice": "reward_notice"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "other",
+                    "pattern": r"(?is).*?Date of Expiry:\s*(?P<expiry>\d{4}-\d{2}-\d{2})",
+                    "outputs": {"expiry": "reward_expiry_raw"},
+                },
+            },
+        ],
+    },
 
     "INTERPOL_UNSC_SPECIAL_NOTICES": {
         "source_name": "INTERPOL",
