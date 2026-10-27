@@ -40,6 +40,7 @@ FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "sources"
 
 # list_name -> committed sample file (one per source list).
 SAMPLES = {
+    "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY_raw_sample.jsonl",
     "BSP_SENIOR_OFFICIALS": "BSP_SENIOR_OFFICIALS_raw_sample.jsonl",
     "OFAC-SDN": "OFAC-SDN_raw_sample.jsonl",
     "OFAC-NON-SDN": "OFAC-NON-SDN_raw_sample.jsonl",

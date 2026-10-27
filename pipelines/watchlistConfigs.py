@@ -1323,6 +1323,47 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": {
+        "source_name": "HKPF",
+        "list_name": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY",
+        "date_order": "DMY",
+        "download_method": "HTTPS",
+        "url": "https://www.police.gov.hk/info/appeals_public/nsc/en.xml",
+        "file_type": "xml",
+        "root_tags": ["case"],
+        "external_id_path": "id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "item.img",
+                    "pattern": r"(?s)^(?P<path>.+)$",
+                    "outputs": {"path": "photo_path"},
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "output_field": "photo_url",
+                    "template": "https://www.police.gov.hk{photo_path}",
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "output_field": "profile_url",
+                    "template": "https://www.police.gov.hk/ppp_en/06_appeals_public/nsc/{url}",
+                },
+            },
+        ],
+    },
+
+
     "INTERPOL_UNSC_SPECIAL_NOTICES": {
         "source_name": "INTERPOL",
         "list_name": "INTERPOL_UNSC_SPECIAL_NOTICES",
