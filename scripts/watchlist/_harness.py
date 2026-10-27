@@ -47,16 +47,7 @@ from transforms.preProcessingEngine import PreProcessingEngine
 
 STAGES = ["ingest", "extract", "preprocess", "prenorm", "map", "postnorm"]
 
-EXT = {
-    "xml": ".xml",
-    "xlsx": ".xlsx",
-    "html": ".html",
-    "pdf": ".pdf",
-    "csv": ".csv",
-    "json": ".json",
-    "jsonl": ".jsonl",
-}
-SKIP_PARTS = ("attachment", "profile", "image")
+from scripts.watchlist.sourceFiles import find_source_file
 
 
 def get_config(list_name: str) -> dict:
@@ -94,29 +85,8 @@ def write_meta(list_name: str, **values) -> None:
 
 
 def find_latest_source_file(list_name: str, config: dict) -> Path | None:
-    """Most recent downloaded listing file for a list (never an attachment), or its local_path."""
-    local = config.get("local_path")
-    if local and (ROOT / local).is_file():
-        return ROOT / local
-
-    ext = EXT.get(config.get("file_type", ""), "")
-    source = config.get("source_name", "")
-    candidates: list[Path] = []
-
-    for base in (DOWNLOADS / source / list_name, DOWNLOADS / list_name):
-        if base.is_dir():
-            candidates += [
-                p
-                for p in base.rglob(f"*{ext}")
-                if p.is_file() and not any(s in str(p).lower() for s in SKIP_PARTS)
-            ]
-
-    for pattern in (f"{list_name}*{ext}", f"*{list_name}*{ext}"):
-        candidates += [p for p in DOWNLOADS.glob(pattern) if p.is_file()]
-
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+    """Select the latest source artifact, excluding image evidence sidecars."""
+    return find_source_file(DOWNLOADS, ROOT, list_name, config)
 
 
 def _resolve_preprocessing_rules(config: dict, source_file) -> list[dict]:

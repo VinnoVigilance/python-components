@@ -11,6 +11,7 @@ from repositories import (
     watchlistFileLogRepository,
 )
 from services.watchlistPipeline import watchlistFileService
+from services.watchlistPipeline.attachmentPaths import list_attachment_paths
 
 
 logger = logging.getLogger(__name__)
@@ -209,29 +210,16 @@ def process_attachments(
                 ]
 
                 for rule in list_rules:
-                    attachment_directory = (
-                        day_directory
-                        / rule["local_directory"]
-                    )
-
-                    if not attachment_directory.is_dir():
-                        continue
-
-                    for file_path in sorted(
-                        attachment_directory.iterdir()
-                    ):
-                        if file_path.is_file():
-                            attachment_jobs.append(
-                                {
-                                    "scope": "list",
-                                    "file_path": file_path,
-                                    "source_url": rule.get(
-                                        "source_url"
-                                    ),
-                                    "external_id": None,
-                                    "attachment_type": None,
-                                }
-                            )
+                    for file_path in list_attachment_paths(source_file_path, rule):
+                        attachment_jobs.append(
+                            {
+                                "scope": "list",
+                                "file_path": file_path,
+                                "source_url": rule.get("source_url"),
+                                "external_id": None,
+                                "attachment_type": None,
+                            }
+                        )
 
                 for job in attachment_jobs:
                     file_path = job["file_path"]

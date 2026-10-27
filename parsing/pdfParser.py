@@ -7,11 +7,12 @@ class PdfParser:
     """
     PDF parser for tabular watchlist files, with a text mode
     (config ``parser: {mode: text}``) returning the whole document text.
+    Explicit ``parser: {mode: ocr}`` delegates to the shared OCR parser.
 
     Output:
         A list of dictionaries.
 
-    Important:
+    Important for native table mode:
         - It does NOT add metadata fields such as source_page or source_table.
         - It only returns columns that exist in the PDF table.
         - entity_type should be added later by preprocessing, not here.
@@ -40,6 +41,12 @@ class PdfParser:
             )
 
         config = config or {}
+
+        # OCR is opt-in; table/text parsing below retains the existing behavior.
+        if str((config.get("parser") or {}).get("mode", "")).strip().lower() == "ocr":
+            from parsing.ocrParser import OcrParser
+
+            return OcrParser().parse(file_path=pdf_path, config=config)
 
         text_mode = (
             str(

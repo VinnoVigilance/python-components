@@ -103,3 +103,5 @@ def test_exit_replaces_an_event_loop_closed_by_the_browser():
     assert loop is not closed and not loop.is_closed()
     loop.close()
     asyncio.set_event_loop(None)
+
+
