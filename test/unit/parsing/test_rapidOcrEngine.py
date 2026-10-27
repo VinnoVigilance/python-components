@@ -98,7 +98,7 @@ class TestRapidOcrEngine(unittest.TestCase):
 
     def test_missing_optional_package_has_an_actionable_error(self):
         with patch.dict(sys.modules, {"rapidocr": None}):
-            with self.assertRaisesRegex(RuntimeError, "requirements-ocr.txt"):
+            with self.assertRaisesRegex(RuntimeError, "requirements.txt"):
                 REAL_BUILD(self.engine)
 
     def test_adapter_import_does_not_import_ocr_runtime(self):

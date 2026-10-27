@@ -71,7 +71,8 @@ class RapidOcrEngine:
         except ImportError as exc:
             raise RuntimeError(
                 "OCR dependencies are unavailable. "
-                "Install requirements-ocr.txt in the OCR runtime."
+                "Install the OCR dependencies from requirements.txt "
+                "in the Python environment running this pipeline."
             ) from exc
 
         def member(enum_class, name, field):

@@ -161,7 +161,8 @@ class DocumentOcrReader:
         except ImportError as exc:
             raise RuntimeError(
                 "PDF rendering dependency is unavailable. "
-                "Install requirements-ocr.txt in the OCR runtime."
+                "Install the OCR dependencies from requirements.txt "
+                "in the Python environment running this pipeline."
             ) from exc
 
         pages = []

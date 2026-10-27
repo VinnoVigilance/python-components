@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -153,7 +154,34 @@ class TestParserOcrIntegration(unittest.TestCase):
             result = self.parse()
         read.assert_called_once_with(self.source, page_numbers=[1])
         self.assertEqual(result[0]["_ocr"]["recognition_mode"], "fresh")
+        self.assertEqual(result[0]["_ocr"]["execution_mode"], "in_process")
         self.assertNotIn("saved_ocr_path", result[0]["_ocr"])
+
+    def test_fresh_recognition_runs_in_calling_process_without_external_python(self):
+        self.config["parser"].pop("saved_ocr_path")
+        caller_pid = os.getpid()
+
+        def backend(image, **kwargs):
+            self.assertEqual(os.getpid(), caller_pid)
+            self.assertEqual(image.size, (20, 10))
+            return SimpleNamespace(
+                txts=["EXAMPLE NAME"], scores=[0.98],
+                boxes=[[[1, 1], [19, 1], [19, 9], [1, 9]]],
+            )
+
+        with patch.dict(os.environ, {}, clear=True), patch(
+            "subprocess.Popen", side_effect=AssertionError("OCR must not start a child process")
+        ), patch("parsing.ocr.rapidOcrEngine.RapidOcrEngine._build_backend", return_value=backend):
+            result = self.parse()
+
+        self.assertEqual(result[0]["name"], "EXAMPLE NAME")
+        self.assertEqual(result[0]["_ocr"]["execution_mode"], "in_process")
+        self.assertEqual(result[0]["_ocr"]["source_sha256"], self.document["source_sha256"])
+
+    def test_old_runtime_options_fail_explicitly_before_recognition(self):
+        self.config["parser"]["runtime"] = {"mode": "subprocess"}
+        with self.assertRaisesRegex(ValueError, "Unknown OCR parser settings.*runtime"):
+            self.parse()
 
     def test_missing_or_invalid_parser_settings_fail_explicitly(self):
         for cfg in ({}, {"parser": {}}, {"parser": {"mode": "text", "layout": self.layout}},

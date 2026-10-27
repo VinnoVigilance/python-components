@@ -4,8 +4,11 @@ import json
 import unittest
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from parsing.ocr.ocrRecordExtractor import OcrLayoutError, OcrRecordExtractor
+from parsing.ocrParser import OcrParser
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -38,6 +41,32 @@ class TestPdeaOcrLayout(unittest.TestCase):
         matches = [r for r in records if r["primary_name"] == "BENITO SZE"]
         self.assertEqual(len(matches), 1)
         self.assertEqual(matches[0]["raw_text"].count("BENITO SZE"), 2)
+
+    def test_current_process_parser_preserves_reviewed_names_and_raw_evidence(self):
+        # Decode the real image and use the reviewed OCR lines at the recognizer
+        # boundary; exercise the reader, engine adapter, parser and layout.
+        lines = self.document["pages"][0]["lines"]
+        backend = Mock(return_value=SimpleNamespace(
+            txts=[line["text"] for line in lines],
+            scores=[line["score"] for line in lines],
+            boxes=[line["box"] for line in lines],
+        ))
+        config = {"file_type": "image", "parser": {
+            "mode": "ocr", "layout_path": "config/ocrLayouts/pdea_most_wanted.json",
+        }}
+        with patch("parsing.ocr.rapidOcrEngine.RapidOcrEngine._build_backend", return_value=backend):
+            actual = OcrParser().parse(
+                ROOT / "test/fixtures/watchlist/pdea_most_wanted/source_image.jpg", config,
+            )
+        backend.assert_called_once()
+        expected = self.records()
+        self.assertEqual([row["primary_name"] for row in actual],
+                         [row["primary_name"] for row in expected])
+        self.assertEqual([row["raw_text"] for row in actual],
+                         [row["raw_text"] for row in expected])
+        self.assertEqual([row["_ocr"]["review_flags"] for row in actual],
+                         [row["_ocr"]["review_flags"] for row in expected])
+        self.assertTrue(all(row["_ocr"]["execution_mode"] == "in_process" for row in actual))
 
     def test_footer_dates_hotlines_and_president_are_not_person_records(self):
         raw_text = "\n".join(row["raw_text"] for row in self.records())

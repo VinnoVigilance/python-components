@@ -2260,11 +2260,6 @@ WATCHLIST_CONFIGS = {
         "parser": {
             "mode": "ocr",
             "layout_path": "config/ocrLayouts/pdea_most_wanted.json",
-            "runtime": {
-                "mode": "subprocess",
-                "python_env": "VV_OCR_PYTHON",
-                "timeout_seconds": 180,
-            },
         },
 
         "bypass_config": {

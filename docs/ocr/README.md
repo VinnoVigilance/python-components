@@ -28,19 +28,24 @@ Existing PDF table/text parsing remains unchanged unless OCR mode is selected.
 
 ## Runtime environment
 
-The current PDEA config selects subprocess OCR because OCR packages are installed
-in a separate environment. The main job passes source/settings to
-`documentOcrWorker`; it uses the shared reader and writes its private result.
-Production code does not import `scripts/ocr`.
+OCR runs inside the Python process that calls the parser. Install its CPU
+dependencies in the same project environment using the existing requirements.txt.
+The parser starts no additional Python process and needs no separate interpreter
+path or environment variable. The Job's existing source-process isolation is
+unchanged. Production code does not import development scripts.
 
-```powershell
-$env:VV_OCR_PYTHON = Join-Path $env:LOCALAPPDATA "VV\venvs\pdea-ocr\Scripts\python.exe"
+```python
+"parser": {
+    "mode": "ocr",
+    "layout_path": "config/ocrLayouts/pdea_most_wanted.json",
+},
 ```
 
-This setting belongs to each machine/service environment, not a committed
-workstation path. `requirements-ocr.txt` describes the separate OCR dependencies.
-Subprocess execution is optional for sources whose main environment already has
-the OCR packages; the parser's default remains `in_process`.
+Recognition loads RapidOCR only when OCR is requested; normal XML, JSON, table
+and PDF text parsing does not initialize its models. RapidOCR may download its
+models on the first recognition in this environment; prepare them before running
+on an offline server. Source-byte, page-count and image-pixel limits remain.
+There is no longer a separate per-OCR worker wall-clock timeout.
 
 ## Existing developer commands
 
@@ -73,15 +78,17 @@ browser and download files. Project imports still require the normal environment
 ## Tests and real job
 
 ```powershell
-python -m unittest discover -s test/unit/parsing -p "test_subprocessOcr.py" -v
+python -m unittest discover -s test/unit/parsing -p "test_*Ocr*.py" -v
+python -m scripts.watchlist.stage_extract PDEA_MOST_WANTED
 python -m jobs.watchlistPiplineJob --source PDEA_MOST_WANTED
 ```
 
-Runtime unit tests use a fake recognizer in a real child process and perform no
-live OCR/network/DB writes. The real job requires registered database lookups,
-working storage and the OCR environment; it writes Raw/Core/storage. Verify its
-first successful run and then a second run with the same image for duplicate
-handling. Local mocked tests do not replace this live check.
+Unit tests use a fake recognizer and real image/PDF decoding, with no model
+downloads or database writes. Run stage_extract on the downloaded poster to test
+real recognition in the project environment. An UNCHANGED Job alone cannot test
+recognition, because duplicate-file detection correctly skips the parser.
+The real Job requires registered database lookups and working storage; it writes
+Raw/Core/storage. Local mocked tests do not replace these live checks.
 
 Generated `data/ocr/` files, old probe scripts and per-step instructions are
 development artifacts. Keep them outside the release; retain source fixtures

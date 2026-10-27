@@ -53,9 +53,9 @@ class TestPdeaSourceIntegration(unittest.TestCase):
         }.items():
             self.assertEqual(self.config[key], value)
 
-    def test_production_config_runs_fresh_ocr_in_configured_runtime(self):
-        self.assertEqual(self.config['parser']['runtime']['mode'], 'subprocess')
-        self.assertEqual(self.config['parser']['runtime']['python_env'], 'VV_OCR_PYTHON')
+    def test_production_config_runs_fresh_ocr_without_external_runtime_settings(self):
+        self.assertEqual(self.config['parser']['mode'], 'ocr')
+        self.assertNotIn('runtime', self.config['parser'])
         self.assertNotIn('saved_ocr_path', self.config['parser'])
 
     def test_acquisition_saves_image_as_the_primary_file(self):

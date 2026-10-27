@@ -252,7 +252,7 @@ class TestDocumentOcrReader(unittest.TestCase):
         import sys
         path = self.pdf_file()
         with patch.dict(sys.modules, {"pypdfium2": None}):
-            with self.assertRaisesRegex(RuntimeError, "requirements-ocr.txt"):
+            with self.assertRaisesRegex(RuntimeError, "requirements.txt"):
                 self.reader.read(path)
         self.builder.assert_not_called()
 

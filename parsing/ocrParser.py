@@ -15,7 +15,8 @@ IMAGE_TYPES = {"image", "img", "jpg", "jpeg", "png", "tif", "tiff", "bmp", "webp
 class OcrParser:
     """Match the existing parse(file_path, config) parser interface.
 
-    Fresh recognition loads optional OCR dependencies only during parse().
+    Fresh recognition runs in the calling process and loads OCR dependencies
+    only during parse().
     saved_ocr_path is an explicit replay option, not an automatic OCR cache.
     """
 
@@ -30,7 +31,7 @@ class OcrParser:
         if not isinstance(settings, dict):
             raise ValueError("OCR source must define a parser object and layout_path/layout.")
         allowed = {"type", "mode", "layout_path", "layout", "engine", "document",
-                   "page_numbers", "saved_ocr_path", "runtime"}
+                   "page_numbers", "saved_ocr_path"}
         unknown = set(settings) - allowed
         if unknown:
             raise ValueError(f"Unknown OCR parser settings: {sorted(unknown)}")
@@ -45,9 +46,6 @@ class OcrParser:
         else:
             layout = deepcopy(settings["layout"])
         extractor = OcrRecordExtractor(layout)
-
-        from parsing.ocr.subprocessOcr import validate_runtime
-        runtime = validate_runtime(settings.get("runtime"))
 
         # Parser construction/factory imports remain independent of OCR packages.
         from parsing.ocr.documentOcrReader import DocumentOcrReader, DocumentOcrSettings
@@ -88,14 +86,8 @@ class OcrParser:
             document["source_path"] = str(source_path)
         else:
             previous_source_path = None
-            if runtime["mode"] == "subprocess":
-                from parsing.ocr.subprocessOcr import read_document_in_subprocess
-                document = read_document_in_subprocess(
-                    source_path, engine_settings, document_settings, requested, runtime,
-                )
-            else:
-                reader = DocumentOcrReader(RapidOcrEngine(engine_settings), document_settings)
-                document = reader.read(source_path, page_numbers=requested)
+            reader = DocumentOcrReader(RapidOcrEngine(engine_settings), document_settings)
+            document = reader.read(source_path, page_numbers=requested)
 
         file_type = str(config.get("file_type", "")).strip().lower()
         expected_kind = "image" if file_type in IMAGE_TYPES else "pdf" if file_type == "pdf" else None
@@ -109,7 +101,7 @@ class OcrParser:
         for page in document["pages"]:
             if page["image_size"][0] * page["image_size"][1] > engine_settings.max_pixels:
                 raise ValueError("OCR page exceeds parser.engine.max_pixels.")
-            if replay_path is not None or runtime["mode"] == "subprocess":
+            if replay_path is not None:
                 for key in engine_config:
                     if (page.get("settings") or {}).get(key) != getattr(engine_settings, key):
                         raise ValueError(f"Saved OCR engine setting differs: {key}.")
@@ -119,7 +111,7 @@ class OcrParser:
         for record in records:
             record["_ocr"]["recognition_mode"] = "replay" if replay_path else "fresh"
             if replay_path is None:
-                record["_ocr"]["execution_mode"] = runtime["mode"]
+                record["_ocr"]["execution_mode"] = "in_process"
             if replay_path:
                 record["_ocr"]["saved_ocr_path"] = str(replay_path)
                 record["_ocr"]["ocr_document_source_path"] = previous_source_path
