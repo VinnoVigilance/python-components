@@ -2431,4 +2431,104 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
+    "PDEA_MOST_WANTED": {
+        "source_name": "PDEA",
+        "list_name": "PDEA_MOST_WANTED",
+        "download_method": "BYPASS",
+        "url": "https://pdea.gov.ph/most-wanted/",
+        "file_type": "image",
+        "date_order": "DMY",
+        "external_id_path": "unique_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 16,
+
+        "parser": {
+            "mode": "ocr",
+            "layout_path": "config/ocrLayouts/pdea_most_wanted.json",
+        },
+
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "challenge": "cloudflare",
+            "navigation_mode": "safe_get",
+            "headless": False,
+            "timeout_seconds": 120,
+            "success_criteria": [
+                "Most Wanted",
+            ],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "article#post-377 .entry-content "
+                        "img[alt='Most Wanted']"
+                    ),
+                    "timeout": 90,
+                },
+                {
+                    "action": "save_image",
+                    "image": {
+                        "selector_type": "xpath",
+                        "selector": (
+                            "//article[@id='post-377']"
+                            "//div[contains("
+                            "concat(' ', normalize-space(@class), ' '),"
+                            " ' entry-content ')]"
+                            "//img[@alt='Most Wanted']"
+                        ),
+                        "prefer": "largest_srcset",
+                    },
+                    "timeout_seconds": 45,
+                    "max_size_bytes": 10_000_000,
+                    "max_pixels": 40_000_000,
+                    "min_width": 1000,
+                    "min_height": 800,
+                    "allowed_formats": [
+                        "JPEG",
+                        "PNG",
+                        "WEBP",
+                    ],
+                },
+            ],
+            "validation": {
+                "min_size_bytes": 100_000,
+            },
+        },
+
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                    "overwrite": True,
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["primary_name"],
+                    "output_field": "unique_id",
+                    "prefix": "PDEA-MOST-WANTED",
+                },
+            },
+        ],
+
+        "attachments": [
+            {
+                "scope": "list",
+                "local_files": [
+                    "{source_stem}.source.html",
+                    "{source_stem}.manifest.json",
+                ],
+                "required": True,
+                "source_url": "https://pdea.gov.ph/most-wanted/",
+            },
+        ],
+    },
 }
