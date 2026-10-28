@@ -134,8 +134,13 @@ class TestCrawlerUserAgent(unittest.TestCase):
         self.assertEqual(config['fetch_strategy'], 'direct')
         self.assertEqual(config['crawler_settings']['user_agent_env'], 'SEC_HTTP_USER_AGENT')
         self.assertEqual(config['pagination']['type'], 'next_link')
-        self.assertEqual(config['crawler_settings']['concurrent_requests_per_domain'], 1)
-        self.assertEqual(config['crawler_settings']['download_delay'], 1.0)
+        self.assertEqual(config['crawler_settings']['concurrent_requests_per_domain'], 4)
+        self.assertEqual(config['crawler_settings']['download_delay'], 0.25)
+        settings, _ = self.run_source(config['crawler_settings'],
+                                      environment={'SEC_HTTP_USER_AGENT': AGENT})
+        self.assertEqual(settings['USER_AGENT'], AGENT)
+        self.assertEqual(settings.getint('CONCURRENT_REQUESTS_PER_DOMAIN'), 4)
+        self.assertEqual(settings.getfloat('DOWNLOAD_DELAY'), 0.25)
 
 
 if __name__ == '__main__':
