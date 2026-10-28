@@ -30,7 +30,7 @@ inscriptis==2.7.3
 rapidocr==3.10.0
 onnxruntime==1.31.1
 pypdfium2==5.14.0
-Pillow==13.0.0
+Pillow==12.2.0
 
 # --- Ingestion / infrastructure ---
 requests==2.34.2         # source file downloads
