@@ -733,6 +733,11 @@ class PreProcessingEngine:
             "SourceURL",
         )
 
+        when_field = config.get("when_field")
+        if when_field and not self._resolve_field(record, when_field):
+            record.setdefault(output_field, "")
+            return record
+
         template = config.get(
             "template"
         )
@@ -1099,6 +1104,49 @@ class PreProcessingEngine:
 
         return records
 
+    def expand_regex_records(self, records, config):
+        """Expand repeated named captures into records carrying their original source fields."""
+        pattern = re.compile(config["pattern"])
+        if not pattern.groupindex:
+            raise ValueError("expand_regex_records requires named capture groups")
+
+        expanded = []
+        for record in records:
+            value = str(self._resolve_field(record, config["input_field"]) or "")
+            matches = [
+                {key: (value or "").strip() for key, value in match.groupdict().items()}
+                for match in pattern.finditer(value)
+            ]
+            if not matches:
+                raise ValueError(
+                    f"No records matched {config['input_field']}; refusing to omit the source record"
+                )
+
+            boundary_pattern = config.get("boundary_pattern")
+            if boundary_pattern and len(list(re.finditer(boundary_pattern, value))) != len(matches):
+                raise ValueError("Not every source record boundary produced an extracted record")
+
+            reference_field = config.get("reference_field")
+            if reference_field:
+                references = self._resolve_field(record, reference_field) or []
+                if isinstance(references, dict):
+                    references = [references]
+                expected = {
+                    str(item.get(config["reference_key"]) or "").strip().casefold()
+                    for item in references
+                    if item.get(config["reference_key"])
+                }
+                actual = {item[config["match_key"]].casefold() for item in matches}
+                if len(actual) != len(matches):
+                    raise ValueError("Repeated source identity in extracted records")
+                if expected - actual:
+                    raise ValueError(f"Source names were not extracted: {sorted(expected - actual)}")
+
+            for match in matches:
+                expanded.append({**record, **match})
+
+        return expanded
+
     def split_field_regex(self, record, config):
         """
         Split one field into several sibling fields via a named-group regex.
@@ -1171,6 +1219,8 @@ class PreProcessingEngine:
 
         record_key = key_of(dig(record, config["key_field"]), config.get("key_pattern"))
         items = dig(record, config["list_field"]) or []
+        if isinstance(items, dict):
+            items = [items]
 
         chosen = None
 
