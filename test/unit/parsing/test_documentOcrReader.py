@@ -241,7 +241,7 @@ class TestDocumentOcrReader(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "empty"):
             self.reader.read(path)
         path.write_bytes(b"<html><title>Just a moment...</title></html>")
-        with self.assertRaises(UnidentifiedImageError):
+        with self.assertRaisesRegex(ValueError, "embedded-images-v1"):
             self.reader.read(path)
         path.write_bytes(b"%PDF-invalid data")
         with self.assertRaises(Exception):

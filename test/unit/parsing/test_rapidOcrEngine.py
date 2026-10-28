@@ -42,7 +42,7 @@ class TestRapidOcrEngine(unittest.TestCase):
             ["  SAMPLE NAME  ", "CC? 01-XX", ""],
         )
         self.assertEqual([x["score"] for x in result["lines"]], [0.99, 0.02, 0.0])
-        self.assertEqual(self.backend.call_args.kwargs, {"text_score": 0.0})
+        self.assertEqual(self.backend.call_args.kwargs, {"text_score": 0.0, "use_cls": True})
 
     def test_crop_and_upscale_coordinates_return_to_the_full_image(self):
         self.backend.return_value = output(
@@ -95,6 +95,30 @@ class TestRapidOcrEngine(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "recognition_language"):
                 REAL_BUILD(engine)
         fake.RapidOCR.assert_not_called()
+
+    def test_angle_classification_is_on_by_default(self):
+        self.assertTrue(OcrSettings().use_angle_classification)
+        fake = self._fake_rapidocr()
+        with patch.dict(sys.modules, {"rapidocr": fake}):
+            REAL_BUILD(self.engine)
+        self.assertTrue(fake.RapidOCR.call_args.kwargs["params"]["Global.use_cls"])
+
+    def test_disabled_angle_classification_is_passed_to_model_and_inference(self):
+        engine = RapidOcrEngine(OcrSettings(use_angle_classification=False))
+        fake = self._fake_rapidocr()
+        with patch.dict(sys.modules, {"rapidocr": fake}):
+            REAL_BUILD(engine)
+        self.assertFalse(fake.RapidOCR.call_args.kwargs["params"]["Global.use_cls"])
+        original = self.image.tobytes()
+        result = engine.recognize(self.image)
+        self.assertFalse(self.backend.call_args.kwargs["use_cls"])
+        self.assertFalse(result["settings"]["use_angle_classification"])
+        self.assertEqual(self.image.tobytes(), original)
+
+    def test_non_boolean_angle_settings_are_rejected(self):
+        for value in (None, 0, 1, "false", "true"):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "boolean"):
+                OcrSettings(use_angle_classification=value)
 
     def test_missing_optional_package_has_an_actionable_error(self):
         with patch.dict(sys.modules, {"rapidocr": None}):

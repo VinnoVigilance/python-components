@@ -15,7 +15,7 @@ BINARY_FETCH_EXPRESSION = r"""
         const target = new URL(options.url, location.href);
         if (target.origin !== location.origin) throw new Error('Asset origin differs from page');
         const response = await fetch(target.href, {
-            credentials: 'same-origin', cache: 'no-store', signal: controller.signal
+            credentials: 'same-origin', cache: options.cacheMode, signal: controller.signal
         });
         if (response.status !== 200) throw new Error('Asset HTTP ' + response.status);
         if (new URL(response.url).origin !== location.origin) throw new Error('Asset redirected to another origin');
@@ -66,16 +66,20 @@ def _origin(url):
     return parts.scheme.lower(), parts.hostname.lower(), parts.port or (443 if parts.scheme == "https" else 80)
 
 
-def fetch_browser_binary(engine, url, *, page_url, timeout_seconds=45, max_bytes=10_000_000):
+def fetch_browser_binary(engine, url, *, page_url, timeout_seconds=45, max_bytes=10_000_000,
+                         cache_mode="no-store"):
     for value, name in ((timeout_seconds, "timeout_seconds"), (max_bytes, "max_bytes")):
         if type(value) is not int or value <= 0:
             raise ValueError(f"{name} must be a positive integer.")
+    if cache_mode not in ("no-store", "force-cache"):
+        raise ValueError("cache_mode must be no-store or force-cache.")
     url = http_url(url, page_url)
     page_url = http_url(page_url, page_url)
     if _origin(url) != _origin(page_url):
         raise ValueError("Browser asset download requires the page's same origin.")
     expression = BINARY_FETCH_EXPRESSION.replace("__OPTIONS__", json.dumps({
         "url": url, "timeoutMs": timeout_seconds * 1000, "maxBytes": max_bytes,
+        "cacheMode": cache_mode,
     }))
     use_native = (
         getattr(engine, "navigationMode", None) == "uc_open"

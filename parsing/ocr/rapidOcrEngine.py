@@ -26,8 +26,11 @@ class OcrSettings:
     detection_model_type: str = "SMALL"
     model_root_dir: str | None = None
     max_pixels: int = 40_000_000
+    use_angle_classification: bool = True
 
     def __post_init__(self):
+        if type(self.use_angle_classification) is not bool:
+            raise ValueError("use_angle_classification must be boolean.")
         for name in (
             "recognition_language", "recognition_version",
             "recognition_model_type", "detection_version",
@@ -84,6 +87,7 @@ class RapidOcrEngine:
                 ) from exc
 
         params = {
+            "Global.use_cls": self.settings.use_angle_classification,
             "Det.engine_type": EngineType.ONNXRUNTIME,
             "Cls.engine_type": EngineType.ONNXRUNTIME,
             "Rec.engine_type": EngineType.ONNXRUNTIME,
@@ -171,7 +175,10 @@ class RapidOcrEngine:
             if self._backend is None:
                 self._backend = self._build_backend()
             started = time.perf_counter()
-            output = self._backend(working, text_score=0.0)
+            output = self._backend(
+                working, text_score=0.0,
+                use_cls=self.settings.use_angle_classification,
+            )
             lines = self._convert_lines(output, left, top, scale_x, scale_y)
             elapsed = time.perf_counter() - started
 

@@ -63,6 +63,23 @@ The local source selector recognizes image extensions and excludes the rendered
 HTML/manifest. These commands do not write Raw/Core; acquisition can open a
 browser and download files. Project imports still require the normal environment.
 
+## Self-contained HTML image sources
+
+`save_html` can opt into `embed_images` with a content selector and expected
+image count. It saves the relevant text and unchanged PNG/JPEG/WEBP bytes in a
+stable HTML snapshot marked `embedded-images-v1`. This HTML file is the primary
+artifact and the normal pipeline hashes its exact bytes. Partial captures fail.
+
+The shared document reader treats embedded images as numbered pages at their
+native resolution. It accepts only the snapshot format, never downloads external
+image URLs, and rejects invalid images, indexes, dimensions and partial results.
+The document hash belongs to the whole HTML; each page also retains its image
+byte hash and source URL. Models must be available locally for offline inference.
+
+`file_type: html` or `htm` is routed through the existing OCR parser with explicit
+`parser.mode: ocr` and a layout. Ordinary `SAVED_HTML_SPIDER` sources keep their
+existing spider path. PNG/JPEG/TIFF and PDF table/text/OCR behavior is unchanged.
+
 ## PDEA data contract
 
 - Original poster is the primary artifact; its filename is not a person ID.

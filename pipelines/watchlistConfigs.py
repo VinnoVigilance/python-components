@@ -2244,7 +2244,7 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
-
+    
     "PDEA_MOST_WANTED": {
         "source_name": "PDEA",
         "list_name": "PDEA_MOST_WANTED",
@@ -2343,5 +2343,109 @@ WATCHLIST_CONFIGS = {
                 "source_url": "https://pdea.gov.ph/most-wanted/",
             },
         ],
+    },
+
+    "PNP_SDSPPO_MOST_WANTED": {
+        "source_name": "PNP",
+        "list_name": "PNP_SDSPPO_MOST_WANTED",
+        "download_method": "BYPASS",
+        "url": "https://sdsppo.pro13.pnp.gov.ph/?page_id=288",
+        "file_type": "html",
+        "date_order": "DMY",
+        "external_id_path": "unique_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 18,
+        "parser": {
+            "mode": "ocr",
+            "layout_path": "config/ocrLayouts/pnp_sdsppo_most_wanted.json",
+            "engine": {
+                "use_angle_classification": False
+            },
+            "document": {
+                "recognition_scale": 2
+            }
+        },
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "challenge": "cloudflare",
+            "navigation_mode": "safe_get",
+            "headless": False,
+            "timeout_seconds": 90,
+            "actions": [
+                {
+                    "action": "save_html",
+                    "embed_images": {
+                        "content_selector": "article#post-288 .entry-content",
+                        "expected_count": 4,
+                        "timeout_seconds": 30
+                    }
+                }
+            ],
+            "validation": {
+                "min_size_bytes": 100000
+            }
+        },
+        "preprocessing": [
+            {
+                "handler": "extract_labelled_ocr_fields",
+                "level": "record",
+                "config": {
+                    "input_field": "left_column_lines",
+                    "labels": {
+                        "REGION": "region_raw",
+                        "NAME": "name_raw",
+                        "JOR NO.": "joint_order_raw",
+                        "POSITION": "position_raw",
+                        "CC NO.": "case_numbers_raw"
+                    }
+                }
+            },
+            {
+                "handler": "extract_labelled_ocr_fields",
+                "level": "record",
+                "config": {
+                    "input_field": "right_column_lines",
+                    "labels": {
+                        "ALIAS": "aliases_raw",
+                        "REWARD": "reward_raw",
+                        "OFFENSE/S": "offenses_raw",
+                        "ISSUING COURT": "issuing_court_raw"
+                    }
+                }
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name_raw",
+                    "pattern": "(?s)^\\s*(?P<primary_name>[^/]+?)(?:\\s*/\\s*(?P<alternate_name>.+))?\\s*$",
+                    "outputs": {
+                        "primary_name": "primary_name",
+                        "alternate_name": "alternate_name_raw"
+                    }
+                }
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                    "overwrite": True
+                }
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "primary_name"
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "PNP-SDSPPO-MOST-WANTED"
+                }
+            }
+        ]
     },
 }

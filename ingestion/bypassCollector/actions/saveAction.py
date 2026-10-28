@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class SaveHtmlAction(BaseAction):
-    """Save the current browser DOM as HTML."""
+    """Save the browser DOM, or an opt-in self-contained image snapshot."""
 
     def execute(
         self,
@@ -31,6 +31,9 @@ class SaveHtmlAction(BaseAction):
         context: Dict[str, Any],
         engine: Any,
     ) -> bool:
+        if "embed_images" in actionConfig:
+            return self._save_embedded_images(actionConfig, context, engine)
+
         html = engine.getHtml()
 
         if not html:
@@ -60,6 +63,160 @@ class SaveHtmlAction(BaseAction):
                 f"Failed to save HTML: {type(e).__name__}: {e}"
             )
             return False
+
+    def _save_embedded_images(self, actionConfig, context, engine) -> bool:
+        """Capture a selected content section and original image bytes atomically.
+
+        The output has stable content: no capture times, filenames or browser
+        scripts. A failed image prevents publication of the whole snapshot.
+        """
+        import copy
+        import tempfile
+        from html import escape
+        from uuid import uuid4
+
+        from lxml import html as lxml_html
+        from PIL import Image
+
+        from ingestion.bypassCollector.browserBinaryDownload import fetch_browser_binary
+        from ingestion.urlResolver.htmlImageResolver import resolve_image_from_html
+
+        context.pop("savedFile", None)
+        part_path = None
+        try:
+            settings = actionConfig["embed_images"]
+            if not isinstance(settings, dict):
+                raise ValueError("embed_images must be an object.")
+            allowed = {"content_selector", "expected_count", "timeout_seconds"}
+            if set(settings) - allowed:
+                raise ValueError("Unknown embed_images settings.")
+            selector = settings.get("content_selector")
+            if not isinstance(selector, str) or not selector.strip():
+                raise ValueError("embed_images.content_selector must be a CSS selector.")
+            count = settings.get("expected_count")
+            timeout = settings.get("timeout_seconds", 30)
+            if type(count) is not int or not 1 <= count <= 100:
+                raise ValueError("embed_images.expected_count must be between 1 and 100.")
+            if type(timeout) is not int or timeout < 1:
+                raise ValueError("embed_images.timeout_seconds must be a positive integer.")
+
+            markup = engine.getHtml()
+            if not markup:
+                raise ValueError("Browser returned empty HTML.")
+            page_url = engine.getCurrentUrl() or context.get("url")
+            root = lxml_html.fromstring(markup)
+            sections = root.cssselect(selector)
+            if len(sections) != 1:
+                raise ValueError("Content selector must match exactly one section.")
+            nodes = sections[0].xpath(".//img")
+            if len(nodes) != count:
+                raise ValueError(f"Found {len(nodes)} images; expected {count}.")
+
+            assets = []
+            for node in nodes:
+                selected = resolve_image_from_html(markup, page_url, {
+                    "selector_type": "xpath",
+                    "selector": root.getroottree().getpath(node),
+                    "prefer": "largest_srcset",
+                })
+                assets.append((selected, " ".join((node.get("alt") or "").split())))
+            urls = [selected.url for selected, _ in assets]
+            if len(set(urls)) != count:
+                raise ValueError("Content contains duplicate image URLs.")
+
+            clean = copy.deepcopy(sections[0])
+            for element in clean.xpath(".//script | .//style | .//noscript"):
+                element.drop_tree()
+            source_text = " ".join(clean.text_content().split())
+
+            options = json.dumps({"selector": selector, "urls": urls,
+                                  "timeoutMs": timeout * 1000})
+            loaded = engine.evaluateAwait("""(async function(options) {
+                const sections = document.querySelectorAll(options.selector);
+                if (sections.length !== 1) throw new Error('Content section changed');
+                const images = Array.from(sections[0].querySelectorAll('img'));
+                if (images.length !== options.urls.length) throw new Error('Image count changed');
+                images.forEach((img, index) => {
+                    img.removeAttribute('srcset');
+                    img.removeAttribute('sizes');
+                    img.loading = 'eager';
+                    img.src = options.urls[index];
+                });
+                const deadline = Date.now() + options.timeoutMs;
+                while (images.some(img => !img.complete || !img.naturalWidth)) {
+                    if (Date.now() >= deadline) throw new Error('Content images did not load');
+                    await new Promise(resolve => setTimeout(resolve, 250));
+                }
+                return images.map(img => ({url: img.currentSrc,
+                    width: img.naturalWidth, height: img.naturalHeight}));
+            })(""" + options + ")")
+            if not isinstance(loaded, list) or len(loaded) != count:
+                raise ValueError("Browser did not load every content image.")
+
+            captured = []
+            total = 0
+            mime_types = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}
+            for (selected, alt), actual in zip(assets, loaded):
+                if not isinstance(actual, dict) or actual.get("url") != selected.url:
+                    raise ValueError("Loaded image differs from the selected original.")
+                payload, _ = fetch_browser_binary(
+                    engine, selected.url, page_url=page_url,
+                    timeout_seconds=timeout, cache_mode="force-cache",
+                )
+                total += len(payload)
+                if total > 40_000_000:
+                    raise ValueError("Embedded images exceed the 40 MB total limit.")
+                with Image.open(BytesIO(payload)) as image:
+                    image_format, size = image.format, image.size
+                    if image_format not in mime_types or getattr(image, "n_frames", 1) != 1:
+                        raise ValueError("Expected a static PNG, JPEG or WEBP image.")
+                    if size[0] * size[1] > 40_000_000:
+                        raise ValueError("Image exceeds the 40 megapixel limit.")
+                    if size != (actual.get("width"), actual.get("height")):
+                        raise ValueError("Image dimensions differ from the browser image.")
+                    if selected.width_hint is not None and size[0] != selected.width_hint:
+                        raise ValueError("Image width differs from the original srcset descriptor.")
+                    image.verify()
+                with Image.open(BytesIO(payload)) as image:
+                    image.load()
+                captured.append((selected.url, alt, mime_types[image_format], size, payload))
+
+            title = str(context.get("list_name") or "Source images")
+            source_url = str(context.get("url") or page_url)
+            lines = ['<!DOCTYPE html>', '<html><head><meta charset="utf-8">',
+                     '<meta name="snapshot-format" content="embedded-images-v1">',
+                     f'<meta name="source-url" content="{escape(source_url, quote=True)}">',
+                     f'<title>{escape(title)}</title></head><body>',
+                     f'<h1>{escape(title)}</h1><main data-ocr-images="1">',
+                     f'<p data-source-text="1">{escape(source_text)}</p>']
+            for index, (url, alt, mime, size, payload) in enumerate(sorted(captured), 1):
+                encoded = base64.b64encode(payload).decode("ascii")
+                lines.append(
+                    f'<figure data-image-index="{index}" data-source-url="{escape(url, quote=True)}">'
+                    f'<img alt="{escape(alt, quote=True)}" width="{size[0]}" height="{size[1]}" '
+                    f'src="data:{mime};base64,{encoded}"></figure>'
+                )
+            snapshot = ("\n".join(lines) + "\n</main></body></html>\n").encode("utf-8")
+
+            name = Path(self._buildFilename(actionConfig, context))
+            if name.name != str(name) or name.suffix.lower() != ".html":
+                raise ValueError("Snapshot filename must be an HTML basename.")
+            output_dir = Path(actionConfig.get("outputDir", context.get("outputDir", "data/downloads")))
+            output_dir.mkdir(parents=True, exist_ok=True)
+            filepath = output_dir / f"{name.stem}_{uuid4().hex[:12]}.html"
+            with tempfile.NamedTemporaryFile(dir=output_dir, suffix=".part", delete=False) as handle:
+                part_path = Path(handle.name)
+                handle.write(snapshot)
+            part_path.replace(filepath)
+            context["savedFile"] = str(filepath)
+            logger.info("Self-contained HTML saved: %s; images=%s; bytes=%s", filepath, count, len(snapshot))
+            return True
+        except Exception:
+            logger.exception("Self-contained HTML capture failed")
+            return False
+        finally:
+            if part_path is not None:
+                part_path.unlink(missing_ok=True)
 
     def _buildFilename(
         self,

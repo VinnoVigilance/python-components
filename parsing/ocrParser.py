@@ -1,4 +1,4 @@
-"""Shared parser adapter: image/PDF -> document OCR -> layout-based raw records."""
+"""Shared parser adapter: image/PDF/embedded HTML -> OCR -> raw records."""
 
 import hashlib
 import json
@@ -10,6 +10,7 @@ from parsing.ocr.ocrRecordExtractor import OcrRecordExtractor
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 IMAGE_TYPES = {"image", "img", "jpg", "jpeg", "png", "tif", "tiff", "bmp", "webp", "gif"}
+HTML_TYPES = {"html", "htm"}
 
 
 class OcrParser:
@@ -30,6 +31,9 @@ class OcrParser:
         settings = config.get("parser")
         if not isinstance(settings, dict):
             raise ValueError("OCR source must define a parser object and layout_path/layout.")
+        file_type = str(config.get("file_type", "")).strip().lower()
+        if file_type in HTML_TYPES and str(settings.get("mode", "")).strip().lower() != "ocr":
+            raise ValueError("HTML OCR requires explicit parser.mode='ocr'.")
         allowed = {"type", "mode", "layout_path", "layout", "engine", "document",
                    "page_numbers", "saved_ocr_path"}
         unknown = set(settings) - allowed
@@ -89,8 +93,8 @@ class OcrParser:
             reader = DocumentOcrReader(RapidOcrEngine(engine_settings), document_settings)
             document = reader.read(source_path, page_numbers=requested)
 
-        file_type = str(config.get("file_type", "")).strip().lower()
-        expected_kind = "image" if file_type in IMAGE_TYPES else "pdf" if file_type == "pdf" else None
+        expected_kind = ("image" if file_type in IMAGE_TYPES else "pdf" if file_type == "pdf"
+                         else "html" if file_type in HTML_TYPES else None)
         if expected_kind and document.get("document_type") != expected_kind:
             raise ValueError(f"Expected {expected_kind} content for declared file_type={file_type!r}.")
 
@@ -101,7 +105,16 @@ class OcrParser:
         for page in document["pages"]:
             if page["image_size"][0] * page["image_size"][1] > engine_settings.max_pixels:
                 raise ValueError("OCR page exceeds parser.engine.max_pixels.")
+            width, height = page["image_size"]
+            scaled_size = [round(width * document_settings.recognition_scale),
+                           round(height * document_settings.recognition_scale)]
+            if min(scaled_size) < 1 or scaled_size[0] * scaled_size[1] > engine_settings.max_pixels:
+                raise ValueError("Scaled OCR page exceeds parser.engine.max_pixels or is empty.")
             if replay_path is not None:
+                if "recognition_scale" in document_config:
+                    saved_scale = (page.get("rendering") or {}).get("recognition_scale", 1)
+                    if saved_scale != document_settings.recognition_scale:
+                        raise ValueError("Saved OCR recognition scale differs from configured scale.")
                 for key in engine_config:
                     if (page.get("settings") or {}).get(key) != getattr(engine_settings, key):
                         raise ValueError(f"Saved OCR engine setting differs: {key}.")

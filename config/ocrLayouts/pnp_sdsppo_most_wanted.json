@@ -1,0 +1,289 @@
+{
+  "schema_version": 1,
+  "layout_id": "PNP_SDSPPO_MOST_WANTED",
+  "layout_version": 1,
+  "description": "Eighteen poster entries in four embedded images. Keep labelled left and right columns as raw OCR lines; source preprocessing interprets labels. Region keys are geometry references, never person identifiers.",
+  "require_all_pages": true,
+  "expected_page_count": 4,
+  "fields": {
+    "left_column_lines": {
+      "box": [
+        0,
+        0,
+        0.47368421052631576,
+        1
+      ],
+      "mode": "list",
+      "required": true,
+      "review_below_score": 0.6
+    },
+    "right_column_lines": {
+      "box": [
+        0.47368421052631576,
+        0,
+        1,
+        1
+      ],
+      "mode": "list",
+      "required": true,
+      "review_below_score": 0.6
+    }
+  },
+  "pages": [
+    {
+      "page_number": 1,
+      "reference_size": [
+        578,
+        724
+      ],
+      "aspect_ratio_tolerance": 0.01,
+      "anchors": [
+        {
+          "box": [
+            0,
+            32,
+            65,
+            52
+          ],
+          "text_equals": "REGION"
+        },
+        {
+          "box": [
+            0,
+            0,
+            578,
+            30
+          ],
+          "text_equals": "COMMUNIST TERRORIST GROUP PERSONALITIES WITH REWARD COVERED BY DND-DILG JOINT ORDERS ON REWARD"
+        }
+      ],
+      "record_regions": [
+        {
+          "key": "row_1",
+          "box": [
+            0,
+            32,
+            475,
+            164
+          ]
+        },
+        {
+          "key": "row_2",
+          "box": [
+            0,
+            164,
+            475,
+            295
+          ]
+        },
+        {
+          "key": "row_3",
+          "box": [
+            0,
+            295,
+            475,
+            413
+          ]
+        },
+        {
+          "key": "row_4",
+          "box": [
+            0,
+            413,
+            475,
+            557
+          ]
+        },
+        {
+          "key": "row_5",
+          "box": [
+            0,
+            557,
+            475,
+            724
+          ]
+        }
+      ]
+    },
+    {
+      "page_number": 2,
+      "reference_size": [
+        576,
+        674
+      ],
+      "aspect_ratio_tolerance": 0.01,
+      "anchors": [
+        {
+          "box": [
+            0,
+            0,
+            65,
+            20
+          ],
+          "text_equals": "REGION"
+        }
+      ],
+      "record_regions": [
+        {
+          "key": "row_1",
+          "box": [
+            0,
+            0,
+            475,
+            166
+          ]
+        },
+        {
+          "key": "row_2",
+          "box": [
+            0,
+            166,
+            475,
+            346
+          ]
+        },
+        {
+          "key": "row_3",
+          "box": [
+            0,
+            346,
+            475,
+            464
+          ]
+        },
+        {
+          "key": "row_4",
+          "box": [
+            0,
+            464,
+            475,
+            674
+          ]
+        }
+      ]
+    },
+    {
+      "page_number": 3,
+      "reference_size": [
+        577,
+        800
+      ],
+      "aspect_ratio_tolerance": 0.01,
+      "anchors": [
+        {
+          "box": [
+            0,
+            0,
+            65,
+            20
+          ],
+          "text_equals": "REGION"
+        }
+      ],
+      "record_regions": [
+        {
+          "key": "row_1",
+          "box": [
+            0,
+            0,
+            475,
+            205
+          ]
+        },
+        {
+          "key": "row_2",
+          "box": [
+            0,
+            205,
+            475,
+            349
+          ]
+        },
+        {
+          "key": "row_3",
+          "box": [
+            0,
+            349,
+            475,
+            466
+          ]
+        },
+        {
+          "key": "row_4",
+          "box": [
+            0,
+            466,
+            475,
+            610
+          ]
+        },
+        {
+          "key": "row_5",
+          "box": [
+            0,
+            610,
+            475,
+            800
+          ]
+        }
+      ]
+    },
+    {
+      "page_number": 4,
+      "reference_size": [
+        584,
+        651
+      ],
+      "aspect_ratio_tolerance": 0.01,
+      "anchors": [
+        {
+          "box": [
+            0,
+            0,
+            65,
+            20
+          ],
+          "text_equals": "REGION"
+        }
+      ],
+      "record_regions": [
+        {
+          "key": "row_1",
+          "box": [
+            0,
+            0,
+            475,
+            161
+          ]
+        },
+        {
+          "key": "row_2",
+          "box": [
+            0,
+            161,
+            475,
+            331
+          ]
+        },
+        {
+          "key": "row_3",
+          "box": [
+            0,
+            331,
+            475,
+            510
+          ]
+        },
+        {
+          "key": "row_4",
+          "box": [
+            0,
+            510,
+            475,
+            651
+          ]
+        }
+      ]
+    }
+  ]
+}

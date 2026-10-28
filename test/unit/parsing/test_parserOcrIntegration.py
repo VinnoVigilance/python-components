@@ -69,6 +69,8 @@ class TestParserOcrIntegration(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIsInstance(create_parser(name), OcrParser)
         self.assertIsInstance(create_parser("  IMAGE  "), OcrParser)
+        self.assertIsInstance(create_parser("html"), OcrParser)
+        self.assertIsInstance(create_parser(" HTM "), OcrParser)
         self.assertIsInstance(create_parser("pdf"), PdfParser)
         self.assertEqual(create_parser("xml").__class__.__name__, "XmlParser")
         self.assertEqual(create_parser("json").__class__.__name__, "JsonParser")
@@ -78,7 +80,7 @@ class TestParserOcrIntegration(unittest.TestCase):
         code = (
             "import sys; sys.modules['rapidocr']=None; sys.modules['onnxruntime']=None; "
             "from parsing.parserFactory import create_parser; "
-            "create_parser('image'); create_parser('xml'); create_parser('pdf')"
+            "create_parser('image'); create_parser('xml'); create_parser('pdf'); create_parser('html')"
         )
         result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -118,6 +120,24 @@ class TestParserOcrIntegration(unittest.TestCase):
         self.config["parser"]["engine"] = {"recognition_language": " en "}
         self.assertEqual(self.parse()[0]["name"], "EXAMPLE NAME")
 
+    def test_replay_with_different_angle_setting_is_rejected(self):
+        self.config["parser"]["engine"] = {"use_angle_classification": False}
+        with self.assertRaisesRegex(ValueError, "engine setting differs"):
+            self.parse()
+
+    def test_matching_disabled_angle_replay_does_not_run_models(self):
+        self.config["parser"]["engine"] = {"use_angle_classification": False}
+        self.document["pages"][0]["settings"]["use_angle_classification"] = False
+        self.save_cache()
+        with patch("parsing.ocr.rapidOcrEngine.RapidOcrEngine._build_backend",
+                   side_effect=AssertionError("Replay must not load models")):
+            self.assertEqual(self.parse()[0]["name"], "EXAMPLE NAME")
+
+    def test_legacy_replay_without_new_setting_keeps_working_with_old_config(self):
+        self.document["pages"][0]["settings"].pop("use_angle_classification")
+        self.save_cache()
+        self.assertEqual(self.parse()[0]["name"], "EXAMPLE NAME")
+
     def test_source_size_limit_applies_to_replay(self):
         self.config["parser"]["document"] = {"max_source_bytes": 1}
         with self.assertRaisesRegex(ValueError, "max_source_bytes"):
@@ -131,6 +151,11 @@ class TestParserOcrIntegration(unittest.TestCase):
     def test_declared_type_cannot_silently_accept_other_content(self):
         self.config["file_type"] = "pdf"
         with self.assertRaisesRegex(ValueError, "Expected pdf content"):
+            self.parse()
+
+    def test_declared_html_cannot_accept_replayed_individual_image_content(self):
+        self.config["file_type"] = "html"
+        with self.assertRaisesRegex(ValueError, "Expected html content"):
             self.parse()
 
     def test_relative_layout_and_replay_paths_use_project_root(self):

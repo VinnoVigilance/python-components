@@ -1189,6 +1189,81 @@ class PreProcessingEngine:
 
         return record
 
+    def extract_labelled_ocr_fields(self, record, config):
+        """Extract labelled, vertically stacked fields in one OCR column.
+
+        input_field names a layout field under _ocr.fields. labels maps printed
+        labels to output fields, in their expected top-to-bottom order. Values
+        are assigned by geometry, including wrapped lines and values merged
+        with their label. Matching ignores label case. A missing separator is
+        accepted only at the label edge of the configured OCR column; a value
+        beginning with the same letters must not become another label.
+        Original OCR text/evidence is left untouched.
+        """
+        input_field = config["input_field"]
+        labels = config["labels"]
+        if (not isinstance(labels, dict) or not labels
+                or any(not isinstance(k, str) or not k.strip()
+                       or not isinstance(v, str) or not v.strip()
+                       for k, v in labels.items())
+                or len(set(labels.values())) != len(labels)
+                or len({label.casefold() for label in labels}) != len(labels)):
+            raise ValueError("OCR labels require distinct non-empty output fields.")
+        evidence = record.get("_ocr", {}).get("fields", {}).get(input_field, {})
+        lines = evidence.get("lines")
+        if not isinstance(lines, list) or not lines:
+            raise ValueError(f"Missing OCR column evidence: {input_field}")
+
+        def top(line):
+            return min(point[1] for point in line["box"])
+
+        def center(line):
+            return sum(point[1] for point in line["box"]) / 4
+
+        def start(line):
+            # Allow a value's baseline to differ slightly from its label.
+            height = max(point[1] for point in line["box"]) - top(line)
+            return top(line) - height / 4
+
+        ordered = sorted(lines, key=lambda line: (top(line), min(p[0] for p in line["box"])))
+        markers = []
+        for line in ordered:
+            text = line["text"].strip()
+            area = evidence.get("region")
+            left = min(point[0] for point in line["box"])
+            height = max(point[1] for point in line["box"]) - top(line)
+            at_label_edge = area is not None and left <= area[0] + max(height, 1)
+            for label in sorted(labels, key=len, reverse=True):
+                match = re.match(re.escape(label), text, flags=re.IGNORECASE)
+                if match is None or (area is not None and not at_label_edge):
+                    continue
+                remainder = text[match.end():]
+                if remainder and not remainder[0].isspace() and not at_label_edge:
+                    continue
+                markers.append((label, line, remainder.strip()))
+                break
+        if [label for label, _, _ in markers] != list(labels):
+            raise ValueError(f"Missing, repeated or reordered OCR labels: {input_field}")
+
+        marker_numbers = {line["line_number"] for _, line, _ in markers}
+        values = [line for line in ordered if line["line_number"] not in marker_numbers]
+        assigned = set()
+        outputs = {}
+        for index, (label, marker, inline_value) in enumerate(markers):
+            lower = start(marker)
+            upper = start(markers[index + 1][1]) if index + 1 < len(markers) else float("inf")
+            matches = [line for line in values if lower <= center(line) < upper]
+            assigned.update(line["line_number"] for line in matches)
+            parts = ([inline_value] if inline_value else []) + [line["text"] for line in matches]
+            value = " ".join(" ".join(parts).split())
+            if not value:
+                raise ValueError(f"Empty OCR value for {label!r} in {input_field}")
+            outputs[labels[label]] = value
+        if assigned != {line["line_number"] for line in values}:
+            raise ValueError(f"Unassigned OCR text in column: {input_field}")
+        record.update(outputs)
+        return record
+
     def normalize_empty_fields(self, record, config):
         """Normalize source empty markers in flat or dotted fields."""
 

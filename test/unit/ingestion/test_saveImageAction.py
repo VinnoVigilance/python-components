@@ -88,6 +88,17 @@ class TestBrowserImageDownload(unittest.TestCase):
                     self.fetch(**kwargs)
         self.driver.execute_async_script.assert_not_called()
 
+    def test_cache_mode_is_explicit_and_legacy_default_is_no_store(self):
+        self.fetch()
+        self.assertIn('"cacheMode": "no-store"', self.driver.execute_async_script.call_args.args[0])
+        self.fetch(cache_mode="force-cache")
+        self.assertIn('"cacheMode": "force-cache"', self.driver.execute_async_script.call_args.args[0])
+
+    def test_invalid_cache_mode_is_rejected_before_browser_execution(self):
+        with self.assertRaisesRegex(ValueError, "cache_mode"):
+            self.fetch(cache_mode="unknown")
+        self.driver.execute_async_script.assert_not_called()
+
 
 class TestSaveImageAction(unittest.TestCase):
     def setUp(self):

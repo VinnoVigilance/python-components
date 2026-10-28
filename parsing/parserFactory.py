@@ -5,7 +5,7 @@ from parsing.pdfParser import PdfParser
 from parsing.tabularParser import TabularParser
 from parsing.jsonlParser import JsonlParser
 from parsing.jsonParser import JsonParser
-from parsing.ocrParser import OcrParser, IMAGE_TYPES
+from parsing.ocrParser import OcrParser, IMAGE_TYPES, HTML_TYPES
 
 
 PARSER_REGISTRY = {
@@ -18,7 +18,7 @@ PARSER_REGISTRY = {
     "json": JsonParser,
 }
 
-PARSER_REGISTRY.update({file_type: OcrParser for file_type in IMAGE_TYPES})
+PARSER_REGISTRY.update({file_type: OcrParser for file_type in IMAGE_TYPES | HTML_TYPES})
 
 
 def create_parser(file_type: str):
