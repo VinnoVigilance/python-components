@@ -1,6 +1,8 @@
 """Unit tests for StealthBrowserEngine's Cloudflare challenge indicators."""
 
 import asyncio
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -46,6 +48,32 @@ def test_engine_installs_indicators_on_the_bot():
 
     assert bot.CHALLENGE_INDICATORS == CHALLENGE_INDICATORS
     bot.__enter__.assert_called_once()
+
+
+def test_navigation_pdf_configures_isolated_browser_downloads():
+    bot = MagicMock()
+    with patch(
+        "ingestion.bypassCollector.engines.stealthBrowserEngine.StealthBot",
+        return_value=bot,
+    ), patch(
+        "ingestion.bypassCollector.engines.stealthBrowserEngine.CompatibleSeleniumBaseDriver",
+    ) as driver, patch(
+        "ingestion.bypassCollector.engines.stealthBrowserEngine.TemporaryDirectory",
+        side_effect=lambda **kwargs: TemporaryDirectory(dir=Path.cwd(), **kwargs),
+    ), patch(
+        "ingestion.bypassCollector.engines.stealthBrowserEngine._reset_closed_event_loop",
+    ):
+        with StealthBrowserEngine(downloadPdfs=True) as engine:
+            directory = engine.downloadDirectory
+            assert Path(directory).is_dir()
+            driver.assert_called_once_with(
+                driver_version="mlatest", binary_location=None, external_pdf=True,
+            )
+            bot.sb.activate_cdp_mode.assert_called_once_with(
+                "about:blank", downloads_path=str(directory),
+            )
+
+    assert not Path(directory).exists()
 
 
 ENGINE_TIME = "ingestion.bypassCollector.engines.stealthBrowserEngine.time"
