@@ -1,0 +1,20 @@
+{
+  "status": "frozen_blind_review_in_progress",
+  "reviewed_count": 60,
+  "reviewer": "codex-gpt6",
+  "review_is_independent_human_reference": false,
+  "source_export_sha256": "59d8c957ad81c103aa47178c784500feac5ca98c3aa88941456da6abf43754ab",
+  "export_rows": 500,
+  "selected_count": 400,
+  "exported_rows_consumed": 422,
+  "excluded_before_400": {
+    "prior_id": 14,
+    "unusable_title_or_body": 8
+  },
+  "distinct_publisher_names": 81,
+  "blind_sha256": "eda0e8376c75e917570544d5e1736ecea86416516c4786a4e68c4b2ee61eb8f2",
+  "internal_sha256": "986153d2273fdb2fc89ca75c8e4950baef907503c29c24f83f24034ba5d7143f",
+  "no_model_scores_or_labels_used_in_selection": true,
+  "full_text_preserved": true,
+  "independent_human_reference": false
+}

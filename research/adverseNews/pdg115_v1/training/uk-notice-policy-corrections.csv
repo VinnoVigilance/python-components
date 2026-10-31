@@ -1,0 +1,7 @@
+article_id,old_silver_label,policy_label,reason,decision_date,source
+AN-P115-R3900,1,0,active notice with unspecified failings,2026-10-31,product-owner-confirmed-rule-and-GPT-full-text-audit
+AN-P115-R3964,1,0,closed notice with repayment obligation but no qualifying offence,2026-10-31,product-owner-confirmed-rule-and-GPT-full-text-audit
+AN-P115-R3975,1,0,lifted financial-management notice,2026-10-31,product-owner-confirmed-rule-and-GPT-full-text-audit
+AN-P115-R4038,1,0,lifted inadequate-service notice,2026-10-31,product-owner-confirmed-rule-and-GPT-full-text-audit
+AN-P115-R4253,1,0,lifted financial-control notice,2026-10-31,product-owner-confirmed-rule-and-GPT-full-text-audit
+AN-P115-R4347,1,0,active financial-management notice without specific breach,2026-10-31,product-owner-confirmed-rule-and-GPT-full-text-audit

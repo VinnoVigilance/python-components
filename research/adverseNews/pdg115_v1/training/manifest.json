@@ -1,0 +1,14 @@
+{
+  "status": "frozen_training_snapshot",
+  "rows": 5044,
+  "positive": 2286,
+  "negative": 2758,
+  "base_rows": 5000,
+  "policy_corrections": 6,
+  "earlier_certain_additions": 18,
+  "new_certain_additions": 26,
+  "base_sha256": "2e591b40d249d52ad5324c7086d3432eb62a0be2122b6b6bab4a3a485930942d",
+  "final_sha256": "8f4b80c0fb49153a2cf7c3df79765cb8efca2e5d1aac5c8ec56b4a8ac04524e4",
+  "label_policy": "adverse-news-policy-v0.2",
+  "independent_human_reference": false
+}
