@@ -36,6 +36,7 @@ FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "sources"
 
 # list_name -> committed sample file (mirrors test_source_conformance.SAMPLES).
 SAMPLES = {
+    "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022": "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022_raw_sample.jsonl",
     "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY_raw_sample.jsonl",
     "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES": "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES_raw_sample.jsonl",
     "BSP_SENIOR_OFFICIALS": "BSP_SENIOR_OFFICIALS_raw_sample.jsonl",
@@ -83,6 +84,10 @@ SAMPLES = {
 # "Crime" and "Sanctions" respectively. A set expects that spread across the
 # entries; a plain string expects that single value on every entry.
 GOLDEN = {
+    "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022", "SourceName": "PNP",
+    },
     "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": {
         "SourceType": "Official", "DatasetCategory": "Law Enforcement",
         "ListName": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY", "SourceName": "HKPF",
