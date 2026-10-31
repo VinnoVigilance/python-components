@@ -1,0 +1,60 @@
+{
+  "schema_version": "adverse-news-final-label-pool-v1",
+  "status": "complete_label_pool_not_independent_benchmark",
+  "articles": 5000,
+  "positive": 2273,
+  "negative": 2727,
+  "label_origin_counts": {
+    "human_confirmed_after_discussion": 9,
+    "proposed_silver_model_agreement": 91,
+    "gpt6_luna_proposed_silver": 4498,
+    "gpt6_luna_parent_policy_qc_corrected": 2,
+    "two_model_agreement": 382,
+    "user_adjudication_after_answer_hidden_disagreement_review": 18
+  },
+  "source_counts": {
+    "ADB": 1,
+    "AMLC": 43,
+    "DOJ_PH": 491,
+    "DTI_PH": 81,
+    "NBI": 944,
+    "PCIJ": 45,
+    "PTV": 1319,
+    "SEC_PH": 758,
+    "UK_GOV": 1318
+  },
+  "dataset_counts": {
+    "ADB_CASE_SUMMARIES": 1,
+    "AMLC_NEWS_AND_ANNOUNCEMENTS": 43,
+    "DOJ_PH_NEWS": 491,
+    "DTI_PH_FAIR_TRADE_PRESS_RELEASES": 81,
+    "NBI_PRESS_RELEASES": 944,
+    "PCIJ_CORRUPTION_WATCH": 21,
+    "PCIJ_INVESTIGATIVE_REPORTS": 24,
+    "PTV_NEWS": 1319,
+    "SEC_PH_ADVISORIES": 758,
+    "UK_GOV_NEWS_COMMUNICATIONS": 1318
+  },
+  "language_metadata_counts": {
+    "<unknown>": 4199,
+    "en": 801
+  },
+  "gpt_expansion_model_and_mode": "GPT-6 Luna / low reasoning",
+  "gpt_labels_sha256": "79a3a019d77c356efe3a9036543a7306d7b09a6686fedd31db47b143971811f9",
+  "policy_corrections_sha256": "299dfe964715d51ec0c2c2aa17a7b935ab0a66756ba861c4681a1a24d119bf5f",
+  "policy_correction_count": 2,
+  "pilot_sha256": "bcceb0d226b46dbb173c9d6f3d46c94f6e3e911e892505aa78b0268b8473cb24",
+  "expansion_session_sha256": "a84221d3ea841b67a918bfba49cf25050a0bc87fdb698f13f3ba0c108dc9673e",
+  "dataset_sha256": "f47dbc68639d781f908b190e63b762dfeee25ac003fff5e56e848e00475cc2c4",
+  "all_expansion_labels_validated": true,
+  "independent_human_reference_count": 0,
+  "teacher_labels_are_not_truth": true,
+  "reserved_reference_pool_used_for_labeling": false,
+  "same_case_review_complete": false,
+  "model_inputs": [
+    "title",
+    "body"
+  ],
+  "candidate_splits_are_provisional": true,
+  "note": "This is a complete 5,000-row proposed-label corpus, not a production benchmark. Rebuild case-safe evaluation splits after duplicate/case review and create an independent answer-blind human reference."
+}

@@ -34,6 +34,13 @@ reference labels. Read `EVIDENCE.md` for the comparison and limitations.
 | `evaluation/mixed_150/` | Older mixed-source reserved packet. |
 | `evaluation/fresh_400_in_progress/` | User's 500-row export, frozen 400-article packet, metadata, and 60/400 saved GPT reviews. **No model scores or training use for these 400.** |
 | `code/` | Small self-contained scripts to assemble training data, reproduce the fit, score full articles, and evaluate a completed blind packet. |
+| `context/` | Compact model-selection, publisher-transfer, and UK_GOV error reports for planning v2. |
+| `queries/` | Read-only SQL used to request source counts and UK_GOV sampling exports. |
+
+For future work on another device, read `V2_HANDOFF.md` after this page. It
+records what was tested, which scores are diagnostic, and the proposed v2
+sequence. The base training manifest is retained at
+`training/base-5000-manifest.json`.
 
 The source research tree had over 2 GB of intermediate experiment files and
 many one-off scripts. This snapshot keeps the policy, final training inputs,
