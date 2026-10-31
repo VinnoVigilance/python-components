@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pdfplumber
@@ -8,6 +9,7 @@ class PdfParser:
     PDF parser for tabular watchlist files, with a text mode
     (config ``parser: {mode: text}``) returning the whole document text.
     Explicit ``parser: {mode: ocr}`` delegates to the shared OCR parser.
+    Explicit ``parser: {mode: image_cards}`` discovers bordered image/text cards.
 
     Output:
         A list of dictionaries.
@@ -41,6 +43,10 @@ class PdfParser:
             )
 
         config = config or {}
+
+        settings = config.get("parser") or {}
+        if str(settings.get("mode", "")).strip().lower() == "image_cards":
+            return self._parse_image_cards(pdf_path, settings)
 
         # OCR is opt-in; table/text parsing below retains the existing behavior.
         if str((config.get("parser") or {}).get("mode", "")).strip().lower() == "ocr":
@@ -191,6 +197,105 @@ class PdfParser:
         )
 
         return records
+
+    def _parse_image_cards(self, pdf_path, settings):
+        """Discover ruled image cards and separate styled captions from their remaining text."""
+        record_pattern = re.compile(settings["record_pattern"])
+        font_pattern = re.compile(settings["caption_font_pattern"])
+        page_pattern = settings.get("page_pattern")
+        if page_pattern and not re.compile(page_pattern).groupindex:
+            raise ValueError("PDF page_pattern requires named capture groups.")
+
+        records = []
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text(x_tolerance=1, y_tolerance=1) or ""
+                expected_count = len(list(record_pattern.finditer(page_text)))
+                if not expected_count:
+                    continue
+                page_fields = {}
+                if page_pattern:
+                    match = re.search(page_pattern, page_text)
+                    if match is None:
+                        raise ValueError(f"PDF page {page.page_number}: missing page fields.")
+                    page_fields = {
+                        key: " ".join((value or "").split())
+                        for key, value in match.groupdict().items()
+                    }
+
+                cells = sorted(
+                    {
+                        cell
+                        for table in page.find_tables(settings["table_settings"])
+                        for cell in table.cells
+                    },
+                    key=lambda box: (box[1], box[0]),
+                )
+                page_records = []
+                for cell in cells:
+                    card = page.crop(cell)
+                    card_text = card.extract_text(x_tolerance=1, y_tolerance=1) or ""
+                    count = len(list(record_pattern.finditer(card_text)))
+                    if not count:
+                        continue
+                    if count != 1:
+                        raise ValueError(f"PDF page {page.page_number}: merged record cells.")
+                    caption, caption_chars = self._card_caption(card, font_pattern)
+                    if not card.images:
+                        raise ValueError(f"PDF page {page.page_number}: card has no image.")
+                    body = card.filter(
+                        lambda item: item["object_type"] != "char"
+                        or id(item) not in caption_chars
+                    ).extract_text(x_tolerance=1, y_tolerance=1)
+                    body = " ".join((body or "").split())
+                    marker = record_pattern.search(body)
+                    if marker is None:
+                        raise ValueError(f"PDF page {page.page_number}: missing card body marker.")
+                    body = body[marker.start():]
+                    record = {
+                        **page_fields,
+                        settings["caption_field"]: caption,
+                        settings["body_field"]: body,
+                        "source_page": page.page_number,
+                        "source_position": len(page_records) + 1,
+                    }
+                    for field, pattern in settings.get("required_patterns", {}).items():
+                        if not re.fullmatch(pattern, record.get(field, "")):
+                            raise ValueError(
+                                f"PDF page {page.page_number}: invalid card field {field!r}."
+                            )
+                    page_records.append(record)
+                if len(page_records) != expected_count:
+                    raise ValueError(
+                        f"PDF page {page.page_number}: found {expected_count} record markers "
+                        f"but extracted {len(page_records)} cards."
+                    )
+                records.extend(page_records)
+        if not records:
+            raise ValueError("PDF contains no matching image cards.")
+        return records
+
+    @staticmethod
+    def _card_caption(card, font_pattern):
+        """Read the final contiguous text block matching the configured font style."""
+        lines = card.filter(
+            lambda item: item["object_type"] != "char"
+            or font_pattern.search(item.get("fontname", "")) is not None
+        ).extract_text_lines(x_tolerance=1, y_tolerance=1)
+        if not lines:
+            raise ValueError(f"PDF page {card.page_number}: missing styled card caption.")
+        lines = sorted(lines, key=lambda line: (line["top"], line["x0"]))
+        caption = [lines[-1]]
+        for line in reversed(lines[:-1]):
+            next_line = caption[0]
+            line_height = max(
+                line["bottom"] - line["top"], next_line["bottom"] - next_line["top"]
+            )
+            if next_line["top"] - line["bottom"] > line_height / 2:
+                break
+            caption.insert(0, line)
+        text = " ".join(" ".join(line["text"] for line in caption).split())
+        return text, {id(char) for line in caption for char in line["chars"]}
 
 
     def parse_text(self, file_path):

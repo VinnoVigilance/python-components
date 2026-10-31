@@ -9,12 +9,14 @@ The DNFBP fixture is a small real PDF (a few pages), so we test at two levels:
     path runs on every push and in CI.
 """
 
+from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
 import pytest
 
 from parsing.pdfParser import PdfParser
+from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
 
 pytestmark = pytest.mark.unit
 
@@ -157,6 +159,24 @@ class TestRealPdf:
 
     def test_rows_carry_the_institution_code_column(self):
         assert any("INSTITUTION CODE" in r for r in _real_records())
+
+
+def test_image_cards_extracts_all_populated_pro9_cards():
+    config = WATCHLIST_CONFIGS["PNP_PRO9_MOST_WANTED_2024"]
+    records = list(PdfParser().parse(
+        Path(__file__).resolve().parents[2] / "fixtures" / "parsing"
+        / "pnp_pro9_most_wanted_2024.pdf",
+        config,
+    ))
+
+    assert len(records) == 34
+    assert Counter(record["source_page"] for record in records) == {
+        1: 10, 2: 10, 3: 4, 4: 10,
+    }
+    assert records[0]["name_raw"] == "GEREMIAS EYAS A.K.A. PLUTO"
+    assert "L-00948" in records[0]["details_raw"]
+    assert "Iligan City" in records[9]["details_raw"]
+    assert records[-1]["source_position"] == 10
 
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "parsing"
