@@ -86,4 +86,6 @@ source counts were requested; database access is required to fetch new rows.
 
 The `context/` folder retains compact reports on classical-model selection,
 publisher transfer, UK_GOV diversity, and the school-notice policy change.
-It omits large intermediate models, caches, and exploratory per-fold outputs.
+It also retains the frozen encoder comparison, which found no publisher-transfer
+gain over LSA + SVM. It omits large intermediate models, caches, and exploratory
+per-fold outputs.

@@ -1,6 +1,6 @@
 # Updated UK_GOV model: final research decision
 
-This is the frozen research decision for `pdg115_v1`. The bundle called
+This is the frozen research decision for `research/adverseNews/v1`. The bundle called
 `candidate-bundle.joblib` below is stored here as `model/model.joblib` with
 the same SHA-256. Paths under `results/` describe the original local research
 workspace; the curated training and evaluation files live in this folder.
