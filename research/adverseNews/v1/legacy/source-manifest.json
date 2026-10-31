@@ -1,0 +1,356 @@
+{
+  "status": "historical_source_archive",
+  "files": 70,
+  "records": [
+    {
+      "original_path": "research/adverseNews/.gitignore",
+      "archive_path": "original-source/.gitignore",
+      "sha256": "878861f2474d103f653ab053a52f6b91723d98abb7caaa0db0766962687dc1e4"
+    },
+    {
+      "original_path": "research/adverseNews/analyze_finalist_thresholds.py",
+      "archive_path": "original-source/analyze_finalist_thresholds.py",
+      "sha256": "e14244ea8bcdcd75b5e067272a809ea0ca1cc49b43d43b24cc201a46e7274eb2"
+    },
+    {
+      "original_path": "research/adverseNews/analyze_ptv_tag_errors.py",
+      "archive_path": "original-source/analyze_ptv_tag_errors.py",
+      "sha256": "816754381eebd6ca1cc0816c5f1b0caa082113369b71403c747a18ef42958661"
+    },
+    {
+      "original_path": "research/adverseNews/analyze_strong_review.py",
+      "archive_path": "original-source/analyze_strong_review.py",
+      "sha256": "62c9f3a12ff9021941ce84f01826aa19d0d72a997b28065cc5b3e29b9d41fa37"
+    },
+    {
+      "original_path": "research/adverseNews/analyze_uk_url_sections.py",
+      "archive_path": "original-source/analyze_uk_url_sections.py",
+      "sha256": "53036cd4c0a85ae44d786c01f15c7645c1fa8308df975b40da400c3bfe7a1971"
+    },
+    {
+      "original_path": "research/adverseNews/apply_expansion_user_adjudications.py",
+      "archive_path": "original-source/apply_expansion_user_adjudications.py",
+      "sha256": "c95ed5ef2681f75e9eb14c8fd62d5fa63113c48543768ec6851bad1f4a3a5a28"
+    },
+    {
+      "original_path": "research/adverseNews/audit_source_stage_links.py",
+      "archive_path": "original-source/audit_source_stage_links.py",
+      "sha256": "6fc6ea100e6ac3b929cd68b91d5f5f45a6d073ac85675dc17c750952d0d325ee"
+    },
+    {
+      "original_path": "research/adverseNews/audit_source_tags.py",
+      "archive_path": "original-source/audit_source_tags.py",
+      "sha256": "4bfce0830c5e41277b607dbc8f4a349af651d55f5db47b901a75cf7c24693558"
+    },
+    {
+      "original_path": "research/adverseNews/build_final_500_labels.py",
+      "archive_path": "original-source/build_final_500_labels.py",
+      "sha256": "41e6c72b2e7ad1281f98e4295f46fe1df6d49a21953f5b3adea81988634c71b2"
+    },
+    {
+      "original_path": "research/adverseNews/build_labeling_packets.py",
+      "archive_path": "original-source/build_labeling_packets.py",
+      "sha256": "fd3adc64436f8d93c7f9acfa234569f2900dc1582d90c59994fb29fed7c20ff6"
+    },
+    {
+      "original_path": "research/adverseNews/build_paired_expansion.py",
+      "archive_path": "original-source/build_paired_expansion.py",
+      "sha256": "8be2ea1ca46e054b909f58a8a888175c7441863ae3e326e5cc288bc6a6f5f340"
+    },
+    {
+      "original_path": "research/adverseNews/compare_uk_random_shadow.py",
+      "archive_path": "original-source/compare_uk_random_shadow.py",
+      "sha256": "ed17d786e7e68277f12a41acff47cb77de1139c4675f59ed7c987c4413a7bea0"
+    },
+    {
+      "original_path": "research/adverseNews/configs/experiments.json",
+      "archive_path": "original-source/configs/experiments.json",
+      "sha256": "40d5f884a6b375b42d30918dac67732fa9568e199fcdf5bbf02bd45899c91e59"
+    },
+    {
+      "original_path": "research/adverseNews/configs/local-inputs.json",
+      "archive_path": "original-source/configs/local-inputs.json",
+      "sha256": "94767c5629b1968cf7869309aed63412b8b9a47749f80a838c0721f683b86465"
+    },
+    {
+      "original_path": "research/adverseNews/configs/robustness-plan.json",
+      "archive_path": "original-source/configs/robustness-plan.json",
+      "sha256": "e122dc1172b8b9181b41100af9a537c7332c688a758d0e491584544bdb427a64"
+    },
+    {
+      "original_path": "research/adverseNews/contracts.py",
+      "archive_path": "original-source/contracts.py",
+      "sha256": "dd46b09f88c2aa57622cf151ecf8e1d550fee11504a077a4309231f590e2edac"
+    },
+    {
+      "original_path": "docs/PDG-115-adverse-news-labeling-guide.md",
+      "archive_path": "original-source/docs/PDG-115-adverse-news-labeling-guide.md",
+      "sha256": "d0cb1a2611d87610ebbd7d64d5f35fd815d83bdd6b3096ac72451b999a40556e"
+    },
+    {
+      "original_path": "docs/PDG-115-cpu-research-and-training-design.md",
+      "archive_path": "original-source/docs/PDG-115-cpu-research-and-training-design.md",
+      "sha256": "4d77513df60e2a9c1939e830336d477c36c7f04603151435967565506c3167af"
+    },
+    {
+      "original_path": "docs/PDG-115-implementation-handoff.md",
+      "archive_path": "original-source/docs/PDG-115-implementation-handoff.md",
+      "sha256": "8b4413d8d5922265272cb597bc0d24bea2fdbf5e1a4566f9fbc13ad95c2d28e1"
+    },
+    {
+      "original_path": "research/adverseNews/evaluate_source_stage_opinions.py",
+      "archive_path": "original-source/evaluate_source_stage_opinions.py",
+      "sha256": "000bab232d5ba23deaa1c0dfff976fc0e068d7684288040fbcdedf51f3ae1d2b"
+    },
+    {
+      "original_path": "research/adverseNews/finalize_expansion_5000.py",
+      "archive_path": "original-source/finalize_expansion_5000.py",
+      "sha256": "1787c763f967af88069c5d4944bf7de161ff70a23ce6b99b41f92ab42b4d1384"
+    },
+    {
+      "original_path": "research/adverseNews/fit_finalist_models.py",
+      "archive_path": "original-source/fit_finalist_models.py",
+      "sha256": "e7374ea1b1c39c88ad2a162b54dad6105a476093c7f83918e06fc5db86316177"
+    },
+    {
+      "original_path": "research/adverseNews/fit_uk_followup_candidate.py",
+      "archive_path": "original-source/fit_uk_followup_candidate.py",
+      "sha256": "b8464a9634308b314eb8bf3bc4bc0dd5047eaa79f2e31f8605efdfe20abfa58b"
+    },
+    {
+      "original_path": "research/adverseNews/import_batch_labels.py",
+      "archive_path": "original-source/import_batch_labels.py",
+      "sha256": "4478ac5c4e894fb9a69ca50876f24aa489462fb5c0c4f64f595c11be4df3b7d9"
+    },
+    {
+      "original_path": "research/adverseNews/import_expansion_response.py",
+      "archive_path": "original-source/import_expansion_response.py",
+      "sha256": "f3518fa8f2fb810597b80e800ef9f6a9d12d4a8335a76ae90f64db8e4bc09681"
+    },
+    {
+      "original_path": "research/adverseNews/import_source_stage_labels.py",
+      "archive_path": "original-source/import_source_stage_labels.py",
+      "sha256": "cc2741ce473911ab190783131f7bbcbeb34ac687fb9f924b7241259cfdf60730"
+    },
+    {
+      "original_path": "research/adverseNews/package_uk_diversity_candidate.py",
+      "archive_path": "original-source/package_uk_diversity_candidate.py",
+      "sha256": "c762c5b9f04f673f2c3d3bc6a835cb0ea990e8e7eca75d437a9d4d9a8d21129d"
+    },
+    {
+      "original_path": "research/adverseNews/policy/adverse-news-policy-v0.2/labeling-guide.md",
+      "archive_path": "original-source/policy/adverse-news-policy-v0.2/labeling-guide.md",
+      "sha256": "b7ca4f4e4f0c18bd4e971d2335d613ac440ff71f88ed1b08bf2aaa8949ba58d0"
+    },
+    {
+      "original_path": "research/adverseNews/policy/adverse-news-policy-v0.2/local-teacher-system.txt",
+      "archive_path": "original-source/policy/adverse-news-policy-v0.2/local-teacher-system.txt",
+      "sha256": "e11c0b5fc1336eea1280303cf7d6a63a944ca8579c981378aec1e3d93f798561"
+    },
+    {
+      "original_path": "research/adverseNews/policy/adverse-news-policy-v0.2/snapshot.json",
+      "archive_path": "original-source/policy/adverse-news-policy-v0.2/snapshot.json",
+      "sha256": "8028609e72b8a0ad20a225b3892e8745d1d97a7deb8035bc3ccd3bdb93b4d504"
+    },
+    {
+      "original_path": "research/adverseNews/predict_finalists.py",
+      "archive_path": "original-source/predict_finalists.py",
+      "sha256": "3384488aeef1f6dccbad945dc3e01c4bb6600bb0e87abe59b1d9bb89bac9dd3e"
+    },
+    {
+      "original_path": "research/adverseNews/prepare.py",
+      "archive_path": "original-source/prepare.py",
+      "sha256": "af4f71e92b7f7d33fed4e19ef180edab0bfc284278bc1bd7404c7795026e1e04"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_agreement_audit.py",
+      "archive_path": "original-source/prepare_agreement_audit.py",
+      "sha256": "11d3a4cd9f4dcc8df9177d7f61c1718a380c987d667d19e7397b15a59b68b4ec"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_disagreement_review.py",
+      "archive_path": "original-source/prepare_disagreement_review.py",
+      "sha256": "25fd1a76890a1637a8e8a8eda4c6375a885d28fe7419523aa926f5003a0d179c"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_expansion_4500.py",
+      "archive_path": "original-source/prepare_expansion_4500.py",
+      "sha256": "e25f07abb4009ebb80c238e88d523e905b0022f11c8424052c01de96d8674ac1"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_focus_review_v1.py",
+      "archive_path": "original-source/prepare_focus_review_v1.py",
+      "sha256": "fa7313a6a04808481385bff3d59eb25daf12468e0c8b851a352ab3f30e3d91e3"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_focus_review_v2.py",
+      "archive_path": "original-source/prepare_focus_review_v2.py",
+      "sha256": "91b69d19c172b82e4caeeb0d3fa71415d304da156763085791b228125bfea8a1"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_labeling_materials.py",
+      "archive_path": "original-source/prepare_labeling_materials.py",
+      "sha256": "d299e072d922e2d900a0de14c5df84e22e38a1077534226cded56b571e9759d4"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_pattern_training_v1.py",
+      "archive_path": "original-source/prepare_pattern_training_v1.py",
+      "sha256": "21c6e759af68164b011e0e39c208d0a00568dda135f6dee73ac58e6fa9473076"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_pattern_training_v2.py",
+      "archive_path": "original-source/prepare_pattern_training_v2.py",
+      "sha256": "febe06600d9575c855470708bc75908f47ac433cd2ff2a951181f6c36b1a671a"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_source_stage.py",
+      "archive_path": "original-source/prepare_source_stage.py",
+      "sha256": "b903e5769db157ffa03cc4476ada8384e1d72658ec8512fb71bc9d05281e1bad"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_source_stage_review_queue.py",
+      "archive_path": "original-source/prepare_source_stage_review_queue.py",
+      "sha256": "40655587af7ebf8274fe24e6b119440b797c8f0ab3a06563896ad20eafd7c4d3"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_strong_review.py",
+      "archive_path": "original-source/prepare_strong_review.py",
+      "sha256": "102a3cbbe96ae21742dac024fddcd8aa999a1fc36878099d52f0a7f586cd2362"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_uk_diversity_review.py",
+      "archive_path": "original-source/prepare_uk_diversity_review.py",
+      "sha256": "43637ad92e4397656e599e9ce7c9a76efdf490515ee95dbfbb2533a8615f29b2"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_uk_followup.py",
+      "archive_path": "original-source/prepare_uk_followup.py",
+      "sha256": "351933c0ce3c47e8bd0d727334bb7ebf011f92b71b1d6720b225c59cf9f611b2"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_uk_random_shadow_packet.py",
+      "archive_path": "original-source/prepare_uk_random_shadow_packet.py",
+      "sha256": "807df435c3b8971000e35aa4ef85190064152cb40ca4a95a454166d507b40dd4"
+    },
+    {
+      "original_path": "research/adverseNews/prepare_uk_release_gate_packet.py",
+      "archive_path": "original-source/prepare_uk_release_gate_packet.py",
+      "sha256": "8da86de47dce742f08f9ff4782c702923a4c2cd9c8a809d2567d31b1600df8bb"
+    },
+    {
+      "original_path": "research/adverseNews/README.md",
+      "archive_path": "original-source/README.md",
+      "sha256": "e5eddfc0c0b0c324ba9ba169124e7ae8f1c057d304a6341b8dcd1f9fe547a9b2"
+    },
+    {
+      "original_path": "research/adverseNews/repack_labeling_packets.py",
+      "archive_path": "original-source/repack_labeling_packets.py",
+      "sha256": "55878e5c9eb0d34616d74d25d3af3a4dc2a93661f0d72c3e588bd7a4b6ce1bb3"
+    },
+    {
+      "original_path": "research/adverseNews/requirements-classical.txt",
+      "archive_path": "original-source/requirements-classical.txt",
+      "sha256": "f2872d684d500097760266c5eb6598e21c65178b1afe15bf3443d4bc31f37c03"
+    },
+    {
+      "original_path": "research/adverseNews/requirements-encoder.txt",
+      "archive_path": "original-source/requirements-encoder.txt",
+      "sha256": "b4825343c37b984a7f6c4b155a82deb22af641f76bf587889988859f2bb10e50"
+    },
+    {
+      "original_path": "research/adverseNews/run_classical_screen.py",
+      "archive_path": "original-source/run_classical_screen.py",
+      "sha256": "d1bed126c34354a5f36ab256031f8c2a13720d819d474a5bd24e362d102e8e6e"
+    },
+    {
+      "original_path": "research/adverseNews/run_encoder_screen.py",
+      "archive_path": "original-source/run_encoder_screen.py",
+      "sha256": "8cf8352bc070a0a336d6043c5f509fd3b55a2f5839852931b287a31057ff4a70"
+    },
+    {
+      "original_path": "research/adverseNews/run_expanded_screen.py",
+      "archive_path": "original-source/run_expanded_screen.py",
+      "sha256": "6d072724865a1d9b327c65595db1bc23f782667a3e18135960d107f12a21c975"
+    },
+    {
+      "original_path": "research/adverseNews/run_lsa_dimension_screen.py",
+      "archive_path": "original-source/run_lsa_dimension_screen.py",
+      "sha256": "c5fa9e2c49ae58c48ccd77afdfe448fd405dc300c51bd253225e564ba82f8a6f"
+    },
+    {
+      "original_path": "research/adverseNews/run_refined_screen.py",
+      "archive_path": "original-source/run_refined_screen.py",
+      "sha256": "dfe24593ead74b8e4a6e7363a18853ec4ad0c4f320aa5cfba84d0533c6b93e44"
+    },
+    {
+      "original_path": "research/adverseNews/run_source_heldout_screen.py",
+      "archive_path": "original-source/run_source_heldout_screen.py",
+      "sha256": "50b635782babcdadb906a122325685b2dd839f178a97e272dbe8ade9d8bb3c8c"
+    },
+    {
+      "original_path": "research/adverseNews/schemas/label-response.schema.json",
+      "archive_path": "original-source/schemas/label-response.schema.json",
+      "sha256": "80afd66610b867e2285040b1d7676dcd82bcce568c2122d882c64a36e1cba829"
+    },
+    {
+      "original_path": "research/adverseNews/select_exports.py",
+      "archive_path": "original-source/select_exports.py",
+      "sha256": "181a3ef0fdc33189c69e57223b970e83499918401241363444fd5a007d82ea94"
+    },
+    {
+      "original_path": "research/adverseNews/START_HERE.md",
+      "archive_path": "original-source/START_HERE.md",
+      "sha256": "df52fe0bed6ffeee4e19bb31ed187b1cd379536b21c60f179fbddbadfc507cba"
+    },
+    {
+      "original_path": "research/adverseNews/study_source_depth.py",
+      "archive_path": "original-source/study_source_depth.py",
+      "sha256": "73e922391e4d93747e25e20342be62402fee219cafe927077b3cb4a2129440c2"
+    },
+    {
+      "original_path": "research/adverseNews/study_source_diversity.py",
+      "archive_path": "original-source/study_source_diversity.py",
+      "sha256": "ba9ba4a57f45258c2d579b431f49ef0d55ea3583e5690551da1b4482f673479b"
+    },
+    {
+      "original_path": "research/adverseNews/study_teacher_student_pilot.py",
+      "archive_path": "original-source/study_teacher_student_pilot.py",
+      "sha256": "09587163f27f0fba848407437fbf52e3a9ec6fb49b676b9057d04f0934dd75af"
+    },
+    {
+      "original_path": "research/adverseNews/study_uk_diversity_update.py",
+      "archive_path": "original-source/study_uk_diversity_update.py",
+      "sha256": "aadec6677c1fbf9069e0c7ef82ad5d89aae80c78e8131beba3d79da6ad111bb1"
+    },
+    {
+      "original_path": "research/adverseNews/study_unknown_source_triage.py",
+      "archive_path": "original-source/study_unknown_source_triage.py",
+      "sha256": "f545d8458dfd14f5440780d57cfd3fca89f9d59ed9b7628713a4f2e4f4ffd793"
+    },
+    {
+      "original_path": "research/adverseNews/summarize_encoder_screen.py",
+      "archive_path": "original-source/summarize_encoder_screen.py",
+      "sha256": "7624879d9e61bb7ef36419de021b8226934e87d1482ce6a9ffb2bc1ae2202233"
+    },
+    {
+      "original_path": "research/adverseNews/summarize_paired_expansion.py",
+      "archive_path": "original-source/summarize_paired_expansion.py",
+      "sha256": "27b185dcea48c9b16ddb96b68777a4476446bb1315b6e0a9ecb58635fcb22e3f"
+    },
+    {
+      "original_path": "research/adverseNews/summarize_uk_followup_candidate.py",
+      "archive_path": "original-source/summarize_uk_followup_candidate.py",
+      "sha256": "6b53d2ec07d4fc78423be9b7c82d9c1d6a83ce8a623fe1ee079a5980adfe0e75"
+    },
+    {
+      "original_path": "research/adverseNews/triage_new_publishers.py",
+      "archive_path": "original-source/triage_new_publishers.py",
+      "sha256": "e904527094b3a6731db92dc0d542e3c4eabce5ef8b494b34f30f3ac2702cdbc8"
+    },
+    {
+      "original_path": "research/adverseNews/write_expansion_readme.py",
+      "archive_path": "original-source/write_expansion_readme.py",
+      "sha256": "048cce93156256a060a749b04af739ead3bd70ab1b4eeed31f203a15f5e60ad4"
+    }
+  ]
+}

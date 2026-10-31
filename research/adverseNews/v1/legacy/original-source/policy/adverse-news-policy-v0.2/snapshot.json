@@ -1,0 +1,11 @@
+{
+  "policy_version": "adverse-news-policy-v0.2",
+  "prompt_id": "pdg115-binary-labeler-v0.2",
+  "source": "docs/PDG-115-adverse-news-labeling-guide.md, section 13A",
+  "source_sha256": "d0cb1a2611d87610ebbd7d64d5f35fd815d83bdd6b3096ac72451b999a40556e",
+  "files_sha256": {
+    "labeling-guide.md": "d0cb1a2611d87610ebbd7d64d5f35fd815d83bdd6b3096ac72451b999a40556e",
+    "local-teacher-system.txt": "e11c0b5fc1336eea1280303cf7d6a63a944ca8579c981378aec1e3d93f798561"
+  },
+  "status": "preserved policy, no model execution; pilot policy exceptions remain for review"
+}

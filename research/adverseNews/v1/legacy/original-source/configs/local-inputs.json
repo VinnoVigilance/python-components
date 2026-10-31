@@ -1,0 +1,20 @@
+{
+  "schema_version": "adverse-inputs-v1",
+  "adapter": "canonical",
+  "root": "../../../data/final",
+  "datasets": [
+    "NBI_PRESS_RELEASES",
+    "AMLC_NEWS_AND_ANNOUNCEMENTS",
+    "PCIJ_CORRUPTION_WATCH",
+    "PCIJ_INVESTIGATIVE_REPORTS",
+    "DOJ_PH_NEWS",
+    "UK_GOV_NEWS_COMMUNICATIONS",
+    "DTI_PH_FAIR_TRADE_PRESS_RELEASES",
+    "DTI_PH_FAIR_TRADE_UPDATES",
+    "PTV_NEWS",
+    "INTERAKSYON_POLITICS_ISSUES",
+    "SEC_PH_ADVISORIES",
+    "ADB_CASE_SUMMARIES"
+  ],
+  "supported_languages": []
+}

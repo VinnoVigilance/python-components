@@ -89,3 +89,8 @@ publisher transfer, UK_GOV diversity, and the school-notice policy change.
 It also retains the frozen encoder comparison, which found no publisher-transfer
 gain over LSA + SVM. It omits large intermediate models, caches, and exploratory
 per-fold outputs.
+
+`legacy/` preserves the original exploratory scripts and notes in case a v2
+investigation needs to trace how the early packets or screens were generated.
+Those scripts are historical and may depend on local extracts that were not
+uploaded. Use `code/` for the supported v1 workflow.

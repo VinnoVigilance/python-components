@@ -36,6 +36,7 @@ reference labels. Read `EVIDENCE.md` for the comparison and limitations.
 | `code/` | Small self-contained scripts to assemble training data, reproduce the fit, score full articles, and evaluate a completed blind packet. |
 | `context/` | Compact model-selection, encoder, publisher-transfer, and UK_GOV error reports for planning v2. |
 | `queries/` | Read-only SQL used to request source counts and UK_GOV sampling exports. |
+| `legacy/` | Original exploratory source scripts and PDG-115 notes, preserved with checksums for historical reference. |
 
 For future work on another device, read `V2_HANDOFF.md` after this page. It
 records what was tested, which scores are diagnostic, and the proposed v2

@@ -1,0 +1,50 @@
+{
+  "schema_version": "adverse-robustness-plan-v1",
+  "status": "preparation_only_execution_requires_user_approval",
+  "candidate_snapshot": "data/prepared/db-selection-v3",
+  "labels_available": false,
+  "human_review_budget": "A few articles initially; 300-400 is not a requirement",
+  "reference_policy": "A small exploratory review cannot establish production precision or recall",
+  "comparisons_after_approval": [
+    "E1 full-text word/character TF-IDF plus linear classifiers",
+    "E2 compact frozen semantic encoder with full-body chunk coverage"
+  ],
+  "evaluation_designs": [
+    {
+      "name": "group_cross_validation",
+      "candidate_folds": 5,
+      "partition": "train_candidate only",
+      "group_by": "reviewed duplicate/version/same-case component",
+      "fit_inside_each_fold": ["vocabulary", "task_specific_transformations", "classifier"],
+      "decision": "Reassess fold count and class balance once labels and case review exist"
+    },
+    {
+      "name": "held_out_publisher",
+      "hold_out_by": "source_name, not merely dataset_name",
+      "reason": "Measure transfer to unfamiliar publisher wording and article format",
+      "purge_from_fit": "Any group touching the held-out source, including cross-source copies",
+      "limitations": "Tiny source pools need separate descriptive reporting, not strong accuracy claims"
+    },
+    {
+      "name": "later_date_holdout",
+      "date_field": "published_date",
+      "boundary": null,
+      "group_boundary_policy": "Keep related cases together or exclude crossing cases from this comparison",
+      "missing_dates": "Do not substitute database ingestion time for publication time",
+      "uk_metadata_status": "Publication dates restored from exact-ID metadata export; boundary remains unselected"
+    }
+  ],
+  "final_reference": {
+    "status": "reserved candidates only; not frozen or gold-labeled",
+    "human_independent_of_teacher": true,
+    "exclude_from_prompt_examples_threshold_selection_and_cv": true,
+    "must_complete_before_final_claim": [
+      "same-case/near-duplicate review", "independent human reference",
+      "sampling design and source proportions", "adequate positive/negative counts"
+    ]
+  },
+  "forbidden_in_this_phase": [
+    "training", "model inference", "teacher labeling", "model downloads",
+    "package installation", "implementation tests", "database writes"
+  ]
+}

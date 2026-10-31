@@ -2,3 +2,4 @@ research/watchlistRiskClassification/cache/student_e5small_v6/*.safetensors filt
 intelligence/risk/watchlistRiskCategory/models/*/*.safetensors filter=lfs diff=lfs merge=lfs -text
 research/adverseNews/v1/model/model.joblib filter=lfs diff=lfs merge=lfs -text
 research/adverseNews/v1/**/*.jsonl -text
+research/adverseNews/v1/legacy/original-source/** -text

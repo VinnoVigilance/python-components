@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PDG-115 binary label transport",
+  "type": "object",
+  "properties": {"label": {"type": "integer", "enum": [0, 1]}},
+  "required": ["label"],
+  "additionalProperties": false
+}

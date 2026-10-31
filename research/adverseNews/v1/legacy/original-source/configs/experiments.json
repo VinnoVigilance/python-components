@@ -1,0 +1,75 @@
+{
+  "schema_version": "adverse-experiments-v1",
+  "status": "design_only_no_runner",
+  "device": "cpu",
+  "paid_apis": false,
+  "seed": 115,
+  "threads_initial_candidate": 10,
+  "memory_budget_gib": 28,
+  "required_before_execution": [
+    "frozen inventory, policy, annotation and split file hashes",
+    "exact model/library revisions and environment lock",
+    "independent human reference reserved before selection",
+    "explicit authorization for training or inference"
+  ],
+  "semantic_inputs": ["title", "body"],
+  "target": {"type": "integer", "values": [0, 1]},
+  "splits": {
+    "fit": "train",
+    "selection_and_threshold": "dev",
+    "final": "final",
+    "challenge_report_separately": "challenge"
+  },
+  "label_ablation": ["human_only", "human_plus_separately_identified_silver"],
+  "learning_curve_train_sizes": [250, 500, 1000, 2000, 5000],
+  "candidates": [
+    {
+      "id": "E1",
+      "representation": "full title/body word and character TF-IDF",
+      "classifiers": ["logistic_regression", "linear_svm", "binary_nbsvm_comparison"],
+      "preserve_negation": true,
+      "fit_vocabulary_on": "train",
+      "ngram_ranges_and_regularization": "freeze finite grid before fitting"
+    },
+    {
+      "id": "E2",
+      "encoder": "intfloat/multilingual-e5-small",
+      "revision": null,
+      "freeze_encoder": true,
+      "classifiers": ["logistic_regression", "optional_sparse_semantic_combination"],
+      "representation": "title plus mean/max and final-chunk vectors",
+      "chunk_recipe": {
+        "status": "must finalize with exact tokenizer before execution",
+        "token_budget_includes_title_and_special_tokens": true,
+        "paragraph_aware": true,
+        "overlap_tokens": null,
+        "cover_entire_body": true,
+        "silent_truncation_allowed": false,
+        "record_order_offsets_token_counts_and_coverage": true
+      },
+      "feature_cache_key_fields": [
+        "content_hash", "encoder_revision", "tokenizer_revision",
+        "input_recipe_hash", "chunk_recipe_hash", "pooling_recipe_hash", "runtime_version"
+      ]
+    }
+  ],
+  "optional_teacher": {
+    "id": "E4",
+    "status": "deferred_measured_pilot_only",
+    "candidate_models": ["Qwen3-1.7B", "Qwen3-4B-Instruct-2507"],
+    "pilot_dev_article_count": [50, 100],
+    "runtime": "CPU-compatible runtime with exact revision and quantization recorded",
+    "final_reference_may_be_used_for_prompt_selection": false,
+    "teacher_labels_are_reference": false
+  },
+  "required_result_fields": [
+    "data_split_policy_prompt_annotation_hashes", "code_revision_and_dirty_diff_hash",
+    "model_tokenizer_library_revisions", "seed_and_thread_settings", "class_counts_and_label_origins",
+    "sampling_design_and_group_counts", "feature_and_chunk_recipe", "class_weights",
+    "threshold_selected_on_dev", "positive_precision_recall", "false_omission_rate",
+    "macro_f1", "pr_auc", "group_aware_intervals", "source_language_length_boundary_slices",
+    "eligible_processed_and_failed_counts", "full_body_coverage", "median_p95_cpu_article_latency",
+    "throughput", "peak_ram", "artifact_size", "elapsed_time"
+  ],
+  "release_criteria": "not agreed; no measured performance or release claim"
+}
