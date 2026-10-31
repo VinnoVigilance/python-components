@@ -28,7 +28,7 @@ reference labels. Read `EVIDENCE.md` for the comparison and limitations.
 | --- | --- |
 | `policy/` | Frozen adverse-news label rule v0.2. |
 | `training/` | Compressed 5,000-row base, six corrections, two small reviewed addition packets, and assembled 5,044-row training data. |
-| `model/` | Frozen 126 MB joblib bundle, original research manifest, and per-article comparison table. Git LFS is configured for the model when it is eventually staged. |
+| `model/` | Frozen 126 MB joblib bundle, original research manifest, and per-article comparison table. Git LFS stores the model. |
 | `evaluation/fresh_35/` | Untouched UK_GOV packet and GPT reviews used for the newest completed comparison. |
 | `evaluation/diagnostic_117/` | Older random UK_GOV diagnostic; its errors guided training topics. |
 | `evaluation/mixed_150/` | Older mixed-source reserved packet. |
