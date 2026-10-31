@@ -69,6 +69,7 @@ SAMPLES = {
     "AFDB-DEBARRED-ENTITIES": "AFDB-DEBARRED-ENTITIES_raw_sample.jsonl",
     "CANADA_CONSOLIDATED_SANCTIONS": "CANADA_CONSOLIDATED_SANCTIONS_raw_sample.jsonl",
     "EBRD_INELIGIBLE_ENTITIES": "EBRD_INELIGIBLE_ENTITIES_raw_sample.jsonl",
+    "PNP_PRO9_MOST_WANTED_2024": "PNP_PRO9_MOST_WANTED_2024_raw_sample.jsonl",
 }
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
@@ -214,6 +215,10 @@ GOLDEN = {
         "SourceType": "Official", "DatasetCategory": "Regulatory",
         "ListName": "EBRD_INELIGIBLE_ENTITIES", "SourceName": "EBRD",
     },
+    "PNP_PRO9_MOST_WANTED_2024": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "PNP_PRO9_MOST_WANTED_2024", "SourceName": "PNP",
+    },
 }
 
 
@@ -291,3 +296,31 @@ class TestSourceGolden:
             f"{list_name}: no Sources[] entry was produced for any sample record "
             f"-- the mapping's 'sources' group did not populate"
         )
+
+
+def test_pnp_pro9_2024_card_fields_survive_normalization():
+    records = _canonical_records("PNP_PRO9_MOST_WANTED_2024")
+    assert len(records) == 34
+    assert len({record["EntityId"] for record in records}) == 34
+    assert all(record["EntityType"] == "Individual" for record in records)
+    assert all(record["Sources"][0]["SourceURL"].endswith(
+        "/02-TMWP-PROVINCIAL-LEVEL.pdf"
+    ) for record in records)
+
+    by_name = {record["Names"][0]["Name"]: record for record in records}
+    antung = by_name["ANTUNG HASAN ASNALUL"]
+    assert {item["Type"]: item["Value"] for item in antung["additionalInfo"]} == {
+        "Offense": "MURDER",
+        "Case Reference": "32819",
+        "Crime Activity": (
+            "Laying of IED, Ambuscade, Illegal Drug Trade, "
+            "Extortion, Gun-for-Hire"
+        ),
+        "Issuing Unit": "ZCPO",
+        "List Level": "CITY",
+        "List Reference Year": "2024",
+    }
+    assert sum(
+        any(item["Type"] == "Crime Activity" for item in record["additionalInfo"])
+        for record in records
+    ) == 1

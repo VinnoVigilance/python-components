@@ -2532,6 +2532,137 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "PNP_PRO9_MOST_WANTED_2024": {
+        "source_name": "PNP",
+        "list_name": "PNP_PRO9_MOST_WANTED_2024",
+        "download_method": "BYPASS",
+        "url": (
+            "https://pro9.pnp.gov.ph/wp-content/uploads/2024/08/"
+            "02-TMWP-PROVINCIAL-LEVEL.pdf"
+        ),
+        "file_type": "pdf",
+        "date_order": "DMY",
+        "external_id_path": "unique_id",
+        "schedule": "monthly",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 34,
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "challenge": "cloudflare",
+            "navigation_mode": "safe_get",
+            "headless": False,
+            "timeout_seconds": 90,
+            "actions": [
+                {
+                    "action": "save_pdf",
+                    "download_mode": "navigation",
+                    "url": (
+                        "https://pro9.pnp.gov.ph/wp-content/uploads/2024/08/"
+                        "02-TMWP-PROVINCIAL-LEVEL.pdf"
+                    ),
+                    "filename_pattern": "{source}_{list}_{timestamp}.pdf",
+                    "timeout_seconds": 60,
+                    "max_size_bytes": 10_000_000,
+                },
+            ],
+            "validation": {
+                "min_size_bytes": 10_000,
+            },
+        },
+        "parser": {
+            "mode": "image_cards",
+            "table_settings": {
+                "vertical_strategy": "lines_strict",
+                "horizontal_strategy": "lines_strict",
+            },
+            "record_pattern": r"(?i)Crime\s*Committed\s*:",
+            "page_pattern": (
+                r"(?m)^(?P<page_heading>(?:PROVINCIAL|CITY)\s+LEVEL\s*-\s*"
+                r"[^:\n]+:\s*TOP\s+10\s+MOST\s+WANTED\s+PERSON\s+CY\s+\d{4})\s*$"
+            ),
+            "caption_field": "name_raw",
+            "caption_font_pattern": r"(?i)bold",
+            "body_field": "details_raw",
+            "required_patterns": {
+                "details_raw": (
+                    r"(?is)(?:1\s*\.\s*)?Crime\s*Committed\s*:\s*.+?"
+                    r"\s*(?:2\s*\.\s*)?Criminal\s*Case(?:\s*(?:No|Nr)\.?)?\s*:\s*.+?"
+                    r"\s*(?:3\s*\.\s*)?Last\s*Known\s*Address\s*:\s*.+"
+                )
+            },
+        },
+        "preprocessing": [
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "page_heading",
+                    "pattern": (
+                        r"(?is)^(?P<list_level>PROVINCIAL|CITY)\s+LEVEL\s*-\s*"
+                        r"(?P<issuing_unit>[^:]+):.*?\bCY\s*(?P<reference_year>\d{4})\s*$"
+                    ),
+                    "outputs": {
+                        "list_level": "list_level_raw",
+                        "issuing_unit": "issuing_unit_raw",
+                        "reference_year": "reference_year_raw",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name_raw",
+                    "pattern": (
+                        r"(?is)^\s*(?P<primary_name>.+?)"
+                        r"(?:\s+A\.?\s*K\.?\s*A\.?\s+(?P<aliases>.+))?\s*$"
+                    ),
+                    "outputs": {
+                        "primary_name": "primary_name",
+                        "aliases": "aliases_raw",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "details_raw",
+                    "pattern": (
+                        r"(?is)^\s*(?:1\s*\.\s*)?Crime\s*Committed\s*:\s*(?P<offenses>.+?)"
+                        r"\s*(?:2\s*\.\s*)?Criminal\s*Case(?:\s*(?:No|Nr)\.?)?\s*:\s*"
+                        r"(?P<case_numbers>.+?)(?:\s*Crime\s*Activity\s*:\s*(?P<activity>.+?))?"
+                        r"\s*(?:3\s*\.\s*)?Last\s*Known\s*Address\s*:\s*(?P<address>.+?)\s*$"
+                    ),
+                    "outputs": {
+                        "offenses": "offenses_raw",
+                        "case_numbers": "case_numbers_raw",
+                        "activity": "crime_activity_raw",
+                        "address": "last_known_address_raw",
+                    },
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                    "overwrite": True,
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["primary_name", "issuing_unit_raw"],
+                    "output_field": "unique_id",
+                    "prefix": "PNP-PRO9-MOST-WANTED",
+                },
+            },
+        ],
+    },
+
     "PNP_SDSPPO_MOST_WANTED": {
         "source_name": "PNP",
         "list_name": "PNP_SDSPPO_MOST_WANTED",
