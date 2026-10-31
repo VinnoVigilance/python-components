@@ -209,6 +209,11 @@ class BypassCollector:
                     "navigation_mode",
                     "safe_get",
                 ),
+                downloadPdfs=any(
+                    action.get("action") == "save_pdf"
+                    and action.get("download_mode") == "navigation"
+                    for action in bypassConfig.get("actions", [])
+                ),
             )
         
         elif engineType == "playwright":

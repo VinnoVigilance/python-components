@@ -30,10 +30,12 @@ class CompatibleSeleniumBaseDriver(SeleniumBaseDriver):
         self,
         driver_version: str = "mlatest",
         binary_location: Optional[str] = None,
+        external_pdf: bool = False,
     ):
         super().__init__()
         self.driver_version = driver_version
         self.binary_location = binary_location
+        self.external_pdf = external_pdf
 
     def initialize(
         self,
@@ -60,6 +62,8 @@ class CompatibleSeleniumBaseDriver(SeleniumBaseDriver):
 
         if self.binary_location:
             sb_kwargs["binary_location"] = self.binary_location
+        if self.external_pdf:
+            sb_kwargs["external_pdf"] = True
 
         logger.info(
             f"Launching Chrome with driver_version={self.driver_version!r}."

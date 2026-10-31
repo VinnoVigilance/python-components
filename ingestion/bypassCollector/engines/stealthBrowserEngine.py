@@ -5,6 +5,8 @@ StealthBot browser engine implementation.
 import asyncio
 import json
 import logging
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Optional, Any
 import time
 
@@ -44,7 +46,8 @@ class StealthBrowserEngine(BaseEngine):
         timeoutSeconds: int = 90,
         driverVersion: str = "mlatest",
         binaryLocation: Optional[str] = None,
-        navigationMode: str = "safe_get"
+        navigationMode: str = "safe_get",
+        downloadPdfs: bool = False,
 
     ):
         """
@@ -66,6 +69,9 @@ class StealthBrowserEngine(BaseEngine):
         self._bot = None
         self.sb = None
         self.navigationMode = navigationMode
+        self.downloadPdfs = downloadPdfs
+        self.downloadDirectory = None
+        self._downloadTemp = None
     
     def __enter__(self):
         """Initialize StealthBot."""
@@ -89,17 +95,32 @@ class StealthBrowserEngine(BaseEngine):
                 driver_strategy=CompatibleSeleniumBaseDriver(
                     driver_version=self.driverVersion,
                     binary_location=self.binaryLocation,
+                    external_pdf=self.downloadPdfs,
                 ),
             )
             self._bot.CHALLENGE_INDICATORS = CHALLENGE_INDICATORS
 
             self._bot.__enter__()
             self.sb = self._bot.sb
+            if self.downloadPdfs:
+                self._downloadTemp = TemporaryDirectory(prefix="watchlist_pdf_")
+                self.downloadDirectory = Path(self._downloadTemp.name)
+                if self.navigationMode == "safe_get":
+                    self.sb.activate_cdp_mode(
+                        "about:blank", downloads_path=str(self.downloadDirectory)
+                    )
+                else:
+                    self.sb.driver.execute_cdp_cmd("Browser.setDownloadBehavior", {
+                        "behavior": "allow",
+                        "downloadPath": str(self.downloadDirectory),
+                    })
             
             logger.info("StealthBot initialized successfully")
             return self
         except Exception as e:
             logger.error(f"Failed to initialize StealthBot: {type(e).__name__}: {e}")
+            if self.sb is not None:
+                self.__exit__(type(e), e, e.__traceback__)
             raise
     
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -110,6 +131,13 @@ class StealthBrowserEngine(BaseEngine):
                 logger.info("StealthBot closed successfully")
             except Exception as e:
                 logger.error(f"Error closing StealthBot: {type(e).__name__}: {e}")
+        if self._downloadTemp is not None:
+            try:
+                self._downloadTemp.cleanup()
+            except OSError as error:
+                logger.warning("Could not remove browser download directory: %s", error)
+            self._downloadTemp = None
+            self.downloadDirectory = None
         _reset_closed_event_loop()
 
     def navigate(self, url: str, settle_seconds: float = 5) -> bool:
@@ -147,6 +175,9 @@ class StealthBrowserEngine(BaseEngine):
 
             return True
         except Exception as e:
+            if self.downloadDirectory is not None and any(self.downloadDirectory.iterdir()):
+                logger.info("Browser download started during navigation: %s", type(e).__name__)
+                return True
             logger.error(f"Navigation failed: {type(e).__name__}: {e}")
             return False
     

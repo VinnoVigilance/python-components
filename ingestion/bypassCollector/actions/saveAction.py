@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import re
+import time
 
 from datetime import datetime
 from io import BytesIO
@@ -476,13 +477,131 @@ class SavePdfAction(SaveHtmlAction):
                     "PDF timeout and size limit must be positive."
                 )
 
-            options = json.dumps({
-                "url": url,
-                "timeoutMs": timeout_seconds * 1000,
-                "maxBytes": max_bytes,
-            })
+            download_mode = actionConfig.get("download_mode", "fetch")
+            if download_mode == "navigation":
+                if url != context.get("url"):
+                    raise ValueError("Navigation PDF URL must match the collector URL.")
+                result = self._read_navigation_pdf(engine, timeout_seconds, max_bytes)
+            elif download_mode == "fetch":
+                result = self._fetch_pdf(engine, url, timeout_seconds, max_bytes)
+            else:
+                raise ValueError(f"Unknown PDF download_mode: {download_mode!r}")
 
-            expression = """
+            if isinstance(result, str):
+                result = json.loads(result)
+
+            if (
+                not isinstance(result, dict)
+                or not result.get("ok")
+            ):
+                error = (
+                    result.get("error")
+                    if isinstance(result, dict)
+                    else (
+                        "Browser returned no usable "
+                        "download result."
+                    )
+                )
+
+                raise RuntimeError(error)
+
+            if download_mode == "fetch" and result.get("status") != 200:
+                raise ValueError(
+                    "PDF response was not HTTP 200."
+                )
+
+            payload = (
+                result["payload"] if download_mode == "navigation"
+                else base64.b64decode(result["base64"], validate=True)
+            )
+
+            if (
+                not payload
+                or len(payload) > max_bytes
+                or len(payload) != result.get("size")
+            ):
+                raise ValueError(
+                    "Downloaded PDF size is invalid."
+                )
+
+            if not payload.startswith(b"%PDF-"):
+                raise ValueError(
+                    "Downloaded response is not a PDF."
+                )
+
+            with pdfplumber.open(BytesIO(payload)) as pdf:
+                if not pdf.pages:
+                    raise ValueError(
+                        "Downloaded PDF has no pages."
+                    )
+
+            file_config = dict(actionConfig)
+
+            file_config.setdefault(
+                "filename_pattern",
+                "{source}_{list}_{timestamp}.pdf",
+            )
+
+            filename = self._buildFilename(
+                file_config,
+                context,
+            )
+
+            output_dir = Path(
+                actionConfig.get("outputDir")
+                or context.get("outputDir")
+                or "data/downloads"
+            )
+
+            file_path = output_dir / filename
+
+            file_path.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            temporary_path = file_path.with_suffix(
+                file_path.suffix + ".part"
+            )
+
+            try:
+                temporary_path.write_bytes(payload)
+                temporary_path.replace(file_path)
+
+            finally:
+                temporary_path.unlink(missing_ok=True)
+
+            context["savedFile"] = str(file_path)
+
+            logger.info(
+                "PDF saved: %s; bytes=%d; mode=%s; Content-Type=%s",
+                file_path,
+                len(payload),
+                download_mode,
+                result.get("contentType"),
+            )
+
+            return True
+
+        except Exception as error:
+            logger.error(
+                "PDF download failed: %s: %s",
+                type(error).__name__,
+                error,
+            )
+
+            return False
+
+    @staticmethod
+    def _fetch_pdf(engine, url, timeout_seconds, max_bytes):
+        """Fetch PDF bytes from JavaScript in the active browser session."""
+        options = json.dumps({
+            "url": url,
+            "timeoutMs": timeout_seconds * 1000,
+            "maxBytes": max_bytes,
+        })
+
+        expression = """
 (async function(options) {
     const controller = new AbortController();
 
@@ -557,133 +676,68 @@ class SavePdfAction(SaveHtmlAction):
 })(__OPTIONS__)
 """.replace("__OPTIONS__", options)
 
-            if getattr(engine.sb, "cdp", None) is not None:
-                result = engine.evaluateAwait(expression)
+        if getattr(engine.sb, "cdp", None) is not None:
+            result = engine.evaluateAwait(expression)
 
-            else:
-                driver = engine.sb.driver
-                previous_timeout = driver.timeouts.script
+        else:
+            driver = engine.sb.driver
+            previous_timeout = driver.timeouts.script
 
-                driver.set_script_timeout(
-                    timeout_seconds + 10
-                )
-
-                try:
-                    result = driver.execute_async_script(
-                        "const done = "
-                        "arguments[arguments.length - 1];\n"
-                        + expression
-                        + ".then(done).catch(error => done("
-                        + "JSON.stringify({"
-                        + "ok: false, error: String(error)"
-                        + "})));"
-                    )
-
-                finally:
-                    driver.set_script_timeout(
-                        previous_timeout
-                    )
-
-            if isinstance(result, str):
-                result = json.loads(result)
-
-            if (
-                not isinstance(result, dict)
-                or not result.get("ok")
-            ):
-                error = (
-                    result.get("error")
-                    if isinstance(result, dict)
-                    else (
-                        "Browser returned no usable "
-                        "download result."
-                    )
-                )
-
-                raise RuntimeError(error)
-
-            if result.get("status") != 200:
-                raise ValueError(
-                    "PDF response was not HTTP 200."
-                )
-
-            payload = base64.b64decode(
-                result["base64"],
-                validate=True,
-            )
-
-            if (
-                not payload
-                or len(payload) > max_bytes
-                or len(payload) != result.get("size")
-            ):
-                raise ValueError(
-                    "Downloaded PDF size is invalid."
-                )
-
-            if not payload.startswith(b"%PDF-"):
-                raise ValueError(
-                    "Downloaded response is not a PDF."
-                )
-
-            with pdfplumber.open(BytesIO(payload)) as pdf:
-                if not pdf.pages:
-                    raise ValueError(
-                        "Downloaded PDF has no pages."
-                    )
-
-            file_config = dict(actionConfig)
-
-            file_config.setdefault(
-                "filename_pattern",
-                "{source}_{list}_{timestamp}.pdf",
-            )
-
-            filename = self._buildFilename(
-                file_config,
-                context,
-            )
-
-            output_dir = Path(
-                actionConfig.get("outputDir")
-                or context.get("outputDir")
-                or "data/downloads"
-            )
-
-            file_path = output_dir / filename
-
-            file_path.parent.mkdir(
-                parents=True,
-                exist_ok=True,
-            )
-
-            temporary_path = file_path.with_suffix(
-                file_path.suffix + ".part"
+            driver.set_script_timeout(
+                timeout_seconds + 10
             )
 
             try:
-                temporary_path.write_bytes(payload)
-                temporary_path.replace(file_path)
+                result = driver.execute_async_script(
+                    "const done = "
+                    "arguments[arguments.length - 1];\n"
+                    + expression
+                    + ".then(done).catch(error => done("
+                    + "JSON.stringify({"
+                    + "ok: false, error: String(error)"
+                    + "})));"
+                )
 
             finally:
-                temporary_path.unlink(missing_ok=True)
+                driver.set_script_timeout(
+                    previous_timeout
+                )
+        return result
 
-            context["savedFile"] = str(file_path)
-
-            logger.info(
-                "PDF saved: %s; bytes=%d; Content-Type=%s",
-                file_path,
-                len(payload),
-                result.get("contentType"),
+    @staticmethod
+    def _read_navigation_pdf(engine, timeout_seconds, max_bytes):
+        """Read a completed file downloaded by this browser's initial navigation."""
+        directory = getattr(engine, "downloadDirectory", None)
+        if directory is None:
+            raise ValueError("Navigation PDF downloads were not enabled before browser startup.")
+        directory = Path(directory)
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            paths = [path for path in directory.iterdir() if path.is_file()]
+            try:
+                oversized = any(path.stat().st_size > max_bytes for path in paths)
+            except FileNotFoundError:
+                continue
+            if oversized:
+                raise ValueError("Browser PDF download exceeds max_size_bytes.")
+            pending = any(
+                path.suffix.lower() in {".crdownload", ".tmp", ".part"}
+                or path.name.startswith(".org.chromium.")
+                for path in paths
             )
-
-            return True
-
-        except Exception as error:
-            logger.error(
-                "PDF download failed: %s: %s",
-                type(error).__name__,
-                error,
-            )
-
-            return False
+            if paths and not pending:
+                if len(paths) != 1:
+                    raise ValueError("Expected exactly one PDF from browser navigation.")
+                try:
+                    with paths[0].open("rb") as stream:
+                        payload = stream.read(max_bytes + 1)
+                except (PermissionError, FileNotFoundError):
+                    time.sleep(0.25)
+                    continue
+                if payload:
+                    return {"ok": True, "payload": payload, "size": len(payload)}
+            time.sleep(0.25)
+        raise TimeoutError(
+            "Browser navigation produced no completed PDF download. "
+            "Check whether the PDF URL opened a block or challenge page."
+        )
