@@ -10,6 +10,48 @@ global:
 
 
 sources:
+  OMBUDSMAN_PH_LATEST_NEWS:
+    enabled: true
+    active: true
+    source_name: OMBUDSMAN_PH
+    dataset_name: OMBUDSMAN_PH_LATEST_NEWS
+    dataset_category: Media
+    schedule: daily
+    date_order: YMD
+    source_page_url: https://www.ombudsman.gov.ph/?cat=64
+    url: https://www.ombudsman.gov.ph/
+    acquisition:
+      type: api
+      download_method: API
+    discovery:
+      policy: full_scan
+    api_config:
+      params:
+        rest_route: /wp/v2/posts
+        categories: 64
+        orderby: date
+        order: desc
+      pagination:
+        type: offset
+        offset_param: offset
+        size_param: per_page
+        page_size: 100
+        start_page: 0
+      items_path: ""
+      write_mode: record_files
+      record_id_path: id
+      transport: requests
+      timeout: 30
+      retry: 3
+      throttle_delay: 0.5
+    parser:
+      type: json
+    identity:
+      external_id:
+        field: id
+      record_key:
+        fields: [source_name, dataset_name, id]
+
   NBI_PRESS_RELEASES:
     enabled: true
     active: true
