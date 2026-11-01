@@ -10,6 +10,7 @@ class PdfParser:
     (config ``parser: {mode: text}``) returning the whole document text.
     Explicit ``parser: {mode: ocr}`` delegates to the shared OCR parser.
     Explicit ``parser: {mode: image_cards}`` discovers bordered image/text cards.
+    Explicit ``parser: {mode: labeled_blocks}`` reads repeated labelled columns.
 
     Output:
         A list of dictionaries.
@@ -45,6 +46,8 @@ class PdfParser:
         config = config or {}
 
         settings = config.get("parser") or {}
+        if str(settings.get("mode", "")).strip().lower() == "labeled_blocks":
+            return self._parse_labeled_blocks(pdf_path, settings)
         if str(settings.get("mode", "")).strip().lower() == "image_cards":
             return self._parse_image_cards(pdf_path, settings)
 
@@ -197,6 +200,165 @@ class PdfParser:
         )
 
         return records
+
+    @staticmethod
+    def _label_matches(words, label):
+        """Find whole label phrases on one text line, retaining their bounds."""
+        tokens = label.split()
+        if not tokens:
+            raise ValueError("PDF labels must not be blank.")
+        matches = []
+        for index in range(len(words) - len(tokens) + 1):
+            group = words[index:index + len(tokens)]
+            if [word["text"] for word in group] != tokens:
+                continue
+            height = max(word["bottom"] - word["top"] for word in group)
+            if max(word["top"] for word in group) - min(word["top"] for word in group) > height / 2:
+                continue
+            matches.append({
+                "x0": min(word["x0"] for word in group),
+                "x1": max(word["x1"] for word in group),
+                "top": min(word["top"] for word in group),
+                "bottom": max(word["bottom"] for word in group),
+            })
+        return matches
+
+    def _parse_labeled_blocks(self, pdf_path, settings):
+        """Extract vertically repeated records using label-relative boundaries.
+
+        Columns declare label phrases, not page coordinates. Each record's
+        labels determine its value lanes and vertical field boundaries. This
+        mode supports labels followed by values in aligned columns; side-by-side
+        cards and records spanning pages require another extraction strategy.
+        Document-specific date/count checks are optional and independent.
+        """
+        columns = settings["columns"]
+        fields = [name for column in columns for field in column["fields"]
+                  for name in (field["field"], field.get("layout_field")) if name]
+        for column in columns:
+            for field in column["fields"]:
+                if field.get("text_mode", "layout") not in {"layout", "stored_characters"}:
+                    raise ValueError(f"Unknown PDF field text_mode: {field['text_mode']!r}.")
+        validation = settings.get("validation", {})
+        page_pattern = validation.get("page_pattern")
+        summary_pattern = validation.get("summary_pattern")
+        if summary_pattern and "record_count" not in re.compile(summary_pattern).groupindex:
+            raise ValueError("PDF summary_pattern requires a record_count group.")
+        if page_pattern and not re.compile(page_pattern).groupindex:
+            raise ValueError("PDF page_pattern requires named capture groups.")
+        reserved = {"source_page", "source_position"}
+        if page_pattern:
+            reserved.update(re.compile(page_pattern).groupindex)
+        if not fields or len(fields) != len(set(fields)) or reserved.intersection(fields):
+            raise ValueError("PDF labelled fields must be unique and not overwrite metadata.")
+        font_pattern = settings.get("label_font_pattern")
+        font_regex = re.compile(font_pattern) if font_pattern else None
+        end_pattern = settings.get("end_pattern")
+        records, summaries = [], []
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text(x_tolerance=1, y_tolerance=1) or ""
+                words = page.extract_words(x_tolerance=1, y_tolerance=1)
+                label_page = page.filter(
+                    lambda item: item["object_type"] != "char"
+                    or font_regex is None
+                    or font_regex.search(item.get("fontname", "")) is not None
+                )
+                label_words = label_page.extract_words(x_tolerance=1, y_tolerance=1)
+                starts = self._label_matches(label_words, settings["record_start"])
+                if not starts:
+                    if settings.get("skip_pages_without_records", False):
+                        continue
+                    raise ValueError(f"PDF page {page.page_number}: no record starts.")
+                starts.sort(key=lambda item: item["top"])
+                if any(abs(a["top"] - b["top"]) < (a["bottom"] - a["top"]) / 2
+                       for a, b in zip(starts, starts[1:])):
+                    raise ValueError(f"PDF page {page.page_number}: side-by-side record starts are unsupported.")
+                metadata = self._labeled_page_metadata(text, page.page_number, validation)
+                if summary_pattern:
+                    summaries.extend(int(match["record_count"]) for match in
+                                     re.finditer(summary_pattern, text))
+                ends = [word["top"] for word in words
+                        if end_pattern and re.fullmatch(end_pattern, word["text"])]
+                if end_pattern and (not ends or min(ends) <= starts[-1]["top"]):
+                    raise ValueError(f"PDF page {page.page_number}: missing/invalid record end.")
+                for position, start in enumerate(starts):
+                    tolerance = (start["bottom"] - start["top"]) / 5
+                    end = (starts[position + 1]["top"] if position + 1 < len(starts)
+                           else min(ends) if ends else page.bbox[3]) - tolerance
+                    block_words = [word for word in label_words
+                                   if start["top"] - tolerance <= word["top"] < end]
+                    lanes = []
+                    for column in columns:
+                        anchors = []
+                        for field in column["fields"]:
+                            matches = self._label_matches(block_words, field["label"])
+                            if len(matches) != 1:
+                                raise ValueError(
+                                    f"PDF page {page.page_number}, record {position + 1}: "
+                                    f"missing/ambiguous label {field['label']!r}."
+                                )
+                            anchors.append((matches[0], field))
+                        if not anchors:
+                            raise ValueError("PDF labelled columns must contain fields.")
+                        label_left = min(anchor["x0"] for anchor, _ in anchors)
+                        if any(abs(anchor["x0"] - label_left) > tolerance for anchor, _ in anchors):
+                            raise ValueError(f"PDF page {page.page_number}: column labels are not aligned.")
+                        value_left = max(anchor["x1"] for anchor, _ in anchors) + tolerance / 2
+                        lanes.append((label_left, value_left, sorted(anchors, key=lambda item: item[0]["top"])))
+                    lanes.sort(key=lambda item: item[0])
+                    record = {**metadata, "source_page": page.page_number,
+                              "source_position": position + 1}
+                    for lane_index, (_, left, anchors) in enumerate(lanes):
+                        right = lanes[lane_index + 1][0] - tolerance / 2 if lane_index + 1 < len(lanes) else page.bbox[2]
+                        if left >= right:
+                            raise ValueError(f"PDF page {page.page_number}: overlapping labelled columns.")
+                        for index, (anchor, field) in enumerate(anchors):
+                            bottom = anchors[index + 1][0]["top"] - tolerance if index + 1 < len(anchors) else end
+                            if bottom <= anchor["top"]:
+                                raise ValueError(f"PDF page {page.page_number}: overlapping field labels.")
+                            crop = page.crop((left, anchor["top"] - tolerance, right, bottom))
+                            value = crop.extract_text(
+                                x_tolerance=1, y_tolerance=1
+                            ) or ""
+                            if field.get("layout_field"):
+                                record[field["layout_field"]] = value
+                            if field.get("text_mode") == "stored_characters":
+                                # Preserve actual source spaces instead of synthesizing
+                                # spaces at visual wraps. Opt-in: PDF character order
+                                # and explicit spaces are not reliable in every source.
+                                stored = "".join(char["text"] for char in crop.chars)
+                                if "".join(stored.split()) != "".join(value.split()):
+                                    raise ValueError(
+                                        f"PDF page {page.page_number}: stored character order "
+                                        f"differs from layout for {field['field']}."
+                                    )
+                                value = stored.strip()
+                            if field.get("required") and not value.strip():
+                                raise ValueError(f"PDF page {page.page_number}: empty {field['field']}.")
+                            if field.get("pattern") and not re.fullmatch(field["pattern"], value):
+                                raise ValueError(f"PDF page {page.page_number}: invalid {field['field']}.")
+                            record[field["field"]] = value
+                    records.append(record)
+        if not records:
+            raise ValueError("PDF contains no labelled records.")
+        if summary_pattern and (len(summaries) != 1 or summaries[0] != len(records)):
+            raise ValueError(f"PDF record summary {summaries} does not reconcile with {len(records)} records.")
+        return records
+
+    @staticmethod
+    def _labeled_page_metadata(text, page_number, validation):
+        pattern = validation.get("page_pattern")
+        if not pattern:
+            return {}
+        matches = list(re.finditer(pattern, text))
+        if len(matches) != 1:
+            raise ValueError(f"PDF page {page_number}: missing/ambiguous page metadata.")
+        metadata = matches[0].groupdict()
+        for field, value in validation.get("expected_page_fields", {}).items():
+            if metadata.get(field) != value:
+                raise ValueError(f"PDF page {page_number}: unexpected {field}.")
+        return metadata
 
     def _parse_image_cards(self, pdf_path, settings):
         """Discover ruled image cards and separate styled captions from their remaining text."""

@@ -2532,6 +2532,116 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022": {
+        "source_name": "PNP",
+        "list_name": "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022",
+        "download_method": "BYPASS",
+        "url": (
+            "https://www.spd.ncrpo.pnp.gov.ph/wp-content/uploads/2024/02/"
+            "AsOfOct13_MWPs-with-Reward-criminality_1665621706.pdf"
+        ),
+        "file_type": "pdf",
+        "date_order": "DMY",
+        "external_id_path": "unique_id",
+        "schedule": "every_12_months",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 840,
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "navigation_mode": "safe_get",
+            "headless": False,
+            "timeout_seconds": 90,
+            "actions": [{
+                "action": "save_pdf",
+                "download_mode": "navigation",
+                "url": (
+                    "https://www.spd.ncrpo.pnp.gov.ph/wp-content/uploads/2024/02/"
+                    "AsOfOct13_MWPs-with-Reward-criminality_1665621706.pdf"
+                ),
+                "filename_pattern": "{source}_{list}_{timestamp}.pdf",
+                "timeout_seconds": 60,
+                "max_size_bytes": 10_000_000,
+            }],
+            "validation": {"min_size_bytes": 10_000},
+        },
+        "parser": {
+            "mode": "labeled_blocks",
+            "record_start": "NAME",
+            "label_font_pattern": r"(?i)bold",
+            "end_pattern": r"Thursday,|Summary",
+            "validation": {
+                "page_pattern": (
+                    r"(?m)^Thursday, (?P<reference_date_raw>13 October 2022) "
+                    r"Page \d+ of 97\s*$"
+                ),
+                "expected_page_fields": {"reference_date_raw": "13 October 2022"},
+                "summary_pattern": r"\((?P<record_count>\d+) detail records\)",
+            },
+            "columns": [
+                {
+                    "fields": [
+                        {"label": "NAME", "field": "name_raw"},
+                        {"label": "OFFENSE/S", "field": "offenses_raw", "required": True},
+                        {"label": "ISSUING COURT", "field": "issuing_court_raw"},
+                        {
+                            "label": "CRIMINAL CASE NO.", "field": "case_numbers_raw",
+                            "text_mode": "stored_characters",
+                            "layout_field": "case_numbers_layout_raw",
+                        },
+                    ],
+                },
+                {
+                    "fields": [
+                        {
+                            "label": "ALIAS", "field": "aliases_raw",
+                            "text_mode": "stored_characters",
+                            "layout_field": "aliases_layout_raw",
+                        },
+                        {"label": "REWARD", "field": "reward_raw", "required": True,
+                         "pattern": r"[\d,]+\.\d{2}"},
+                        {"label": "DILG MC NO.", "field": "dilg_mc_raw", "required": True},
+                        {"label": "REGION", "field": "region_raw", "required": True},
+                    ],
+                },
+            ],
+        },
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "name_type", "value": "Primary Name",
+                    "when_field": "name_raw",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {"output_field": "entity_type", "value": "Individual", "overwrite": True},
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "identity_note",
+                    "value": "Primary name is blank in the source. Identity is based on the listed alias; no primary name has been inferred.",
+                    "when_field": "name_raw",
+                    "when_pattern": r"^\s*$",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    # Keep identity stable when extraction fixes alias wrapping.
+                    "fields": ["name_raw", "aliases_layout_raw", "dilg_mc_raw", "region_raw"],
+                    "output_field": "unique_id",
+                    "prefix": "PNP-REWARDS-CRIMINALITY-2022",
+                },
+            },
+        ],
+    },
+
     "PNP_PRO9_MOST_WANTED_2024": {
         "source_name": "PNP",
         "list_name": "PNP_PRO9_MOST_WANTED_2024",
