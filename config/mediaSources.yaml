@@ -10,6 +10,129 @@ global:
 
 
 sources:
+  PNP_NEWS_UPDATES:
+    enabled: true
+    active: true
+    source_name: PNP
+    dataset_name: PNP_NEWS_UPDATES
+    dataset_category: Media
+    schedule: daily
+    url: https://pnp.gov.ph/news-updates/
+    date_order: YMD
+
+    acquisition:
+      type: crawler
+      spider: media
+      fetch_strategy: saved_html
+      download_method: BYPASS
+
+    bypass_config:
+      challenge: cloudflare
+      headless: false
+      timeout_seconds: 120
+      actions:
+        - action: wait
+          type: selector
+          selector: "li.wp-block-post h2.wp-block-post-title a"
+          timeout: 120
+        - action: save_html
+          filename_pattern: "{source}_{list}_{timestamp}.html"
+      validation:
+        required_content:
+          - "wp-block-post-template"
+          - "wp-block-post-title"
+        min_size_bytes: 10000
+
+    detail_browser:
+      headless: false
+      timeout_seconds: 120
+      wait_selector: "article .entry-content"
+
+    storage:
+      save_detail_pages: true
+      reuse_saved_detail_pages: false
+      minimum_detail_size_bytes: 1000
+
+    discovery:
+      strategy: list_detail
+      policy: stop_after_known
+      threshold: 10
+      start_url: https://pnp.gov.ph/news-updates/
+      start_page: 1
+      pagination:
+        type: page_number
+        url_pattern: "https://pnp.gov.ph/news-updates/?query-64-page={page}"
+      article:
+        link_selector: "li.wp-block-post h2.wp-block-post-title a"
+        identity_fields:
+          ListingImageUrl:
+            source: xpath
+            selectors:
+              - "../../figure[contains(@class, 'wp-block-post-featured-image')]//img/@src"
+            required: false
+
+    extraction:
+      SourceURL:
+        source: response_url
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          pattern: "//[^/]+/([^/?]+)/?(?:\\?.*)?$"
+      PostId:
+        selector: "article[id^='post-']"
+        output: attribute
+        attribute: id
+        extraction:
+          strategy: regex
+          pattern: "post-(\\d+)"
+      Title:
+        selector: "h1.entry-title"
+        output: text
+      date.originalValue:
+        selector: "meta[property='article:published_time']"
+        output: attribute
+        attribute: content
+      date.modifiedValue:
+        selector: "meta[property='article:modified_time']"
+        output: attribute
+        attribute: content
+      AuthorName:
+        selector: "meta[name='author']"
+        output: attribute
+        attribute: content
+      BodyHtml:
+        # Keep markup for paragraph-aware normalization. The PNP Excel rule
+        # selects from the first paragraph to the optional PNP Buttons widget.
+        # Layouts without paragraphs produce an empty body and need review.
+        selector: "article .entry-content"
+        output: html
+      ImageUrls:
+        selector: "article .entry-content img"
+        output: attribute
+        attribute: src
+        multiple: true
+      FeaturedImageUrl:
+        selector: "meta[property='og:image']"
+        output: attribute
+        attribute: content
+      OfficialFacebookUrl:
+        selector: "article .entry-content a.link-btn[href*='facebook.com']"
+        output: attribute
+        attribute: href
+
+    parser:
+      type: html
+
+    identity:
+      external_id:
+        field: PostId
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId
+
   OMBUDSMAN_PH_LATEST_NEWS:
     enabled: true
     active: true

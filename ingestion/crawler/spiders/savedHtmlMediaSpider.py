@@ -105,10 +105,9 @@ class SavedHtmlMediaSpider(MediaSpider):
                 yield result
             return
 
-        pending_details = (
-            self._discover_from_saved_listing(
-                listing_response
-            )
+        pending_details = await asyncio.to_thread(
+            self._discover_from_saved_listing,
+            listing_response,
         )
 
         if not pending_details:
@@ -152,6 +151,7 @@ class SavedHtmlMediaSpider(MediaSpider):
         - known/new database checks
         - duplicate-link filtering
         - consecutive-known stop condition
+        - pagination and natural source end
 
         MediaSpider normally converts each discovered
         article into a Scrapy Request. Here we capture
@@ -168,65 +168,92 @@ class SavedHtmlMediaSpider(MediaSpider):
 
         pending_details: list[dict] = []
 
-        outputs = super().parse_listing(
-            response=response,
-            page_number=start_page,
-        )
+        page_number = start_page
+        next_response = response
+        browser = None
 
-        for output in outputs:
+        try:
+            while next_response is not None:
+                outputs = super().parse_listing(
+                    response=next_response,
+                    page_number=page_number,
+                )
+                next_request = None
 
-            if not isinstance(
-                output,
-                scrapy.Request,
-            ):
-                continue
+                for output in outputs:
+                    if not isinstance(output, scrapy.Request):
+                        continue
 
-            callback_arguments = dict(
-                output.cb_kwargs or {}
+                    callback_arguments = dict(output.cb_kwargs or {})
+                    if "record_key" not in callback_arguments:
+                        next_request = output
+                        continue
+
+                    pending_details.append({
+                        "detail_url": output.url,
+                        "record_key": callback_arguments["record_key"],
+                        "is_known": callback_arguments["is_known"],
+                        "source_record_id": callback_arguments.get("source_record_id"),
+                        "identity_fields": callback_arguments.get("identity_fields") or {},
+                    })
+
+                if next_request is None:
+                    break
+
+                if browser is None:
+                    config = self.source_config.get("bypass_config", {})
+                    browser = StealthBrowserEngine(
+                        headless=config.get("headless", False),
+                        timeoutSeconds=config.get("timeout_seconds", 90),
+                    )
+                    browser.__enter__()
+
+                # Listing pages can legitimately contain no article links at
+                # source end, so wait for page load rather than an article.
+                if not browser.navigate(next_request.url):
+                    self.discovery_service.mark_discovery_failure(
+                        "LISTING_NAVIGATION_FAILED"
+                    )
+                    break
+
+                if not browser.waitForPageLoad(browser.timeoutSeconds):
+                    self.discovery_service.mark_discovery_failure(
+                        "LISTING_PAGE_LOAD_FAILED"
+                    )
+                    break
+
+                html = browser.getHtml() or ""
+                if not html or any(marker in html.lower() for marker in (
+                    "performing security verification",
+                    "sorry, you have been blocked",
+                )):
+                    self.discovery_service.mark_discovery_failure(
+                        "LISTING_CHALLENGE_OR_EMPTY_RESPONSE"
+                    )
+                    break
+
+                next_response = HtmlResponse(
+                    url=next_request.url,
+                    body=html.encode("utf-8"),
+                    encoding="utf-8",
+                )
+                title = " ".join(next_response.css("title::text").getall()).lower()
+                if any(marker in title for marker in (
+                    "just a moment", "verify you are human", "access denied",
+                )):
+                    self.discovery_service.mark_discovery_failure(
+                        "LISTING_CHALLENGE_OR_EMPTY_RESPONSE"
+                    )
+                    break
+                page_number = next_request.cb_kwargs["page_number"]
+        except Exception:
+            self.discovery_service.mark_discovery_failure(
+                "LISTING_BROWSER_ERROR"
             )
-
-            # Detail requests contain record_key and
-            # is_known. A possible next-listing-page
-            # request only contains page_number and
-            # must not be treated as an article.
-            if (
-                "record_key"
-                not in callback_arguments
-                or "is_known"
-                not in callback_arguments
-            ):
-                continue
-
-            pending_details.append(
-                {
-                    "detail_url": output.url,
-
-                    "record_key": (
-                        callback_arguments[
-                            "record_key"
-                        ]
-                    ),
-
-                    "is_known": (
-                        callback_arguments[
-                            "is_known"
-                        ]
-                    ),
-
-                    "source_record_id": (
-                        callback_arguments.get(
-                            "source_record_id"
-                        )
-                    ),
-
-                    "identity_fields": (
-                        callback_arguments.get(
-                            "identity_fields"
-                        )
-                        or {}
-                    ),
-                }
-            )
+            self.logger.exception("Saved Media listing pagination failed.")
+        finally:
+            if browser is not None:
+                browser.__exit__(None, None, None)
 
         return pending_details
 

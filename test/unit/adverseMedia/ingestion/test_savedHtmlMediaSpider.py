@@ -315,6 +315,42 @@ def test_saved_listing_uses_media_discovery_and_stops(
     )
 
 
+def test_saved_listing_follows_pages_and_keeps_discovered_items(tmp_path):
+    spider, _, _, discovery = _build_spider(tmp_path)
+    spider.discovery_config["pagination"] = {
+        "type": "page_number",
+        "url_pattern": "https://www.doj.gov.ph/news.html?page={page}",
+    }
+    discovery.build_record_key.side_effect = ["key-101", "key-102"]
+    discovery.check_record_key.return_value = (False, False)
+    first = HtmlResponse(
+        url="https://www.doj.gov.ph/news.html",
+        body=b'<a class="news-link" href="?newsid=101">One</a>',
+        encoding="utf-8",
+    )
+    browser = MagicMock()
+    browser.navigate.return_value = True
+    browser.waitForPageLoad.return_value = True
+    browser.getHtml.side_effect = [
+        '<a class="news-link" href="?newsid=102">Two</a>',
+        "<html><body>No articles</body></html>",
+    ]
+
+    with patch(
+        "ingestion.crawler.spiders.savedHtmlMediaSpider.StealthBrowserEngine",
+        return_value=browser,
+    ):
+        pending = spider._discover_from_saved_listing(first)
+
+    assert [item["source_record_id"] for item in pending] == ["101", "102"]
+    assert browser.navigate.call_args_list == [
+        call("https://www.doj.gov.ph/news.html?page=2"),
+        call("https://www.doj.gov.ph/news.html?page=3"),
+    ]
+    discovery.mark_source_end.assert_called_once()
+    browser.__exit__.assert_called_once()
+
+
 def test_start_yields_every_selected_detail(
     tmp_path,
 ):
