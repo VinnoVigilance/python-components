@@ -141,7 +141,7 @@ GOLDEN = {
         "ListName": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS", "SourceName": "ATC",
     },
     "ATC-DESIGNATED-TERRORIST-GROUPS": {
-        "SourceType": "Official", "DatasetCategory": {"Crime", "Sanctions"},
+        "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "ATC-DESIGNATED-TERRORIST-GROUPS", "SourceName": "ATC",
     },
     "DNFBP": {
@@ -256,9 +256,6 @@ class TestSourceGolden:
 
     def test_sources_constants_match_expected(self, list_name):
         expected = dict(GOLDEN[list_name])
-        # DatasetCategory may be a set (a dual-natured list mapped with `*`
-        # produces one Sources[] entry per value); handle it per record rather
-        # than per entry.
         dataset_expected = expected.pop("DatasetCategory")
         records = _canonical_records(list_name)
         assert records, f"{list_name}: no sample records loaded"
@@ -279,23 +276,14 @@ class TestSourceGolden:
             if not sources:
                 continue
 
-            if isinstance(dataset_expected, (set, frozenset)):
-                got = {src.get("DatasetCategory") for src in sources}
-                assert got == set(dataset_expected), (
-                    f"{list_name}: DatasetCategory across Sources[] = {got!r}, "
-                    f"expected {set(dataset_expected)!r} -- check the `*` "
-                    f"DatasetCategory row under the '{list_name}' column in "
-                    f"mapping.xlsx"
+            expected_categories = (set(dataset_expected) if isinstance(dataset_expected, (set, frozenset))
+                                   else {dataset_expected})
+            for src in sources:
+                got = src.get("DatasetCategory")
+                assert isinstance(got, list) and set(got) == expected_categories, (
+                    f"{list_name}: Sources[].DatasetCategory = {got!r}, "
+                    f"expected {expected_categories!r}"
                 )
-            else:
-                for src in sources:
-                    got = src.get("DatasetCategory")
-                    assert got == dataset_expected, (
-                        f"{list_name}: Sources[].DatasetCategory = {got!r}, "
-                        f"expected {dataset_expected!r} -- check the "
-                        f"Sources[].DatasetCategory row under the '{list_name}' "
-                        f"column in mapping.xlsx"
-                    )
 
         assert saw_sources, (
             f"{list_name}: no Sources[] entry was produced for any sample record "

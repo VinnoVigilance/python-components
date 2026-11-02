@@ -1,5 +1,6 @@
 """Decided lookup rules: list / measure / programme / FBI category -> risk labels (single source for workbook and labels)."""
 import re
+from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
 
 SAN, PEP, REG, LE = "Sanctions", "PEP", "Regulatory", "Law Enforcement"
 TER, PRO, HR = "Terrorism / Terrorist Financing", "Proliferation / Proliferation Financing", "Human Rights / Atrocities"
@@ -8,6 +9,13 @@ COR, VIO, FRA = "Crime-Corruption", "Crime-Violent Crime", "Crime-Fraud"
 
 GUIDE, DATA = "guide", "data review 2026-10-11"
 TEXT = "text decides"
+
+DATASET_CATEGORY_LABELS = {
+    "Sanctions": SAN,
+    "PEP": PEP,
+    "Regulatory": REG,
+    "Law Enforcement": LE,
+}
 
 LISTS = {
     **{l: ([SAN], GUIDE, "Official sanctions list") for l in (
@@ -101,8 +109,23 @@ def program_rule(lst, ptype, program):
 
 
 def record_rule_labels(lst, record):
-    """All labels the lookup rules give one canonical record, with the rule that gave each."""
+    """Return source-backed labels and their provenance for one record."""
     out = {}
+    config = WATCHLIST_CONFIGS.get(lst, {})
+    if config.get("use_dataset_category_as_risk_label", 1) not in (0, 1):
+        raise ValueError(f"Invalid use_dataset_category_as_risk_label for {lst}")
+    for source in (record.get("Sources") or []) if config.get("use_dataset_category_as_risk_label", 1) else []:
+        if not isinstance(source, dict):
+            continue
+        category = source.get("DatasetCategory")
+        categories = category if isinstance(category, list) else [category]
+        for category in categories:
+            if not isinstance(category, str):
+                continue
+            category = category.strip()
+            label = DATASET_CATEGORY_LABELS.get(category)
+            if label:
+                out.setdefault(label, f"dataset category {category}")
     for label in list_rule(lst)[0]:
         out.setdefault(label, f"list {lst}")
     for m in record.get("Measures") or []:

@@ -97,4 +97,14 @@ def normalize_record(
             "Canonical record must be a dictionary."
         )
 
+    for source in canonical_record.get("Sources") or []:
+        if not isinstance(source, dict):
+            continue
+        categories = source.get("DatasetCategory")
+        if isinstance(categories, str):
+            source["DatasetCategory"] = [
+                category.strip() for category in categories.split(",")
+                if category.strip()
+            ]
+
     return canonical_record

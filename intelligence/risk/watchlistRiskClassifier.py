@@ -6,6 +6,7 @@ from pathlib import Path
 from intelligence.risk.result import calculation_version, implementation_version
 from intelligence.risk.watchlistRiskCategory import highlighter, lookupRules, watchlistText
 from intelligence.risk.watchlistRiskCategory.student import VICTIM_LABEL, WatchlistStudent
+from pipelines import watchlistConfigs
 
 
 class WatchlistRiskClassifier:
@@ -20,7 +21,7 @@ class WatchlistRiskClassifier:
             {key: values for key, values in highlighter.TAXONOMY_TRIGGERS.items() if key in scope},
             {key: values for key, values in highlighter.EXTRA_TRIGGERS.items() if key in scope},
         )
-        self.rules_version = implementation_version([lookupRules.__file__])
+        self.rules_version = implementation_version([lookupRules.__file__, watchlistConfigs.__file__])
         self.runtime_version = implementation_version([
             __file__, highlighter.__file__, watchlistText.__file__,
             Path(__file__).parent / "watchlistRiskCategory/student.py",
@@ -57,10 +58,10 @@ class WatchlistRiskClassifier:
         scores = self.student.score(names, texts)
         victim = bool(candidates) and scores[-1] >= self.student.policy["victim_threshold"]
         categories = {}
-        for name in lookupRules.record_rule_labels(source, payload):
+        for name, explanation in lookupRules.record_rule_labels(source, payload).items():
             label_id, display_name = self.labels[name]
             categories[label_id] = {"riskCategoryId": label_id, "riskCategoryName": display_name,
-                                    "method": "lookup", "explanation": "",
+                                    "method": "lookup", "explanation": explanation,
                                     "metadata": {
                                         "rulesVersion": self.rules_version,
                                         "calculationVersion": self.lookup_calculation_version,

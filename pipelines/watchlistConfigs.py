@@ -65,6 +65,7 @@ WATCHLIST_CONFIGS = {
 
     "DNFBP": {
         "source_name": "AMLC",
+        "use_dataset_category_as_risk_label": 0,
         "date_order": "MDY",
         "list_name": "DNFBP",
         "download_method": "Manual",

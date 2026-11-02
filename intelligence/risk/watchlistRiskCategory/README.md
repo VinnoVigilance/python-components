@@ -8,7 +8,7 @@ weights, or download model files at runtime.
 
 - `watchlistText.py`: canonical payload to the research input text.
 - `highlighter.py`: evidence splitting and frozen v6 candidate selection.
-- `lookupRules.py`: researched list, measure and programme rules.
+- `lookupRules.py`: dataset-category, researched list, measure and programme rules.
 - `student.py`: local CPU model loading and label/passage scoring.
 - `models/student-e5small-v6/`: weights, tokenizer, config and manifest.
 
@@ -18,6 +18,16 @@ hashes, asset hashes, the research freeze and inference settings. Model weights
 use the same Git LFS storage mechanism as the research copy.
 
 ## Decision settings
+
+Normalization splits comma-separated `Sources[].DatasetCategory` values into
+an array on one source entry. The lookup rules map every recognized value to
+its risk label: Sanctions, PEP, Regulatory and Law Enforcement. Repeated labels
+are deduplicated. Missing and unsupported categories add no label. In
+particular, broad values such as Crime and Ownership do not identify a specific
+risk label. A list can set `use_dataset_category_as_risk_label` to 0 in
+`pipelines/watchlistConfigs.py` to skip these category labels (DNFBP does so);
+the default is 1. Existing list, measure, programme and text rules can still
+add labels. The per-list setting is included in the risk rule version.
 
 The student receives label/text pairs, truncates the second sequence to a total
 maximum of 256 tokens, and uses 150 characters of neighboring evidence context.
