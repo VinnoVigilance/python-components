@@ -135,4 +135,20 @@ def record_rule_labels(lst, record):
         rule = program_rule(lst, p.get("ProgramType"), p.get("Program"))
         for label in (rule[0] if rule else []):
             out.setdefault(label, f"programme {p.get('Program')}")
+    for mapping in config.get("structured_risk_mappings", []):
+        field = mapping["field"]
+        for item in record.get(field) or []:
+            if not isinstance(item, dict):
+                continue
+            type_key = mapping.get("type_key")
+            if type_key and item.get(type_key) != mapping["type_value"]:
+                continue
+            raw_value = item.get(mapping["value_key"])
+            if not isinstance(raw_value, str):
+                continue
+            value = raw_value.strip()
+            label = mapping["labels"].get(value)
+            if label:
+                provenance = f"{field}.{mapping.get('type_value', mapping['value_key'])}: {value}"
+                out.setdefault(label, provenance)
     return out

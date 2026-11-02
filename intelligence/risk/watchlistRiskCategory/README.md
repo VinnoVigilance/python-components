@@ -29,6 +29,19 @@ risk label. A list can set `use_dataset_category_as_risk_label` to 0 in
 the default is 1. Existing list, measure, programme and text rules can still
 add labels. The per-list setting is included in the risk rule version.
 
+`structured_risk_mappings` in the same list configuration read a named array
+of canonical objects. A rule selects a value key, optionally matches a type
+key/value, and maps each complete, trimmed value to a supported risk label.
+Lists with multiple source values must split them during mapping. Only the
+record carrying the value receives
+the label. Missing or unmapped values add no label; the original canonical
+value is preserved. IDB maps `additionalInfo` entries of type `Prohibited
+Practice`: Fraud to Crime-Fraud and Corruption to Crime-Corruption. Collusion,
+Obstruction, Coercion, Extortion, and Nonspecified remain unmapped. The result's
+lookup explanation identifies the source field and matched value. A future
+list can select another canonical object array, such as `Measures` or
+`Programs`, without changing the rule-reading code.
+
 The student receives label/text pairs, truncates the second sequence to a total
 maximum of 256 tokens, and uses 150 characters of neighboring evidence context.
 A text label is selected if any candidate passage score is >= 0.5, unless the

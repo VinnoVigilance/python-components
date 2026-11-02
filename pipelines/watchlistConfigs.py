@@ -2144,6 +2144,18 @@ WATCHLIST_CONFIGS = {
 
     "IDB_SANCTIONED_ENTITIES": {
         "source_name": "IDB",
+        "structured_risk_mappings": [
+            {
+                "field": "additionalInfo",
+                "value_key": "Value",
+                "type_key": "Type",
+                "type_value": "Prohibited Practice",
+                "labels": {
+                    "Fraud": "Crime-Fraud",
+                    "Corruption": "Crime-Corruption",
+                },
+            },
+        ],
         "list_name": "IDB_SANCTIONED_ENTITIES",
         "date_order": "YMD",
         "download_method": "API",
