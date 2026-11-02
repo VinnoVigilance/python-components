@@ -60,4 +60,4 @@ def test_reward_is_currency_amount_and_expiry_is_not_a_person_end_date(records):
 def test_html_and_reporting_contacts_do_not_become_person_contacts(records):
     for row in records[2].values():
         assert row["Contacts"] == []
-        assert all("<p" not in c["text"] and "<br" not in c["text"] for c in row["Comments"])
+        assert all("<p" not in c["Text"] and "<br" not in c["Text"] for c in row["Comments"])

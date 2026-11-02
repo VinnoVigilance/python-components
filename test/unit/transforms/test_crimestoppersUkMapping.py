@@ -169,7 +169,7 @@ class TestCrimestoppersUkMapping(unittest.TestCase):
 
     def test_body_sections_have_separate_comment_types(self):
         r=self.canonical(self.raw())
-        self.assertEqual([(c['type'],c['text']) for c in r['Comments']],
+        self.assertEqual([(c['Type'],c['Text']) for c in r['Comments']],
             [('Summary','Example summary'),('Remarks','Example appeal description'),('Additional Info','Example extra information')])
 
     def test_missing_additional_information_does_not_create_empty_comment(self):
@@ -179,7 +179,7 @@ class TestCrimestoppersUkMapping(unittest.TestCase):
     def test_reporting_phone_is_not_a_person_contact(self):
         r=self.canonical(self.raw(full_details='Please call Crimestoppers on 0800 555 111'))
         self.assertEqual(r['Contacts'],[])
-        self.assertIn('0800 555 111',r['Comments'][1]['text'])
+        self.assertIn('0800 555 111',r['Comments'][1]['Text'])
 
     def test_photograph_and_profile_links(self):
         r=self.canonical(self.raw())
