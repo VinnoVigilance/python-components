@@ -189,11 +189,33 @@ class TestDetectEntityType:
     def test_vessel_inferred_from_imo(self):
         assert detect_entity_type({"IMO number": "1234567"}) == "Vessel"
 
+    @pytest.mark.parametrize("record", [
+        {"entity_type": "Aircraft"},
+        {"generalInfo": {"entityType": {"text": "Aircraft"}}},
+    ])
+    def test_aircraft_from_normalized_and_ofac_source_types(self, record):
+        assert detect_entity_type(record) == "Aircraft"
+
     def test_defaults_to_individual(self):
         assert detect_entity_type({}) == "Individual"
 
 
 class TestMappingEngineEndToEnd:
+    def test_aircraft_uses_aircraft_rules_instead_of_individual_rules(self):
+        rules = [
+            Rule("Aircraft", "model", "string", None, "path", "model"),
+            Rule("Individual", "individualName", "string", None, "path", "name"),
+        ]
+        engine = MappingEngine(rules)
+
+        result = engine.map_record({
+            "generalInfo": {"entityType": {"text": "Aircraft"}},
+            "model": "IL-76TD",
+            "name": "EP-GOL",
+        })
+
+        assert result == {"model": "IL-76TD"}
+
     def test_scalar_path_and_constant(self):
         rules = [
             Rule("Individual", "fullName", "string", None, "path", "name"),

@@ -9,6 +9,7 @@ rules DataFrame.
 """
 
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -353,14 +354,14 @@ class TestSanitizeHtmlHandler:
     def test_handler_cleans_every_element(self):
         entity = {
             "Comments": [
-                {"type": "Summary", "text": "<p>armed &amp; dangerous</p>"},
-                {"type": "Remarks", "text": "no markup here"},
+                {"Type": "Summary", "Text": "<p>armed &amp; dangerous</p>"},
+                {"Type": "Remarks", "Text": "no markup here"},
             ]
         }
-        sanitize_html_handler(entity, {"condition_path": "Comments[].text"})
+        sanitize_html_handler(entity, {"condition_path": "Comments[].Text"})
 
-        assert entity["Comments"][0]["text"] == "armed & dangerous"
-        assert entity["Comments"][1]["text"] == "no markup here"
+        assert entity["Comments"][0]["Text"] == "armed & dangerous"
+        assert entity["Comments"][1]["Text"] == "no markup here"
 
     def test_missing_array_is_a_no_op(self):
         entity = {"Names": [{"Name": "x"}]}
@@ -395,6 +396,25 @@ class TestSanitizeHtmlHandler:
 
 
 class TestEngineEndToEnd:
+    def test_workbook_comment_rules_use_canonical_field_names(self):
+        rules_path = Path(__file__).resolve().parents[3] / "data" / "rules" / "postNormalization.xlsx"
+        rules = pd.read_excel(rules_path)
+        comment_rules = rules[
+            rules["condition_path"].fillna("").str.startswith("Comments[].")
+        ]
+        engine = PostNormalizationEngine(comment_rules, config={})
+        record = {"Comments": [
+            {"Type": "Remarks", "Text": "<p>armed &amp; dangerous</p>"},
+            {"Type": "Remarks", "Text": ""},
+        ]}
+
+        comments = engine.post_normalize_record(record)["Comments"]
+
+        assert comments[0] == {"Type": "Remarks", "Text": "armed & dangerous"}
+        # The empty-dependency rule must operate on Type, not add a lowercase key.
+        assert comments[1]["Type"] != "Remarks"
+        assert "type" not in comments[1]
+
     def test_runs_rules_and_does_not_mutate_input(self):
         rules_df = pd.DataFrame([{
             "rule_type": "SEARCH_ENRICH",

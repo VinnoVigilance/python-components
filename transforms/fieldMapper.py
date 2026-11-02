@@ -258,11 +258,12 @@ def coerce_to_field_type(value: Any, target_type: Optional[str]) -> Any:
 
 
 def detect_entity_type(raw_json: dict) -> str:
-    """Resolve a record's Individual / Entity / Vessel type.
+    """Resolve a record's mapping category from its entity type.
 
     `entity_type` is the canonical, general path: pre-normalization resolves
     each list's type (from whatever field that list declares in sourceConfig)
-    and writes it here, so a new list never needs a change to this function.
+    and writes it here. Lists using an existing category need no new branch;
+    a new category must be added below.
     The remaining reads are backward-compatible fallbacks for records that did
     not pass through that step (older DFAT/OFAC direct `Type`/`generalInfo`
     fields, and the vessel heuristic for EU designated vessels).
@@ -283,6 +284,9 @@ def detect_entity_type(raw_json: dict) -> str:
 
     if val == "vessel":
         return "Vessel"
+
+    if val == "aircraft":
+        return "Aircraft"
 
     if val == "media":
         return "Media"

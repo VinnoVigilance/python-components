@@ -76,7 +76,7 @@ SAMPLES = {
     "EBRD_INELIGIBLE_ENTITIES": "EBRD_INELIGIBLE_ENTITIES_raw_sample.jsonl",
 }
 
-VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel"}
+VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel", "Aircraft"}
 
 # Tokens that are never legitimate real data, so they must never appear in the
 # canonical output. NOTE: "NA" is deliberately NOT here -- it is Namibia's ISO
