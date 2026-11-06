@@ -30,6 +30,27 @@ from transforms.postNormalization import (
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("field", ["Attachments", "URLs"])
+def test_url_cleanup_preserves_internal_whitespace_only_when_enabled(field):
+    original = "  https://example.test/a  b?x=1&amp;y=2\u200b  "
+    enabled = {field: [{"URL": original}]}
+    default = {field: [{"URL": original}]}
+    rule = {"condition_path": f"{field}[].URL"}
+
+    sanitize_html_handler(enabled, rule, {"preserve_url_whitespace": True})
+    sanitize_html_handler(default, rule, {})
+
+    assert enabled[field][0]["URL"] == "https://example.test/a  b?x=1&y=2"
+    assert default[field][0]["URL"] == "https://example.test/a b?x=1&y=2"
+
+
+def test_url_setting_does_not_change_text_cleanup():
+    entity = {"Content": {"Title": "<b>One  Two</b>"}}
+    sanitize_html_handler(entity, {"condition_path": "Content.Title"},
+                          {"preserve_url_whitespace": True})
+    assert entity["Content"]["Title"] == "One Two"
+
+
 class TestDateWindowStatusHandler:
     RULE = {
         "condition_path": "Measures[].EffectiveDate",

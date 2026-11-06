@@ -610,6 +610,13 @@ def _strip_html(value):
     return collapsed.strip()
 
 
+def _sanitize_url(value):
+    """Decode HTML and remove markup without changing whitespace inside a URL."""
+    unescaped = html.unescape(value)
+    without_tags = re.sub(r"<[^>]+>", " ", unescaped)
+    return without_tags.replace("\u200b", "").replace("\ufeff", "").strip()
+
+
 def sanitize_html_handler(entity, rule, config=None):
     """Strip HTML from a free-text leaf: every element of an array
     (``Comments[].text``) or a single nested field (``Content.Title``).
@@ -622,11 +629,16 @@ def sanitize_html_handler(entity, rule, config=None):
     DEDUPLICATE so two texts that differ only in markup collapse to one.
     """
     path = str(rule["condition_path"])
+    use_url_cleanup = bool(
+        config and config.get("preserve_url_whitespace")
+        and path in {"Attachments[].URL", "URLs[].URL"}
+    )
+    clean_value = _sanitize_url if use_url_cleanup else _strip_html
     if "[]" not in path:
         parent_key, _, leaf = path.rpartition(".")
         parent = entity.get(parent_key) if parent_key else entity
         if isinstance(parent, dict) and isinstance(parent.get(leaf), str):
-            parent[leaf] = _strip_html(parent[leaf])
+            parent[leaf] = clean_value(parent[leaf])
         return
 
     source_list, source_leaf = _split_array_path(path)
@@ -641,7 +653,7 @@ def sanitize_html_handler(entity, rule, config=None):
 
         value = item.get(source_leaf)
         if isinstance(value, str):
-            item[source_leaf] = _strip_html(value)
+            item[source_leaf] = clean_value(value)
 
 
 HANDLERS = {
