@@ -24,6 +24,7 @@ class ApiCollectorTask:
     params: Dict[str, Any] = field(default_factory=dict)
     param_variants: List[Dict[str, Any]] = field(default_factory=list)
     headers: Dict[str, str] = field(default_factory=dict)
+    page_token: Dict[str, Any] = field(default_factory=dict)
     timeout: int = 30
     retry: int = 3
     retry_delay_seconds: float = 1.0
@@ -62,6 +63,7 @@ class ApiCollectorTask:
             params=api_config.get("params", {}),
             param_variants=api_config.get("param_variants", []),
             headers=api_config.get("headers", {}),
+            page_token=api_config.get("page_token", {}),
             timeout=api_config.get("timeout", 30),
             retry=api_config.get("retry", 3),
             retry_delay_seconds=api_config.get(
