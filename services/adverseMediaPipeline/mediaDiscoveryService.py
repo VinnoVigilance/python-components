@@ -132,12 +132,16 @@ class MediaDiscoveryService:
     def mark_discovery_failure(
         self,
         reason: str,
+        *,
+        prevent_known_stop: bool = False,
     ) -> None:
-        """Mark a source-level discovery failure such as an empty first page."""
+        """Mark discovery incomplete and optionally scan remaining entries."""
 
         self.discovery_failure_count += 1
         self.consecutive_known_records = 0
         self.stop_reason = reason
+        if prevent_known_stop:
+            self.stop_after_known = False
 
     def mark_source_end(
         self,
