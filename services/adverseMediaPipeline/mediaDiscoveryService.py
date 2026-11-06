@@ -46,6 +46,7 @@ class MediaDiscoveryService:
         self.new_count = 0
         self.identity_failure_count = 0
         self.discovery_failure_count = 0
+        self.discovery_retry_items: list[dict[str, Any]] = []
         self.selected_detail_count = 0
         self.reached_source_end = False
         self.stop_reason: str | None = None
@@ -134,12 +135,15 @@ class MediaDiscoveryService:
         reason: str,
         *,
         prevent_known_stop: bool = False,
+        retry_item: dict[str, Any] | None = None,
     ) -> None:
-        """Mark discovery incomplete and optionally scan remaining entries."""
+        """Mark discovery incomplete and optionally require scanning remaining entries."""
 
         self.discovery_failure_count += 1
         self.consecutive_known_records = 0
         self.stop_reason = reason
+        if retry_item is not None:
+            self.discovery_retry_items.append(retry_item)
         if prevent_known_stop:
             self.stop_after_known = False
 
@@ -177,6 +181,8 @@ class MediaDiscoveryService:
             "discovery_failure_count": (
                 self.discovery_failure_count
             ),
+            **({"discovery_retry_items": self.discovery_retry_items}
+               if self.discovery_retry_items else {}),
             "selected_detail_count": (
                 self.selected_detail_count
             ),
