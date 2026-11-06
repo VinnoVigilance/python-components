@@ -10,6 +10,57 @@ global:
 
 
 sources:
+  ONENEWS_PH_POLITICS_AND_OTHER_NEWS_FEATURES:
+    enabled: true
+    active: true
+    source_name: ONENEWS_PH
+    dataset_name: ONENEWS_PH_POLITICS_AND_OTHER_NEWS_FEATURES
+    dataset_category: Media
+    schedule: daily
+    date_order: YMD
+    preserve_url_whitespace: true
+    source_page_url: https://www.onenews.ph/categories/3_politics-and-other-news-features
+    url: https://onecms.cignal.tv/services/api/Articles/GetByCategoryWithPagination
+    acquisition:
+      type: api
+      download_method: API
+    discovery:
+      policy: stop_after_known
+      threshold: 20
+    api_config:
+      params:
+        verticalid: 2
+        categoryid: 3
+        subverticalid: ""
+      pagination:
+        type: page
+        page_param: pageno
+        size_param: pagerow
+        page_size: 10
+        start_page: 1
+      items_path: ""
+      write_mode: record_files
+      record_id_path: id
+      transport: requests
+      timeout: 30
+      throttle_delay: 1
+      page_token:
+        url: https://www.onenews.ph/categories/3_politics-and-other-news-features
+        pattern: 'auth:\{token:"([^"]+)"'
+    parser:
+      type: json
+    identity:
+      external_id:
+        field: id
+      record_key:
+        fields: [source_name, dataset_name, id]
+    preprocessing:
+      - handler: build_url_from_template
+        level: record
+        config:
+          output_field: SourceURL
+          template: "https://www.onenews.ph/articles/{slug}"
+
   OMBUDSMAN_PH_LATEST_NEWS:
     enabled: true
     active: true
