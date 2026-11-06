@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [1, 2, 3, 4]
+        group: [1, 2, 3, 4, 5, 6, 7, 8]
 
     # Dummy values so that modules which read config at import time (via
     # config/settings.py) can be imported. No real secret is ever used or
@@ -55,8 +55,8 @@ jobs:
       # Run everything EXCEPT tests that need a real database, live internet,
       # or a full end-to-end pipeline. Those tiers require infrastructure that
       # is not wired into CI yet (see test/README.md).
-      - name: Run tests (shard ${{ matrix.group }} of 4)
-        run: pytest -n auto -m "not db and not network and not e2e" --splits 4 --group ${{ matrix.group }}
+      - name: Run tests (shard ${{ matrix.group }} of 8)
+        run: pytest -n auto -m "not db and not network and not e2e" --splits 8 --group ${{ matrix.group }}
 
   # ---------------------------------------------------------------------------
   # Real-database integration tests. Spins up a disposable PostgreSQL, loads the
