@@ -61,6 +61,64 @@ sources:
           output_field: SourceURL
           template: "https://www.onenews.ph/articles/{slug}"
 
+  US_TREASURY_PRESS_RELEASES:
+    enabled: true
+    active: true
+    source_name: US_TREASURY
+    dataset_name: US_TREASURY_PRESS_RELEASES
+    dataset_category: Media
+    schedule: daily
+    date_order: MDY
+    source_page_url: https://home.treasury.gov/news/press-releases/
+    url: https://home.treasury.gov/news/press-releases/
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 1
+        randomize_download_delay: true
+        retry_times: 3
+
+    discovery:
+      strategy: json_manifest
+      policy: stop_after_known
+      threshold: 10
+      start_url: https://home.treasury.gov/news-data/press-releases/manifest.json
+      json_manifest: {}
+
+    extraction:
+      SourceURL:
+        source: response_url
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: '(?:/news/press-releases/|(?<=\.gov)/(?!news/press-releases/))([^?#]+?)/?(?:[?#].*)?$'
+      Title:
+        selector: '#block-hamilton-page-title h2'
+        output: text
+      date.originalValue:
+        selector: '.field--name-field-news-publication-date time'
+        output: text
+      BodyText:
+        selector: '.field--name-field-news-body'
+        output: text
+      PdfUrls:
+        selector: '.field--name-field-news-body a[href*=".pdf"], .field--name-field-news-body a[href*=".PDF"]'
+        output: attribute
+        attribute: href
+        multiple: true
+
+    parser:
+      type: html
+    identity:
+      external_id:
+        field: SourceRecordId
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
   OMBUDSMAN_PH_LATEST_NEWS:
     enabled: true
     active: true
