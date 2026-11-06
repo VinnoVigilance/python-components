@@ -119,6 +119,58 @@ sources:
       record_key:
         fields: [source_name, dataset_name, SourceRecordId]
 
+  PANAY_NEWS:
+    enabled: true
+    active: true
+    source_name: PANAY_NEWS
+    dataset_name: PANAY_NEWS
+    dataset_category: Media
+    schedule: daily
+    date_order: YMD
+    source_page_url: https://www.panaynews.net/category/news/
+    url: https://www.panaynews.net/wp-json/wp/v2/posts
+
+    acquisition:
+      type: api
+      download_method: API
+
+    discovery:
+      policy: stop_after_known
+      threshold: 10
+
+    api_config:
+      params:
+        # Iloilo, Metro Iloilo, Metro Bacolod, Negros, Nation, Region.
+        categories: "32,39,109,41,40,65"
+        _embed: 1
+        orderby: date
+        order: desc
+      pagination:
+        type: page
+        page_param: page
+        size_param: per_page
+        page_size: 20
+        start_page: 1
+      items_path: ""
+      write_mode: record_files
+      record_id_path: id
+      transport: browser
+      throttle_delay: 1
+      bypass_config:
+        warmup_url: https://www.panaynews.net/
+        headless: true
+        timeout_seconds: 90
+        fetch_timeout_ms: 60000
+        min_request_interval: 1
+
+    parser:
+      type: json
+    identity:
+      external_id:
+        field: id
+      record_key:
+        fields: [source_name, dataset_name, id]
+
   OMBUDSMAN_PH_LATEST_NEWS:
     enabled: true
     active: true
