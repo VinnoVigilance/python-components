@@ -184,7 +184,7 @@ class TestSecUsPauseMapping(unittest.TestCase):
 
     def test_genuine_firm_data_is_only_narrative(self):
         record = self.real('12-west-capital-management')
-        remarks = [c['text'] for c in record['Comments'] if c['type'] == 'Remarks']
+        remarks = [c['Text'] for c in record['Comments'] if c['Type'] == 'Remarks']
         self.assertEqual(len(remarks), 1)
         for value in ('12 West Capital Management LP', '160197', '801-73235', '0001540531'):
             self.assertIn(value, remarks[0])
@@ -195,7 +195,7 @@ class TestSecUsPauseMapping(unittest.TestCase):
     def test_raw_contact_text_is_retained_in_comments(self):
         raw = self.raw['1st-american-securities']
         record = self.canonical(raw)
-        comments = [c['text'] for c in record['Comments'] if c['type'] == 'Additional Info']
+        comments = [c['Text'] for c in record['Comments'] if c['Type'] == 'Additional Info']
         # The project's existing final cleanup folds whitespace in strings.
         self.assertEqual(comments, [' '.join(raw['detail']['contact_text'].split())])
 
