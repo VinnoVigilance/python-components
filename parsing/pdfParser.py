@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pdfplumber
@@ -7,11 +8,14 @@ class PdfParser:
     """
     PDF parser for tabular watchlist files, with a text mode
     (config ``parser: {mode: text}``) returning the whole document text.
+    Explicit ``parser: {mode: ocr}`` delegates to the shared OCR parser.
+    Explicit ``parser: {mode: image_cards}`` discovers bordered image/text cards.
+    Explicit ``parser: {mode: labeled_blocks}`` reads repeated labelled columns.
 
     Output:
         A list of dictionaries.
 
-    Important:
+    Important for native table mode:
         - It does NOT add metadata fields such as source_page or source_table.
         - It only returns columns that exist in the PDF table.
         - entity_type should be added later by preprocessing, not here.
@@ -40,6 +44,18 @@ class PdfParser:
             )
 
         config = config or {}
+
+        settings = config.get("parser") or {}
+        if str(settings.get("mode", "")).strip().lower() == "labeled_blocks":
+            return self._parse_labeled_blocks(pdf_path, settings)
+        if str(settings.get("mode", "")).strip().lower() == "image_cards":
+            return self._parse_image_cards(pdf_path, settings)
+
+        # OCR is opt-in; table/text parsing below retains the existing behavior.
+        if str((config.get("parser") or {}).get("mode", "")).strip().lower() == "ocr":
+            from parsing.ocrParser import OcrParser
+
+            return OcrParser().parse(file_path=pdf_path, config=config)
 
         text_mode = (
             str(
@@ -184,6 +200,264 @@ class PdfParser:
         )
 
         return records
+
+    @staticmethod
+    def _label_matches(words, label):
+        """Find whole label phrases on one text line, retaining their bounds."""
+        tokens = label.split()
+        if not tokens:
+            raise ValueError("PDF labels must not be blank.")
+        matches = []
+        for index in range(len(words) - len(tokens) + 1):
+            group = words[index:index + len(tokens)]
+            if [word["text"] for word in group] != tokens:
+                continue
+            height = max(word["bottom"] - word["top"] for word in group)
+            if max(word["top"] for word in group) - min(word["top"] for word in group) > height / 2:
+                continue
+            matches.append({
+                "x0": min(word["x0"] for word in group),
+                "x1": max(word["x1"] for word in group),
+                "top": min(word["top"] for word in group),
+                "bottom": max(word["bottom"] for word in group),
+            })
+        return matches
+
+    def _parse_labeled_blocks(self, pdf_path, settings):
+        """Extract vertically repeated records using label-relative boundaries.
+
+        Columns declare label phrases, not page coordinates. Each record's
+        labels determine its value lanes and vertical field boundaries. This
+        mode supports labels followed by values in aligned columns; side-by-side
+        cards and records spanning pages require another extraction strategy.
+        Document-specific date/count checks are optional and independent.
+        """
+        columns = settings["columns"]
+        fields = [name for column in columns for field in column["fields"]
+                  for name in (field["field"], field.get("layout_field")) if name]
+        for column in columns:
+            for field in column["fields"]:
+                if field.get("text_mode", "layout") not in {"layout", "stored_characters"}:
+                    raise ValueError(f"Unknown PDF field text_mode: {field['text_mode']!r}.")
+        validation = settings.get("validation", {})
+        page_pattern = validation.get("page_pattern")
+        summary_pattern = validation.get("summary_pattern")
+        if summary_pattern and "record_count" not in re.compile(summary_pattern).groupindex:
+            raise ValueError("PDF summary_pattern requires a record_count group.")
+        if page_pattern and not re.compile(page_pattern).groupindex:
+            raise ValueError("PDF page_pattern requires named capture groups.")
+        reserved = {"source_page", "source_position"}
+        if page_pattern:
+            reserved.update(re.compile(page_pattern).groupindex)
+        if not fields or len(fields) != len(set(fields)) or reserved.intersection(fields):
+            raise ValueError("PDF labelled fields must be unique and not overwrite metadata.")
+        font_pattern = settings.get("label_font_pattern")
+        font_regex = re.compile(font_pattern) if font_pattern else None
+        end_pattern = settings.get("end_pattern")
+        records, summaries = [], []
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text(x_tolerance=1, y_tolerance=1) or ""
+                words = page.extract_words(x_tolerance=1, y_tolerance=1)
+                label_page = page.filter(
+                    lambda item: item["object_type"] != "char"
+                    or font_regex is None
+                    or font_regex.search(item.get("fontname", "")) is not None
+                )
+                label_words = label_page.extract_words(x_tolerance=1, y_tolerance=1)
+                starts = self._label_matches(label_words, settings["record_start"])
+                if not starts:
+                    if settings.get("skip_pages_without_records", False):
+                        continue
+                    raise ValueError(f"PDF page {page.page_number}: no record starts.")
+                starts.sort(key=lambda item: item["top"])
+                if any(abs(a["top"] - b["top"]) < (a["bottom"] - a["top"]) / 2
+                       for a, b in zip(starts, starts[1:])):
+                    raise ValueError(f"PDF page {page.page_number}: side-by-side record starts are unsupported.")
+                metadata = self._labeled_page_metadata(text, page.page_number, validation)
+                if summary_pattern:
+                    summaries.extend(int(match["record_count"]) for match in
+                                     re.finditer(summary_pattern, text))
+                ends = [word["top"] for word in words
+                        if end_pattern and re.fullmatch(end_pattern, word["text"])]
+                if end_pattern and (not ends or min(ends) <= starts[-1]["top"]):
+                    raise ValueError(f"PDF page {page.page_number}: missing/invalid record end.")
+                for position, start in enumerate(starts):
+                    tolerance = (start["bottom"] - start["top"]) / 5
+                    end = (starts[position + 1]["top"] if position + 1 < len(starts)
+                           else min(ends) if ends else page.bbox[3]) - tolerance
+                    block_words = [word for word in label_words
+                                   if start["top"] - tolerance <= word["top"] < end]
+                    lanes = []
+                    for column in columns:
+                        anchors = []
+                        for field in column["fields"]:
+                            matches = self._label_matches(block_words, field["label"])
+                            if len(matches) != 1:
+                                raise ValueError(
+                                    f"PDF page {page.page_number}, record {position + 1}: "
+                                    f"missing/ambiguous label {field['label']!r}."
+                                )
+                            anchors.append((matches[0], field))
+                        if not anchors:
+                            raise ValueError("PDF labelled columns must contain fields.")
+                        label_left = min(anchor["x0"] for anchor, _ in anchors)
+                        if any(abs(anchor["x0"] - label_left) > tolerance for anchor, _ in anchors):
+                            raise ValueError(f"PDF page {page.page_number}: column labels are not aligned.")
+                        value_left = max(anchor["x1"] for anchor, _ in anchors) + tolerance / 2
+                        lanes.append((label_left, value_left, sorted(anchors, key=lambda item: item[0]["top"])))
+                    lanes.sort(key=lambda item: item[0])
+                    record = {**metadata, "source_page": page.page_number,
+                              "source_position": position + 1}
+                    for lane_index, (_, left, anchors) in enumerate(lanes):
+                        right = lanes[lane_index + 1][0] - tolerance / 2 if lane_index + 1 < len(lanes) else page.bbox[2]
+                        if left >= right:
+                            raise ValueError(f"PDF page {page.page_number}: overlapping labelled columns.")
+                        for index, (anchor, field) in enumerate(anchors):
+                            bottom = anchors[index + 1][0]["top"] - tolerance if index + 1 < len(anchors) else end
+                            if bottom <= anchor["top"]:
+                                raise ValueError(f"PDF page {page.page_number}: overlapping field labels.")
+                            crop = page.crop((left, anchor["top"] - tolerance, right, bottom))
+                            value = crop.extract_text(
+                                x_tolerance=1, y_tolerance=1
+                            ) or ""
+                            if field.get("layout_field"):
+                                record[field["layout_field"]] = value
+                            if field.get("text_mode") == "stored_characters":
+                                # Preserve actual source spaces instead of synthesizing
+                                # spaces at visual wraps. Opt-in: PDF character order
+                                # and explicit spaces are not reliable in every source.
+                                stored = "".join(char["text"] for char in crop.chars)
+                                if "".join(stored.split()) != "".join(value.split()):
+                                    raise ValueError(
+                                        f"PDF page {page.page_number}: stored character order "
+                                        f"differs from layout for {field['field']}."
+                                    )
+                                value = stored.strip()
+                            if field.get("required") and not value.strip():
+                                raise ValueError(f"PDF page {page.page_number}: empty {field['field']}.")
+                            if field.get("pattern") and not re.fullmatch(field["pattern"], value):
+                                raise ValueError(f"PDF page {page.page_number}: invalid {field['field']}.")
+                            record[field["field"]] = value
+                    records.append(record)
+        if not records:
+            raise ValueError("PDF contains no labelled records.")
+        if summary_pattern and (len(summaries) != 1 or summaries[0] != len(records)):
+            raise ValueError(f"PDF record summary {summaries} does not reconcile with {len(records)} records.")
+        return records
+
+    @staticmethod
+    def _labeled_page_metadata(text, page_number, validation):
+        pattern = validation.get("page_pattern")
+        if not pattern:
+            return {}
+        matches = list(re.finditer(pattern, text))
+        if len(matches) != 1:
+            raise ValueError(f"PDF page {page_number}: missing/ambiguous page metadata.")
+        metadata = matches[0].groupdict()
+        for field, value in validation.get("expected_page_fields", {}).items():
+            if metadata.get(field) != value:
+                raise ValueError(f"PDF page {page_number}: unexpected {field}.")
+        return metadata
+
+    def _parse_image_cards(self, pdf_path, settings):
+        """Discover ruled image cards and separate styled captions from their remaining text."""
+        record_pattern = re.compile(settings["record_pattern"])
+        font_pattern = re.compile(settings["caption_font_pattern"])
+        page_pattern = settings.get("page_pattern")
+        if page_pattern and not re.compile(page_pattern).groupindex:
+            raise ValueError("PDF page_pattern requires named capture groups.")
+
+        records = []
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text(x_tolerance=1, y_tolerance=1) or ""
+                expected_count = len(list(record_pattern.finditer(page_text)))
+                if not expected_count:
+                    continue
+                page_fields = {}
+                if page_pattern:
+                    match = re.search(page_pattern, page_text)
+                    if match is None:
+                        raise ValueError(f"PDF page {page.page_number}: missing page fields.")
+                    page_fields = {
+                        key: " ".join((value or "").split())
+                        for key, value in match.groupdict().items()
+                    }
+
+                cells = sorted(
+                    {
+                        cell
+                        for table in page.find_tables(settings["table_settings"])
+                        for cell in table.cells
+                    },
+                    key=lambda box: (box[1], box[0]),
+                )
+                page_records = []
+                for cell in cells:
+                    card = page.crop(cell)
+                    card_text = card.extract_text(x_tolerance=1, y_tolerance=1) or ""
+                    count = len(list(record_pattern.finditer(card_text)))
+                    if not count:
+                        continue
+                    if count != 1:
+                        raise ValueError(f"PDF page {page.page_number}: merged record cells.")
+                    caption, caption_chars = self._card_caption(card, font_pattern)
+                    if not card.images:
+                        raise ValueError(f"PDF page {page.page_number}: card has no image.")
+                    body = card.filter(
+                        lambda item: item["object_type"] != "char"
+                        or id(item) not in caption_chars
+                    ).extract_text(x_tolerance=1, y_tolerance=1)
+                    body = " ".join((body or "").split())
+                    marker = record_pattern.search(body)
+                    if marker is None:
+                        raise ValueError(f"PDF page {page.page_number}: missing card body marker.")
+                    body = body[marker.start():]
+                    record = {
+                        **page_fields,
+                        settings["caption_field"]: caption,
+                        settings["body_field"]: body,
+                        "source_page": page.page_number,
+                        "source_position": len(page_records) + 1,
+                    }
+                    for field, pattern in settings.get("required_patterns", {}).items():
+                        if not re.fullmatch(pattern, record.get(field, "")):
+                            raise ValueError(
+                                f"PDF page {page.page_number}: invalid card field {field!r}."
+                            )
+                    page_records.append(record)
+                if len(page_records) != expected_count:
+                    raise ValueError(
+                        f"PDF page {page.page_number}: found {expected_count} record markers "
+                        f"but extracted {len(page_records)} cards."
+                    )
+                records.extend(page_records)
+        if not records:
+            raise ValueError("PDF contains no matching image cards.")
+        return records
+
+    @staticmethod
+    def _card_caption(card, font_pattern):
+        """Read the final contiguous text block matching the configured font style."""
+        lines = card.filter(
+            lambda item: item["object_type"] != "char"
+            or font_pattern.search(item.get("fontname", "")) is not None
+        ).extract_text_lines(x_tolerance=1, y_tolerance=1)
+        if not lines:
+            raise ValueError(f"PDF page {card.page_number}: missing styled card caption.")
+        lines = sorted(lines, key=lambda line: (line["top"], line["x0"]))
+        caption = [lines[-1]]
+        for line in reversed(lines[:-1]):
+            next_line = caption[0]
+            line_height = max(
+                line["bottom"] - line["top"], next_line["bottom"] - next_line["top"]
+            )
+            if next_line["top"] - line["bottom"] > line_height / 2:
+                break
+            caption.insert(0, line)
+        text = " ".join(" ".join(line["text"] for line in caption).split())
+        return text, {id(char) for line in caption for char in line["chars"]}
 
 
     def parse_text(self, file_path):

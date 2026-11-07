@@ -26,22 +26,31 @@ Scrapy==2.17.0
 nameparser==1.4.0
 inscriptis==2.7.3
 
+# --- OCR (CPU) ---
+rapidocr==3.10.0
+onnxruntime==1.31.1
+pypdfium2==5.14.0
+Pillow==12.2.0
+
 # --- Ingestion / infrastructure ---
 requests==2.34.2         # source file downloads
+curl_cffi==0.17.0
 sb-stealth-wrapper==0.5.0  # stealth browser engine for bypassCollector (Cloudflare-protected sources)
 seleniumbase==4.54.10    # SeleniumBase driver, pinned to a device-matched chromedriver (compatibleDriver.py)
 psycopg2-binary==2.9.12  # PostgreSQL access
-boto3                    # SeaweedFS/S3 storage client (not pinned: install if using infrastructure/storage)
+boto3==1.43.123         # SeaweedFS/S3 storage client
 python-dotenv==1.0.1     # load config/secrets from a local .env file
 tzdata; sys_platform == "win32"  # IANA zones for watchlist schedules on Windows
 PyYAML==6.0.3           # YAML source configs; >=6.0.3 required by seleniumbase
 elasticsearch==9.5.0
 
 # --- Watchlist CPU student (versions recorded by the frozen research model) ---
-torch==2.14.1           # CPU inference for the watchlist student
+# PyTorch publishes its CPU wheel separately from PyPI; keep PyPI for other packages.
+--find-links https://download.pytorch.org/whl/cpu/torch/
+torch==2.14.1+cpu       # CPU inference for the watchlist student (Python 3.11, Linux/Windows)
 transformers==5.19.0    # load the packaged student and tokenizer
 
 # --- Analyst UI (utils/vvAnalystApp.py) ---
 streamlit==1.59.2
-tqdm>=4.66,<5
+tqdm==4.70.1 
 

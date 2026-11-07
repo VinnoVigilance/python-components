@@ -1,0 +1,291 @@
+[
+  {
+    "title": "Caspian Trading, Inc., a.k.a. Caspian Investments",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/caspian-trading-inc-aka-caspian-investments",
+    "entity_id": "SEC-US-PAUSE-83b98117c2cf5341235de033009b1a756310561633810a0e5849875f0d76d2e4",
+    "primary": "Caspian Trading, Inc.",
+    "aliases": [
+      "Caspian Investments"
+    ]
+  },
+  {
+    "title": "Easton Consultancy, a.k.a. Easton Consultancy Advisory Firm",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/easton-consultancy-aka-easton-consultancy-advisory-firm",
+    "entity_id": "SEC-US-PAUSE-7ab735c0c5a5d6e8e622dd8dac004f909c4cc4b6d40ea7569c93be62c7a76169",
+    "primary": "Easton Consultancy",
+    "aliases": [
+      "Easton Consultancy Advisory Firm"
+    ]
+  },
+  {
+    "title": "SBV Venture Partners, a.k.a. SBV Venture Partners Law Services",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/sbv-venture-partners-aka-sbv-venture-partners-law-services",
+    "entity_id": "SEC-US-PAUSE-3b934cd865faca01d2b5ebaeb341a78d07219e1bf0cc70da736dc775e662fde5",
+    "primary": "SBV Venture Partners",
+    "aliases": [
+      "SBV Venture Partners Law Services"
+    ]
+  },
+  {
+    "title": "Stargroove Trade Ltd., a.k.a. Stargroove Corporation",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/stargroove-trade-ltd-aka-stargroove-corporation",
+    "entity_id": "SEC-US-PAUSE-856057aa5e43cf3eb05dd71a1c8e4692ae7608b85af5ce9d434a463aaf0aef33",
+    "primary": "Stargroove Trade Ltd.",
+    "aliases": [
+      "Stargroove Corporation"
+    ]
+  },
+  {
+    "title": "Worldwide Insurance Network Group (aka WING Insurance)",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/worldwide-insurance-network-group-aka-wing-insurance",
+    "entity_id": "SEC-US-PAUSE-00cdbaa98238bd15059c07c71bbba78f68d85465661b029c433074ef55b7353a",
+    "primary": "Worldwide Insurance Network Group",
+    "aliases": [
+      "WING Insurance"
+    ]
+  },
+  {
+    "title": "Western Pacific Advisors Inc., a.k.a. Westpac Inc.",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/western-pacific-advisors-inc-aka-westpac-inc",
+    "entity_id": "SEC-US-PAUSE-9a3f0ef0d1db93ee5b746074fe23e35bcbfb43c08b7a9fdcbee0819aca11a068",
+    "primary": "Western Pacific Advisors Inc.",
+    "aliases": [
+      "Westpac Inc."
+    ]
+  },
+  {
+    "title": "West Coast Financial LLC, a.k.a. WC Financial Group LLC",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/west-coast-financial-llc-aka-wc-financial-group-llc",
+    "entity_id": "SEC-US-PAUSE-1d7a12c5d4325ca0916ae99bd4685a67960c5e3969b6076daaf1d684aaef704e",
+    "primary": "West Coast Financial LLC",
+    "aliases": [
+      "WC Financial Group LLC"
+    ]
+  },
+  {
+    "title": "Welborn Capital & Partners LLC, a.k.a. Welborn Capital (sic) LLC, a.k.a. Welborn Capital Partners Inc.",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/welborn-capital-partners-llc-aka-welborn-capital-sic-llc-aka-welborn-capital-partners-inc",
+    "entity_id": "SEC-US-PAUSE-451dee04ac5b54b1e03c4ac092a0ea2b6bc4029673d17ab2eaf0ee86a311aae5",
+    "primary": "Welborn Capital & Partners LLC",
+    "aliases": [
+      "Welborn Capital (sic) LLC",
+      "Welborn Capital Partners Inc."
+    ]
+  },
+  {
+    "title": "Vpoint LLC aka Vantage Point Investment Advisors",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/vpoint-llc-aka-vantage-point-investment-advisors",
+    "entity_id": "SEC-US-PAUSE-72342938bbb0f3cf12363f84a7f86e1fc302bb51790051f06ea3a2b5b04ffaee",
+    "primary": "Vpoint LLC",
+    "aliases": [
+      "Vantage Point Investment Advisors"
+    ]
+  },
+  {
+    "title": "VipBinary, a.k.a. Vip Binary",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/vipbinary-aka-vip-binary",
+    "entity_id": "SEC-US-PAUSE-d5c98970d38a8ba096b9599e2fb66fa23e21f22618184c22ab7dedc55ccfc1dd",
+    "primary": "VipBinary",
+    "aliases": [
+      "Vip Binary"
+    ]
+  },
+  {
+    "title": "United States Settlement and Claims Commission a.k.a. Settlement Claims Commission (SCC)",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/united-states-settlement-claims-commission-aka-settlement-claims-commission-scc",
+    "entity_id": "SEC-US-PAUSE-34ff4bdc614c2ff10913ce2ec54040f2f48ec2cb31f101d63109552ad8c2c3b1",
+    "primary": "United States Settlement and Claims Commission",
+    "aliases": [
+      "Settlement Claims Commission (SCC)"
+    ]
+  },
+  {
+    "title": "Tudor Capital Group, a.k.a. Tudor Capital Global Financial Consultancy Firm",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/tudor-capital-group-aka-tudor-capital-global-financial-consultancy-firm",
+    "entity_id": "SEC-US-PAUSE-56758829de47f798779fdfd5e0331bdf63e6c010e376b7a9f3544683dcb67375",
+    "primary": "Tudor Capital Group",
+    "aliases": [
+      "Tudor Capital Global Financial Consultancy Firm"
+    ]
+  },
+  {
+    "title": "The Firm Inc., a.k.a. The Ottoman Group",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/firm-inc-aka-ottoman-group",
+    "entity_id": "SEC-US-PAUSE-45f5764784d599741846928953999d408e6c8d1021b3d4d0366f967f8585c13c",
+    "primary": "The Firm Inc.",
+    "aliases": [
+      "The Ottoman Group"
+    ]
+  },
+  {
+    "title": "Sungold Investments, a.k.a. Sungold Escrow",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/sungold-investments-aka-sungold-escrow",
+    "entity_id": "SEC-US-PAUSE-605dd1a70b96df9c1d549acb0ba40bc11e32d35b031ea7cc2547d3be47c6e67e",
+    "primary": "Sungold Investments",
+    "aliases": [
+      "Sungold Escrow"
+    ]
+  },
+  {
+    "title": "Pierce Morgan Trust Management, LLC, a.k.a. Pierce Morgan Capital Management",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/pierce-morgan-trust-management-llc-aka-pierce-morgan-capital-management",
+    "entity_id": "SEC-US-PAUSE-c5bbf052993731725e20ee6557c4e69e3d6c99088843238e5fd97a2db535a5e9",
+    "primary": "Pierce Morgan Trust Management, LLC",
+    "aliases": [
+      "Pierce Morgan Capital Management"
+    ]
+  },
+  {
+    "title": "Peterson Capital Partners, Inc., a.k.a. Peterson Capital Partnership Inc.",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/peterson-capital-partners-inc-aka-peterson-capital-partnership-inc",
+    "entity_id": "SEC-US-PAUSE-5c307c190cc8f6d247aa04ca93c9c3b12d6234ede0e966c17fd2c6e94994b7b5",
+    "primary": "Peterson Capital Partners, Inc.",
+    "aliases": [
+      "Peterson Capital Partnership Inc."
+    ]
+  },
+  {
+    "title": "Peterson Advisors Limited, a.k.a. Peterson Consultancy",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/peterson-advisors-limited-aka-peterson-consultancy",
+    "entity_id": "SEC-US-PAUSE-c18b506c2892e58ba5fa1d974a49e6cf9cfcf22901373892367d3f5f2a284d12",
+    "primary": "Peterson Advisors Limited",
+    "aliases": [
+      "Peterson Consultancy"
+    ]
+  },
+  {
+    "title": "Parkbrook Capital Inc. aka Parkbrook Inc.",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/parkbrook-capital-inc-aka-parkbrook-inc",
+    "entity_id": "SEC-US-PAUSE-ec2b6ebd4a7fc67f203baac3d2a58b53753003f22fd73b991a8685803d4c74d5",
+    "primary": "Parkbrook Capital Inc.",
+    "aliases": [
+      "Parkbrook Inc."
+    ]
+  },
+  {
+    "title": "P.J. Solomon Securities LLC, a.k.a. P.J. Solomon LLC",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/pj-solomon-securities-llc-aka-pj-solomon-llc",
+    "entity_id": "SEC-US-PAUSE-7842a26a4507077fc8211fd3e26126b327d237fb9e926abe2cb0760a91999b77",
+    "primary": "P.J. Solomon Securities LLC",
+    "aliases": [
+      "P.J. Solomon LLC"
+    ]
+  },
+  {
+    "title": "NYSE Block Finance. Aka nyseplatform.com",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/nyse-block-finance-aka-nyseplatformcom",
+    "entity_id": "SEC-US-PAUSE-982a9e57306d6a87efbce50ccdbe3d2f697009a6133725f83bad09ed6f439ad7",
+    "primary": "NYSE Block Finance.",
+    "aliases": [
+      "nyseplatform.com"
+    ]
+  },
+  {
+    "title": "Morisson & Associates a.k.a. Morisson & Associates Law Firm & Consultancy",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/morisson-associates-aka-morisson-associates-law-firm-consultancy",
+    "entity_id": "SEC-US-PAUSE-2b89ee4da7931369ff2d599e5a78755ea9194dfe978601254ee9284f90a49159",
+    "primary": "Morisson & Associates",
+    "aliases": [
+      "Morisson & Associates Law Firm & Consultancy"
+    ]
+  },
+  {
+    "title": "International Investor Protection Coalition, a.k.a. IIP Coalition",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/international-investor-protection-coalition-aka-iip-coalition",
+    "entity_id": "SEC-US-PAUSE-64020993152a94a089b2055a7d2b5e9ecf66aa185e403f74f168259c774280db",
+    "primary": "International Investor Protection Coalition",
+    "aliases": [
+      "IIP Coalition"
+    ]
+  },
+  {
+    "title": "Hillton Stock Investment Limited, a.k.a. Hillton Stocks Investments",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/hillton-stock-investment-limited-aka-hillton-stocks-investments",
+    "entity_id": "SEC-US-PAUSE-f8cbb5719e0e59eae7d03d8bc09c93c75c31468f6c593a75517cf186ca77f60b",
+    "primary": "Hillton Stock Investment Limited",
+    "aliases": [
+      "Hillton Stocks Investments"
+    ]
+  },
+  {
+    "title": "Global Financial Corp. Worldwide, a.k.a. GFC Worldwide",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/global-financial-corp-worldwide-aka-gfc-worldwide",
+    "entity_id": "SEC-US-PAUSE-c731af63504102a73120245f20af0a0b5a760a4f47ff51b7a0d5246222b814f4",
+    "primary": "Global Financial Corp. Worldwide",
+    "aliases": [
+      "GFC Worldwide"
+    ]
+  },
+  {
+    "title": "GFC Worldwide, a.k.a. Global Financial Corp.",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/gfc-worldwide-aka-global-financial-corp",
+    "entity_id": "SEC-US-PAUSE-bcfb10430e4fc9ec222d2ae37f153567b1f33971cd48c7f516ce04c27554c94a",
+    "primary": "GFC Worldwide",
+    "aliases": [
+      "Global Financial Corp."
+    ]
+  },
+  {
+    "title": "First Prime Corporations, a.k.a. First Prime Corp.",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/first-prime-corporations-aka-first-prime-corp",
+    "entity_id": "SEC-US-PAUSE-091068858a5c03541416f973231ff7021f4e629305280ed1734353f9b7a41160",
+    "primary": "First Prime Corporations",
+    "aliases": [
+      "First Prime Corp."
+    ]
+  },
+  {
+    "title": "Europa Commodities, a.k.a. Europa Capital LLC",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/europa-commodities-aka-europa-capital-llc",
+    "entity_id": "SEC-US-PAUSE-51953d11e6713833619c0aa0b1cda15afb0b2110616521106919c23af3a202c8",
+    "primary": "Europa Commodities",
+    "aliases": [
+      "Europa Capital LLC"
+    ]
+  },
+  {
+    "title": "Dragon International, a.k.a. Dragon Mergers",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/dragon-international-aka-dragon-mergers",
+    "entity_id": "SEC-US-PAUSE-b91eb1a08bc03a67d748a73eb0bebd664b314821f9d311f19c757f30b751be7d",
+    "primary": "Dragon International",
+    "aliases": [
+      "Dragon Mergers"
+    ]
+  },
+  {
+    "title": "Diversified Portfolio Management Invest, a.k.a. DPM Invest",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/diversified-portfolio-management-invest-aka-dpm-invest",
+    "entity_id": "SEC-US-PAUSE-c4ccdec61f9f37a73f875c4311d3a3a44d21b243b599f358a4c3265c609f1c96",
+    "primary": "Diversified Portfolio Management Invest",
+    "aliases": [
+      "DPM Invest"
+    ]
+  },
+  {
+    "title": "CIG LLC, a.k.a. Commerce Investments Group LLC",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/cig-llc-aka-commerce-investments-group-llc",
+    "entity_id": "SEC-US-PAUSE-9bf6a113c8f29f367c7e19757a9e323ce2391cb5ddc01c8439748aafafc9a9da",
+    "primary": "CIG LLC",
+    "aliases": [
+      "Commerce Investments Group LLC"
+    ]
+  },
+  {
+    "title": "Asia Pacific Group, a.k.a. Asia Pacific Financial Management Group Inc.",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/asia-pacific-group-aka-asia-pacific-financial-management-group-inc",
+    "entity_id": "SEC-US-PAUSE-a8704c05e997e7f1300b77a0774248e69b0a47e8c785a531f30909d9d28cbf8d",
+    "primary": "Asia Pacific Group",
+    "aliases": [
+      "Asia Pacific Financial Management Group Inc."
+    ]
+  },
+  {
+    "title": "Anderson, Franklin, Sullivan Partners Ltd., a.k.a. AFS Partners Ltd.",
+    "detail_url": "https://www.sec.gov/enforcement-litigation/public-alerts-unregistered-soliciting-entities/anderson-franklin-sullivan-partners-ltd-aka-afs-partners-ltd",
+    "entity_id": "SEC-US-PAUSE-676f547a8d0f6378568eb9771b6b8d3905cd982c3ab3cffd9e31bb7d01e24f75",
+    "primary": "Anderson, Franklin, Sullivan Partners Ltd.",
+    "aliases": [
+      "AFS Partners Ltd."
+    ]
+  }
+]

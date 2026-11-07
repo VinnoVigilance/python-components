@@ -6,6 +6,62 @@ language, concrete examples. Companion to the layering rules in `CLAUDE.md`.
 
 ---
 
+## 0. Choose the ingestion method before implementation
+
+For every new source, inspect the available ingestion methods before choosing
+one. Prefer the simplest reliable method that captures the complete, current
+dataset and required profile details. Do not start browser or crawler work just
+because the user supplied a webpage URL.
+
+Check in this order:
+
+1. **Official structured data:** look for JSON endpoints, documented or
+   page-used APIs, and official machine-readable downloads such as JSON, XML,
+   CSV, or XLSX. Inspect page scripts and relevant network requests when useful.
+   A complete, current structured feed is preferred over extracting HTML.
+2. **Direct HTTP HTML:** inspect the server response for the roster and profile
+   contents. Reuse the downloader and configurable spider if the required data
+   is already present without executing JavaScript.
+3. **Browser rendering:** use it when JavaScript or interaction is required to
+   obtain data that cannot be collected from a usable structured endpoint or
+   the server's HTML response.
+4. **Bypass collection:** use the existing bypass transport when source
+   protection prevents the simpler acquisition methods. Protection handling
+   can also be needed for an API; it is a transport concern, not a reason to
+   stop preferring complete structured data.
+
+JSON is a data format; an API is a software interface that may return JSON,
+XML, HTML, or another format. A `.json` suffix is not required for a JSON
+endpoint. An API response containing an HTML string still needs HTML extraction.
+Official downloadable files may be the best source; use PDF extraction, and
+OCR for image-only documents, when that is where the required data is published.
+
+Before accepting an endpoint or extraction method:
+
+- Compare record coverage and a few current names, roles, and assignments with
+  the published source. Check pagination, active filters, continuation links,
+  and profile-only details. HTTP 200 alone does not establish completeness.
+- Inspect the actual response fields and values. Distinguish missing source
+  data from failed acquisition, empty metadata fields, stale feeds, and HTML
+  challenge pages returned with a successful status code.
+- Evaluate identifiers, update information, access requirements, existing
+  pipeline support, request volume, and maintenance cost. A source ID may
+  identify a page or position rather than a person. Do not assume it is a
+  stable person identifier.
+- Use a small hybrid only when needed: for example, a complete API roster plus
+  HTTP biographies. Preserve which source supplied conflicting values. Do not
+  silently prefer a stale endpoint or lose people to simplify integration.
+- Save the checked endpoints, observed coverage, selected method, rejected
+  alternatives, and relevant limitations in the ticket's source notes. Explain
+  the decision before implementing it. Report speed as measured or estimated;
+  fewer implementation steps do not prove faster runtime.
+
+For PDG-100, the Officers JSON endpoint returned 24 records while the requested
+governance page listed 25. The API also disagreed on some offices and did not
+provide the full biographies. The complete governance JSON returned HTML inside
+a field. Direct HTTP therefore provided the simplest complete integration with
+the existing pipeline. See `docs/PDG-100-bsp-senior-officials.md` for evidence.
+
 ## 1. How a crawler list is wired
 
 Three files, one job each:

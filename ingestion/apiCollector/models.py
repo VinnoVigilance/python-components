@@ -24,6 +24,7 @@ class ApiCollectorTask:
     params: Dict[str, Any] = field(default_factory=dict)
     param_variants: List[Dict[str, Any]] = field(default_factory=list)
     headers: Dict[str, str] = field(default_factory=dict)
+    page_token: Dict[str, Any] = field(default_factory=dict)
     timeout: int = 30
     retry: int = 3
     retry_delay_seconds: float = 1.0
@@ -40,6 +41,7 @@ class ApiCollectorTask:
     dedup_path: Optional[str] = None
     faceting: Dict[str, Any] = field(default_factory=dict)
     record_id_path: Optional[str] = None
+    endpoints: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "ApiCollectorTask":
@@ -61,6 +63,7 @@ class ApiCollectorTask:
             params=api_config.get("params", {}),
             param_variants=api_config.get("param_variants", []),
             headers=api_config.get("headers", {}),
+            page_token=api_config.get("page_token", {}),
             timeout=api_config.get("timeout", 30),
             retry=api_config.get("retry", 3),
             retry_delay_seconds=api_config.get(
@@ -84,4 +87,5 @@ class ApiCollectorTask:
             record_shape=api_config.get("record_shape", {}),
             dedup_path=api_config.get("dedup_path"),
             record_id_path=api_config.get("record_id_path"),
+            endpoints=api_config.get("endpoints", []),
         )

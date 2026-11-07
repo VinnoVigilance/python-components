@@ -25,6 +25,7 @@ from transforms.searchEnrichment import (
     detect_script,
     canonicalize_script,
     country_to_iso2,
+    country_code_to_name,
     normalize_number,
 )
 
@@ -344,6 +345,7 @@ _SEARCH_TRANSFORMS = {
     "SCRIPT": detect_script,
     "CANONICAL_SCRIPT": canonicalize_script,
     "COUNTRY_CODE": country_to_iso2,
+    "COUNTRY_NAME": country_code_to_name,
     "NORMALIZE_NUMBER": normalize_number,
     "GENERATE_MEDIA_SUMMARY": generate_media_summary_handler,
 }
@@ -597,23 +599,22 @@ def _hold_override(entity, cfg):
 
 
 def _strip_html(value):
-    """Remove HTML tags and unescape entities from a single string.
-
-    Order matters: entities are unescaped **first** (``&amp;`` -> ``&``), then
-    tags are stripped. Some sources double-encode markup (a literal
-    ``&lt;p&gt;`` sitting inside real ``<p>`` tags); unescaping first turns that
-    back into a ``<p>`` tag so the strip catches it too -- stripping first would
-    leave the resurrected tag behind. Tags become a space (not "") so block
-    boundaries like ``</p><p>`` don't glue words together; runs of whitespace
-    then collapse to one. Anything that isn't a string passes through untouched.
-    """
+    """Decode entities, strip markup and invisible artifacts, and normalize spaces."""
     if not isinstance(value, str):
         return value
 
     unescaped = html.unescape(value)
     without_tags = re.sub(r"<[^>]+>", " ", unescaped)
-    collapsed = re.sub(r"\s+", " ", without_tags)
+    without_formatting = without_tags.replace("\u200b", "").replace("\ufeff", "")
+    collapsed = re.sub(r"\s+", " ", without_formatting)
     return collapsed.strip()
+
+
+def _sanitize_url(value):
+    """Decode HTML and remove markup without changing whitespace inside a URL."""
+    unescaped = html.unescape(value)
+    without_tags = re.sub(r"<[^>]+>", " ", unescaped)
+    return without_tags.replace("\u200b", "").replace("\ufeff", "").strip()
 
 
 def sanitize_html_handler(entity, rule, config=None):
@@ -628,11 +629,16 @@ def sanitize_html_handler(entity, rule, config=None):
     DEDUPLICATE so two texts that differ only in markup collapse to one.
     """
     path = str(rule["condition_path"])
+    use_url_cleanup = bool(
+        config and config.get("preserve_url_whitespace")
+        and path in {"Attachments[].URL", "URLs[].URL"}
+    )
+    clean_value = _sanitize_url if use_url_cleanup else _strip_html
     if "[]" not in path:
         parent_key, _, leaf = path.rpartition(".")
         parent = entity.get(parent_key) if parent_key else entity
         if isinstance(parent, dict) and isinstance(parent.get(leaf), str):
-            parent[leaf] = _strip_html(parent[leaf])
+            parent[leaf] = clean_value(parent[leaf])
         return
 
     source_list, source_leaf = _split_array_path(path)
@@ -647,7 +653,7 @@ def sanitize_html_handler(entity, rule, config=None):
 
         value = item.get(source_leaf)
         if isinstance(value, str):
-            item[source_leaf] = _strip_html(value)
+            item[source_leaf] = clean_value(value)
 
 
 HANDLERS = {

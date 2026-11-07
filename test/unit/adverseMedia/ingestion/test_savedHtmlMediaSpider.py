@@ -575,7 +575,11 @@ def test_media_details_are_saved_as_individual_files(
         "is_known",
         "detail_file_path",
         "extracted",
+        "discovery_retry_key",
     }
+
+    assert results[0]["discovery_retry_key"] is None
+    assert results[1]["discovery_retry_key"] is None
 
     assert results[0][
         "record_key"

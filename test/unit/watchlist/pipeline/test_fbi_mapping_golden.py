@@ -6,7 +6,7 @@ of them are protected by the shape-only conformance test:
 
   * Identifiers -- ONE canonical array carries TWO different source fields
     (``uid`` and ``ncic``), distinguished only by their ``Note``.
-  * Comments[].text -- pulled from THREE raw fields (``description * caution *
+  * Comments[].Text -- pulled from THREE raw fields (``description * caution *
     details``) and HTML-stripped by the post-norm ``SANITIZE_HTML`` rule.
   * additionalInfo[] -- a ``*`` multi-branch of Type/Value pairs where branches
     whose value is empty (Warning/Reward/Build/... on this record) are DROPPED.
@@ -123,11 +123,11 @@ class TestFbiMappingGolden:
     def test_comments_come_from_the_three_fields_without_html(self, primary):
         # description -> Summary, caution/details -> Remarks; the caution field
         # carried <p> HTML in the raw record and must be stripped.
-        types = [c["type"] for c in primary["Comments"]]
+        types = [c["Type"] for c in primary["Comments"]]
         assert types == ["Summary", "Remarks"]
         for c in primary["Comments"]:
-            assert not _HTML_TAG.search(c["text"]), (
-                f"HTML leaked into a comment: {c['text']!r}"
+            assert not _HTML_TAG.search(c["Text"]), (
+                f"HTML leaked into a comment: {c['Text']!r}"
             )
 
 
@@ -137,7 +137,7 @@ class TestFbiCrossRecordInvariants:
     def test_no_html_in_any_comment(self):
         for uid, rec in _records_by_id().items():
             for c in rec.get("Comments", []):
-                assert not _HTML_TAG.search(c.get("text", "")), (
+                assert not _HTML_TAG.search(c["Text"]), (
                     f"{uid}: HTML survived in a comment -- check the "
                     f"SANITIZE_HTML rule in postNormalization.xlsx"
                 )

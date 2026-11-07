@@ -54,7 +54,7 @@ def _choose_sources(kind_label: str, names: list[str], pending: list[str]) -> tu
 
 
 def _run_watchlists() -> dict:
-    from jobs.watchlistPiplineJob import run_watchlist_job
+    from jobs.watchlistPipelineJob import run_watchlist_job
     from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
     from repositories import jobStateRepository
 

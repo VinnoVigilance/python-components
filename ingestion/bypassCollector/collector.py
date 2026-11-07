@@ -199,12 +199,21 @@ class BypassCollector:
                 headless=bypassConfig.get("headless", False),
                 successCriteria=bypassConfig.get(
                     "success_criteria",
-                    []
+                    [],
                 ),
                 timeoutSeconds=bypassConfig.get(
                     "timeout_seconds",
-                    90
-                )
+                    90,
+                ),
+                navigationMode=bypassConfig.get(
+                    "navigation_mode",
+                    "safe_get",
+                ),
+                downloadPdfs=any(
+                    action.get("action") == "save_pdf"
+                    and action.get("download_mode") == "navigation"
+                    for action in bypassConfig.get("actions", [])
+                ),
             )
         
         elif engineType == "playwright":

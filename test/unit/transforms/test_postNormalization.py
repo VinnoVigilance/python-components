@@ -30,6 +30,27 @@ from transforms.postNormalization import (
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("field", ["Attachments", "URLs"])
+def test_url_cleanup_preserves_internal_whitespace_only_when_enabled(field):
+    original = "  https://example.test/a  b?x=1&amp;y=2\u200b  "
+    enabled = {field: [{"URL": original}]}
+    default = {field: [{"URL": original}]}
+    rule = {"condition_path": f"{field}[].URL"}
+
+    sanitize_html_handler(enabled, rule, {"preserve_url_whitespace": True})
+    sanitize_html_handler(default, rule, {})
+
+    assert enabled[field][0]["URL"] == "https://example.test/a  b?x=1&y=2"
+    assert default[field][0]["URL"] == "https://example.test/a b?x=1&y=2"
+
+
+def test_url_setting_does_not_change_text_cleanup():
+    entity = {"Content": {"Title": "<b>One  Two</b>"}}
+    sanitize_html_handler(entity, {"condition_path": "Content.Title"},
+                          {"preserve_url_whitespace": True})
+    assert entity["Content"]["Title"] == "One Two"
+
+
 class TestDateWindowStatusHandler:
     RULE = {
         "condition_path": "Measures[].EffectiveDate",
@@ -139,6 +160,25 @@ def test_split_array_path():
 
 
 class TestSearchEnrichHandler:
+    def test_country_name_enrichment_preserves_existing_names(self, monkeypatch):
+        monkeypatch.setattr("transforms.searchEnrichment._load_valid_iso2",
+                            lambda: {"SD", "NA"})
+        entity = {"Countries": [
+            {"CountryCode": "SD", "CountryName": ""},
+            {"CountryCode": "NA"},
+            {"CountryCode": "SD", "CountryName": "Source-provided name"},
+            {"CountryCode": "ZZ", "CountryName": ""},
+        ]}
+        search_enrich_handler(entity, {
+            "condition_path": "Countries[].CountryCode",
+            "condition": "IF_EMPTY",
+            "target_path": "Countries[].CountryName",
+            "action": "COUNTRY_NAME",
+        })
+        assert [c["CountryName"] for c in entity["Countries"]] == [
+            "Sudan", "Namibia", "Source-provided name", "",
+        ]
+
     def test_normalize_writes_computed_field(self):
         entity = {"Names": [{"Name": "Frank Müller"}]}
         rule = {
@@ -302,6 +342,17 @@ class TestEmptyDependencyHandler:
 
 
 class TestSanitizeHtmlHandler:
+    @pytest.mark.parametrize(
+        "text",
+        ["<p>Central\u200b Bank\ufeff</p>", "<p>Central&#8203; Bank&#65279;</p>"],
+    )
+    def test_removes_literal_and_entity_encoded_invisible_artifacts(self, text):
+        assert _strip_html(text) == "Central Bank"
+
+    def test_preserves_language_significant_joiners(self):
+        text = "می\u200cرود ا\u200dب"
+        assert _strip_html(f"<p>{text}</p>") == text
+
     def test_removes_tags_and_unescapes_entities(self):
         assert (
             _strip_html("<p>Wanted for <b>fraud</b> &amp; theft.</p>")

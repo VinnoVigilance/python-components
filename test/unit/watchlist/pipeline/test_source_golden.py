@@ -36,6 +36,10 @@ FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "sources"
 
 # list_name -> committed sample file (mirrors test_source_conformance.SAMPLES).
 SAMPLES = {
+    "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022": "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022_raw_sample.jsonl",
+    "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY_raw_sample.jsonl",
+    "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES": "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES_raw_sample.jsonl",
+    "BSP_SENIOR_OFFICIALS": "BSP_SENIOR_OFFICIALS_raw_sample.jsonl",
     "OFAC-SDN": "OFAC-SDN_raw_sample.jsonl",
     "OFAC-NON-SDN": "OFAC-NON-SDN_raw_sample.jsonl",
     "UKSL": "UKSL_raw_sample.jsonl",
@@ -50,6 +54,7 @@ SAMPLES = {
     "FBI-WANTED": "FBI-WANTED_raw_sample.jsonl",
     "DMW-RECRUITMENT-AGENCIES": "DMW-RECRUITMENT-AGENCIES_raw_sample.jsonl",
     "INTERPOL-RED-NOTICES": "INTERPOL-RED-NOTICES_raw_sample.jsonl",
+    "INTERPOL_UNSC_SPECIAL_NOTICES": "INTERPOL_UNSC_SPECIAL_NOTICES_raw_sample.jsonl",
     "GPPB-BLACKLISTED-ENTITIES": "GPPB-BLACKLISTED-ENTITIES_raw_sample.jsonl",
     "COMELEC-2025-SENATORS": "COMELEC-2025-SENATORS_raw_sample.jsonl",
     "DILG-LOCAL-OFFICIALS": "DILG-LOCAL-OFFICIALS_raw_sample.jsonl",
@@ -65,6 +70,7 @@ SAMPLES = {
     "AFDB-DEBARRED-ENTITIES": "AFDB-DEBARRED-ENTITIES_raw_sample.jsonl",
     "CANADA_CONSOLIDATED_SANCTIONS": "CANADA_CONSOLIDATED_SANCTIONS_raw_sample.jsonl",
     "EBRD_INELIGIBLE_ENTITIES": "EBRD_INELIGIBLE_ENTITIES_raw_sample.jsonl",
+    "PNP_PRO9_MOST_WANTED_2024": "PNP_PRO9_MOST_WANTED_2024_raw_sample.jsonl",
 }
 
 # list_name -> the constant Sources[] fields every record of that list must carry.
@@ -73,11 +79,29 @@ SAMPLES = {
 # DNFBP -> "Regulatory".
 #
 # DatasetCategory may be a SET when a list is inherently more than one thing:
-# ATC is both a terrorism designation and a targeted financial sanction, mapped
-# with the `*` handler, so each record produces two Sources[] entries carrying
-# "Crime" and "Sanctions" respectively. A set expects that spread across the
-# entries; a plain string expects that single value on every entry.
+# A set expects the values spread across Sources[] entries; a plain string
+# expects that single value on every entry.
 GOLDEN = {
+    "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022", "SourceName": "PNP",
+    },
+    "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY", "SourceName": "HKPF",
+    },
+    "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES", "SourceName": "HKPF",
+    },
+    "BSP_SENIOR_OFFICIALS": {
+        "SourceType": "Official", "DatasetCategory": "PEP",
+        "ListName": "BSP_SENIOR_OFFICIALS", "SourceName": "BSP",
+    },
+    "INTERPOL_UNSC_SPECIAL_NOTICES": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "INTERPOL_UNSC_SPECIAL_NOTICES", "SourceName": "INTERPOL",
+    },
     "OFAC-SDN": {
         "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "OFAC-SDN", "SourceName": "OFAC",
@@ -115,7 +139,7 @@ GOLDEN = {
         "ListName": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS", "SourceName": "ATC",
     },
     "ATC-DESIGNATED-TERRORIST-GROUPS": {
-        "SourceType": "Official", "DatasetCategory": {"Crime", "Sanctions"},
+        "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "ATC-DESIGNATED-TERRORIST-GROUPS", "SourceName": "ATC",
     },
     "DNFBP": {
@@ -194,6 +218,10 @@ GOLDEN = {
         "SourceType": "Official", "DatasetCategory": "Regulatory",
         "ListName": "EBRD_INELIGIBLE_ENTITIES", "SourceName": "EBRD",
     },
+    "PNP_PRO9_MOST_WANTED_2024": {
+        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "ListName": "PNP_PRO9_MOST_WANTED_2024", "SourceName": "PNP",
+    },
 }
 
 
@@ -271,3 +299,31 @@ class TestSourceGolden:
             f"{list_name}: no Sources[] entry was produced for any sample record "
             f"-- the mapping's 'sources' group did not populate"
         )
+
+
+def test_pnp_pro9_2024_card_fields_survive_normalization():
+    records = _canonical_records("PNP_PRO9_MOST_WANTED_2024")
+    assert len(records) == 34
+    assert len({record["EntityId"] for record in records}) == 34
+    assert all(record["EntityType"] == "Individual" for record in records)
+    assert all(record["Sources"][0]["SourceURL"].endswith(
+        "/02-TMWP-PROVINCIAL-LEVEL.pdf"
+    ) for record in records)
+
+    by_name = {record["Names"][0]["Name"]: record for record in records}
+    antung = by_name["ANTUNG HASAN ASNALUL"]
+    assert {item["Type"]: item["Value"] for item in antung["additionalInfo"]} == {
+        "Offense": "MURDER",
+        "Case Reference": "32819",
+        "Crime Activity": (
+            "Laying of IED, Ambuscade, Illegal Drug Trade, "
+            "Extortion, Gun-for-Hire"
+        ),
+        "Issuing Unit": "ZCPO",
+        "List Level": "CITY",
+        "List Reference Year": "2024",
+    }
+    assert sum(
+        any(item["Type"] == "Crime Activity" for item in record["additionalInfo"])
+        for record in records
+    ) == 1

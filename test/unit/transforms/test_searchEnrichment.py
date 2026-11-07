@@ -16,6 +16,7 @@ from transforms.searchEnrichment import (
     _pycountry_iso2,
     canonicalize_script,
     country_to_iso2,
+    country_code_to_name,
     detect_script,
     normalize_number,
     normalize_text,
@@ -25,6 +26,22 @@ from transforms.searchEnrichment import (
 )
 
 pytestmark = pytest.mark.unit
+
+
+class TestCountryCodeToName:
+    @pytest.mark.parametrize("code,name", [("SD", "Sudan"), (" na ", "Namibia")])
+    def test_exact_allowed_code(self, code, name):
+        assert country_code_to_name(code, {"SD", "NA"}) == name
+
+    @pytest.mark.parametrize("code", [None, "", "Sudan", "SD,US", "ZZ", 123, []])
+    def test_invalid_input_is_not_guessed(self, code):
+        assert country_code_to_name(code, {"SD"}) == ""
+
+    def test_known_code_must_be_allowed(self):
+        assert country_code_to_name("SD", {"US"}) == ""
+
+    def test_allowed_code_without_library_name_stays_empty(self):
+        assert country_code_to_name("XK", {"XK"}) == ""
 
 
 class TestToEnglish:

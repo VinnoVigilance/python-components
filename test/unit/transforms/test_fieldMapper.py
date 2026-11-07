@@ -13,6 +13,8 @@ placeholder handling) that the engine relies on.
 import pytest
 
 from transforms.fieldMapper import (
+    ConcatPathHandler,
+    ConstantHandler,
     JsonPath,
     MappingEngine,
     Rule,
@@ -28,6 +30,46 @@ from transforms.fieldMapper import (
 )
 
 pytestmark = pytest.mark.unit
+
+
+class TestConcatPathLabels:
+    def _join(self, expression, item):
+        rule = Rule("Individual", "Identifiers[].Note", "string",
+                    "identifiers", "concat_path", expression)
+        return ConcatPathHandler().handle(rule, {}, item=item)
+
+    @pytest.mark.parametrize("empty", [None, "", "  ", [], {}, "N/A"])
+    def test_empty_paths_do_not_emit_literal_labels(self, empty):
+        assert self._join(
+            '"Citizenship:"|citizenship_id|"Place of issue:"|place_of_issue',
+            {"citizenship_id": empty},
+        ) == ""
+
+    def test_populated_paths_keep_literal_order(self):
+        assert self._join(
+            '"Citizenship:"|citizenship_id|"Place of issue:"|place_of_issue',
+            {"citizenship_id": "SD", "place_of_issue": "Khartoum"},
+        ) == "Citizenship: SD Place of issue: Khartoum"
+
+    def test_partial_data_keeps_existing_literal_behavior(self):
+        assert self._join(
+            '"Citizenship:"|citizenship_id|"Place of issue:"|place_of_issue',
+            {"citizenship_id": "SD"},
+        ) == "Citizenship: SD Place of issue:"
+
+    @pytest.mark.parametrize("value", [0, False, "NA"])
+    def test_real_values_are_not_treated_as_empty(self, value):
+        assert self._join('"Value:"|value', {"value": value}) == f"Value: {value}"
+
+    def test_literal_only_expression_is_unchanged(self):
+        assert self._join('"Known"|"reference"', {}) == "Known reference"
+
+
+@pytest.mark.parametrize("value", ["Official", '"Official"', "PEP", '"PEP"'])
+def test_constant_handler_accepts_quoted_and_unquoted_values(value):
+    rule = Rule("Individual", "Sources[].SourceType", "string",
+                "sources", "constant", value)
+    assert ConstantHandler().handle(rule, {}) == value.strip('"')
 
 
 class TestJsonPath:

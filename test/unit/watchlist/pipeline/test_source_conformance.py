@@ -40,6 +40,10 @@ FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "sources"
 
 # list_name -> committed sample file (one per source list).
 SAMPLES = {
+    "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022": "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022_raw_sample.jsonl",
+    "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY_raw_sample.jsonl",
+    "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES": "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES_raw_sample.jsonl",
+    "BSP_SENIOR_OFFICIALS": "BSP_SENIOR_OFFICIALS_raw_sample.jsonl",
     "OFAC-SDN": "OFAC-SDN_raw_sample.jsonl",
     "OFAC-NON-SDN": "OFAC-NON-SDN_raw_sample.jsonl",
     "UKSL": "UKSL_raw_sample.jsonl",
@@ -54,6 +58,7 @@ SAMPLES = {
     "FBI-WANTED": "FBI-WANTED_raw_sample.jsonl",
     "DMW-RECRUITMENT-AGENCIES": "DMW-RECRUITMENT-AGENCIES_raw_sample.jsonl",
     "INTERPOL-RED-NOTICES": "INTERPOL-RED-NOTICES_raw_sample.jsonl",
+    "INTERPOL_UNSC_SPECIAL_NOTICES": "INTERPOL_UNSC_SPECIAL_NOTICES_raw_sample.jsonl",
     "GPPB-BLACKLISTED-ENTITIES": "GPPB-BLACKLISTED-ENTITIES_raw_sample.jsonl",
     "COMELEC-2025-SENATORS": "COMELEC-2025-SENATORS_raw_sample.jsonl",
     "DILG-LOCAL-OFFICIALS": "DILG-LOCAL-OFFICIALS_raw_sample.jsonl",

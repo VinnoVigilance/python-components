@@ -1,0 +1,88 @@
+fetch_strategy: direct
+
+record_mode: list_detail
+
+discovery:
+  row_selector: "tr.pause-list-page-row"
+  detail_link_selector: "td.views-field-field-display-title a"
+  detail_link_attribute: href
+
+list_fields:
+  name:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string(
+        .//td[contains(@class, 'views-field-field-display-title')]/a
+      ))
+    value: text
+
+  alert_category:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string(
+        .//td[contains(@class, 'views-field-field-article-sub-type-secart')]
+      ))
+    value: text
+
+detail_fields:
+  name:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string(
+        //main//h2[contains(@class, 'usa-alert__heading')]
+      ))
+    value: text
+
+  alert_date_raw:
+    selector_type: xpath
+    selector: >-
+      normalize-space(string(
+        //main//div[contains(@class, 'field--name-field-publish-date')]
+      ))
+    value: text
+
+  contact_text:
+    selector_type: xpath
+    selector: >-
+      //main//div[
+        contains(@class, 'field--name-field-public-alerts-contact')
+      ]//text()
+    value: text
+    join: "\n"
+
+  contact_html:
+    selector_type: css
+    selector: "main .field--name-field-public-alerts-contact"
+    value: html
+
+  notes:
+    selector_type: xpath
+    selector: >-
+      //main//div[
+        contains(concat(' ', normalize-space(@class), ' '),
+                 ' field--name-body ')
+      ]//text()
+    value: text
+    join: " "
+
+record_id:
+  strategy: url_regex
+  source: detail_url
+  pattern: "/public-alerts-unregistered-soliciting-entities/([^/?#]+)/?$"
+
+pagination:
+  type: next_link
+  next_link_selector: "a[rel='next']"
+
+storage:
+  save_listing_page: true
+  save_detail_pages: true
+  detail_directory: "attachments/members"
+
+crawler_settings:
+  user_agent_env: SEC_HTTP_USER_AGENT
+  concurrent_requests_per_domain: 4
+  download_delay: 0.25
+  randomize_download_delay: false
+  retry_times: 2
+  retry_http_codes: [429, 500, 502, 503, 504]

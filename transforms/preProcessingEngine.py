@@ -733,6 +733,11 @@ class PreProcessingEngine:
             "SourceURL",
         )
 
+        when_field = config.get("when_field")
+        if when_field and not self._resolve_field(record, when_field):
+            record.setdefault(output_field, "")
+            return record
+
         template = config.get(
             "template"
         )
@@ -1099,6 +1104,49 @@ class PreProcessingEngine:
 
         return records
 
+    def expand_regex_records(self, records, config):
+        """Expand repeated named captures into records carrying their original source fields."""
+        pattern = re.compile(config["pattern"])
+        if not pattern.groupindex:
+            raise ValueError("expand_regex_records requires named capture groups")
+
+        expanded = []
+        for record in records:
+            value = str(self._resolve_field(record, config["input_field"]) or "")
+            matches = [
+                {key: (value or "").strip() for key, value in match.groupdict().items()}
+                for match in pattern.finditer(value)
+            ]
+            if not matches:
+                raise ValueError(
+                    f"No records matched {config['input_field']}; refusing to omit the source record"
+                )
+
+            boundary_pattern = config.get("boundary_pattern")
+            if boundary_pattern and len(list(re.finditer(boundary_pattern, value))) != len(matches):
+                raise ValueError("Not every source record boundary produced an extracted record")
+
+            reference_field = config.get("reference_field")
+            if reference_field:
+                references = self._resolve_field(record, reference_field) or []
+                if isinstance(references, dict):
+                    references = [references]
+                expected = {
+                    str(item.get(config["reference_key"]) or "").strip().casefold()
+                    for item in references
+                    if item.get(config["reference_key"])
+                }
+                actual = {item[config["match_key"]].casefold() for item in matches}
+                if len(actual) != len(matches):
+                    raise ValueError("Repeated source identity in extracted records")
+                if expected - actual:
+                    raise ValueError(f"Source names were not extracted: {sorted(expected - actual)}")
+
+            for match in matches:
+                expanded.append({**record, **match})
+
+        return expanded
+
     def split_field_regex(self, record, config):
         """
         Split one field into several sibling fields via a named-group regex.
@@ -1171,6 +1219,8 @@ class PreProcessingEngine:
 
         record_key = key_of(dig(record, config["key_field"]), config.get("key_pattern"))
         items = dig(record, config["list_field"]) or []
+        if isinstance(items, dict):
+            items = [items]
 
         chosen = None
 
@@ -1187,6 +1237,81 @@ class PreProcessingEngine:
         for item_subfield, output_field in config["outputs"].items():
             record[output_field] = (chosen or {}).get(item_subfield, default)
 
+        return record
+
+    def extract_labelled_ocr_fields(self, record, config):
+        """Extract labelled, vertically stacked fields in one OCR column.
+
+        input_field names a layout field under _ocr.fields. labels maps printed
+        labels to output fields, in their expected top-to-bottom order. Values
+        are assigned by geometry, including wrapped lines and values merged
+        with their label. Matching ignores label case. A missing separator is
+        accepted only at the label edge of the configured OCR column; a value
+        beginning with the same letters must not become another label.
+        Original OCR text/evidence is left untouched.
+        """
+        input_field = config["input_field"]
+        labels = config["labels"]
+        if (not isinstance(labels, dict) or not labels
+                or any(not isinstance(k, str) or not k.strip()
+                       or not isinstance(v, str) or not v.strip()
+                       for k, v in labels.items())
+                or len(set(labels.values())) != len(labels)
+                or len({label.casefold() for label in labels}) != len(labels)):
+            raise ValueError("OCR labels require distinct non-empty output fields.")
+        evidence = record.get("_ocr", {}).get("fields", {}).get(input_field, {})
+        lines = evidence.get("lines")
+        if not isinstance(lines, list) or not lines:
+            raise ValueError(f"Missing OCR column evidence: {input_field}")
+
+        def top(line):
+            return min(point[1] for point in line["box"])
+
+        def center(line):
+            return sum(point[1] for point in line["box"]) / 4
+
+        def start(line):
+            # Allow a value's baseline to differ slightly from its label.
+            height = max(point[1] for point in line["box"]) - top(line)
+            return top(line) - height / 4
+
+        ordered = sorted(lines, key=lambda line: (top(line), min(p[0] for p in line["box"])))
+        markers = []
+        for line in ordered:
+            text = line["text"].strip()
+            area = evidence.get("region")
+            left = min(point[0] for point in line["box"])
+            height = max(point[1] for point in line["box"]) - top(line)
+            at_label_edge = area is not None and left <= area[0] + max(height, 1)
+            for label in sorted(labels, key=len, reverse=True):
+                match = re.match(re.escape(label), text, flags=re.IGNORECASE)
+                if match is None or (area is not None and not at_label_edge):
+                    continue
+                remainder = text[match.end():]
+                if remainder and not remainder[0].isspace() and not at_label_edge:
+                    continue
+                markers.append((label, line, remainder.strip()))
+                break
+        if [label for label, _, _ in markers] != list(labels):
+            raise ValueError(f"Missing, repeated or reordered OCR labels: {input_field}")
+
+        marker_numbers = {line["line_number"] for _, line, _ in markers}
+        values = [line for line in ordered if line["line_number"] not in marker_numbers]
+        assigned = set()
+        outputs = {}
+        for index, (label, marker, inline_value) in enumerate(markers):
+            lower = start(marker)
+            upper = start(markers[index + 1][1]) if index + 1 < len(markers) else float("inf")
+            matches = [line for line in values if lower <= center(line) < upper]
+            assigned.update(line["line_number"] for line in matches)
+            parts = ([inline_value] if inline_value else []) + [line["text"] for line in matches]
+            value = " ".join(" ".join(parts).split())
+            if not value:
+                raise ValueError(f"Empty OCR value for {label!r} in {input_field}")
+            outputs[labels[label]] = value
+        if assigned != {line["line_number"] for line in values}:
+            raise ValueError(f"Unassigned OCR text in column: {input_field}")
+        record.update(outputs)
         return record
 
     def normalize_empty_fields(self, record, config):

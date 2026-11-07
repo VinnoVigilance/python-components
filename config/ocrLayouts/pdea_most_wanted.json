@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "layout_id": "PDEA_MOST_WANTED",
+  "layout_version": 1,
+  "description": "Extract primary names from poster labels. Preserve other label text as raw OCR. Do not interpret red crosses or derive person status.",
+  "require_all_pages": true,
+  "expected_page_count": 1,
+  "fields": {
+    "primary_name": {
+      "box": [
+        0,
+        0,
+        1,
+        0.3
+      ],
+      "mode": "single",
+      "required": true,
+      "review_below_score": 0.95
+    }
+  },
+  "pages": [
+    {
+      "page_number": 1,
+      "reference_size": [
+        1277,
+        1026
+      ],
+      "aspect_ratio_tolerance": 0.01,
+      "anchors": [
+        {
+          "box": [
+            0,
+            0,
+            1277,
+            85
+          ],
+          "text_equals": "WANTED DANGEROUS DRUG MANUFACTURERS AND TRAFFICKERS"
+        }
+      ],
+      "record_regions": [
+        {
+          "key": "r1c1",
+          "box": [
+            22,
+            213,
+            312,
+            278
+          ]
+        },
+        {
+          "key": "r1c2",
+          "box": [
+            339,
+            213,
+            636,
+            278
+          ]
+        },
+        {
+          "key": "r1c3",
+          "box": [
+            661,
+            213,
+            961,
+            278
+          ]
+        },
+        {
+          "key": "r1c4",
+          "box": [
+            983,
+            213,
+            1277,
+            278
+          ]
+        },
+        {
+          "key": "r2c1",
+          "box": [
+            22,
+            404,
+            312,
+            461
+          ]
+        },
+        {
+          "key": "r2c2",
+          "box": [
+            339,
+            404,
+            636,
+            461
+          ]
+        },
+        {
+          "key": "r2c3",
+          "box": [
+            661,
+            404,
+            961,
+            461
+          ]
+        },
+        {
+          "key": "r2c4",
+          "box": [
+            983,
+            404,
+            1277,
+            461
+          ]
+        },
+        {
+          "key": "r3c1",
+          "box": [
+            22,
+            588,
+            312,
+            648
+          ]
+        },
+        {
+          "key": "r3c2",
+          "box": [
+            339,
+            588,
+            636,
+            648
+          ]
+        },
+        {
+          "key": "r3c3",
+          "box": [
+            661,
+            588,
+            961,
+            648
+          ]
+        },
+        {
+          "key": "r3c4",
+          "box": [
+            983,
+            588,
+            1277,
+            648
+          ]
+        },
+        {
+          "key": "r4c1",
+          "box": [
+            22,
+            783,
+            312,
+            835
+          ]
+        },
+        {
+          "key": "r4c2",
+          "box": [
+            339,
+            783,
+            636,
+            835
+          ]
+        },
+        {
+          "key": "r5c1",
+          "box": [
+            22,
+            969,
+            312,
+            1026
+          ]
+        },
+        {
+          "key": "r5c2",
+          "box": [
+            339,
+            969,
+            636,
+            1026
+          ]
+        }
+      ]
+    }
+  ]
+}

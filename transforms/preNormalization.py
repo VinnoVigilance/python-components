@@ -1,3 +1,4 @@
+import html
 import json
 import re
 import pandas as pd
@@ -15,6 +16,13 @@ class BaseHandler:
     def normalize(self, value, rule):
 
         raise NotImplementedError
+
+
+class HtmlUnescapeHandler(BaseHandler):
+    """Decode one HTML entity layer; use target_field to keep the original."""
+
+    def normalize(self, value, rule):
+        return html.unescape(value) if isinstance(value, str) else value
 
 
 # =========================================================
@@ -186,6 +194,11 @@ class RegexExtractAllHandler(RegexExtractHandler):
     the engine's optional target_field column so the list lands on a new
     field instead of overwriting the field it was read from.
 
+    A list input is processed recursively and all matches are collected in
+    one flat list. This lets a second rule extract values from multiple text
+    sections produced by a first rule. Scalar inputs keep their original
+    matching behavior.
+
     Example (DTI-FTEB press releases):
 
     field "content.rendered" = '<p><img src="a.jpg"></p><p><img src="b.png"></p>'
@@ -195,6 +208,16 @@ class RegexExtractAllHandler(RegexExtractHandler):
     """
 
     def normalize(self, value, rule):
+
+        # A previous rule may have extracted several text sections. Apply
+        # this rule to every section and collect matches without serializing
+        # the Python list into text. String inputs retain the original path.
+        if isinstance(value, list):
+            return [
+                match
+                for item in value
+                for match in self.normalize(item, rule)
+            ]
 
         return self._find_matches(value, rule)
 
@@ -364,6 +387,39 @@ class FlattenDictHandler(BaseHandler):
 # Language Name Handler
 # =========================================================
 
+class FirstNonEmptyHandler(BaseHandler):
+
+    """Choose the first populated path in a ``|``-separated priority list.
+
+    The input must be an object. Paths are relative to that object; a rule
+    whose field is "$" reads the whole record. Always use target_field
+    to preserve the input object.
+    Only structural emptiness is tested. Placeholder words remain available
+    for the existing mapping cleanup. False and zero are real values.
+    """
+
+    def normalize(self, value, rule):
+        if not isinstance(value, dict):
+            return ""
+
+        paths = [part.strip() for part in str(rule or "").split("|")
+                 if part.strip()]
+        if not paths:
+            raise ValueError("first_non_empty requires at least one field path")
+
+        for path in paths:
+            for _, _, candidate in get_nested_values(value, path):
+                if candidate is None:
+                    continue
+                if isinstance(candidate, str) and not candidate.strip():
+                    continue
+                if isinstance(candidate, (list, dict)) and not candidate:
+                    continue
+                return candidate
+
+        return ""
+
+
 class LanguageNameHandler(BaseHandler):
 
     """Resolve an ISO 639-2 language code (e.g. FRE) to its English name via
@@ -385,6 +441,7 @@ class LanguageNameHandler(BaseHandler):
 # =========================================================
 
 HANDLERS = {
+    "html_unescape": HtmlUnescapeHandler(),
     "enum": EnumHandler(),
     "before_parenthesis": BeforeParenthesisHandler(),
     "remove_list_markers": RemoveListMarkersHandler(),
@@ -394,6 +451,7 @@ HANDLERS = {
     "split_pattern": SplitPatternHandler(),
     "flatten_dict": FlattenDictHandler(),
     "language_name": LanguageNameHandler(),
+    "first_non_empty": FirstNonEmptyHandler(),
 }
 
 
@@ -701,10 +759,15 @@ class PreNormalizationEngine:
             # Find Matches
             # -----------------------------------------
 
-            matches = get_nested_values(
-                normalized_json,
-                field,
-            )
+            if field == "$":
+                if not target_field:
+                    raise ValueError("A whole-record rule requires target_field")
+                matches = [(None, None, normalized_json)]
+            else:
+                matches = get_nested_values(
+                    normalized_json,
+                    field,
+                )
 
             if not matches:
 

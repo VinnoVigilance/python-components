@@ -303,6 +303,7 @@ def _download_source_file(
         source_name=config["source_name"],
         list_name=config.get("list_name", config["source_name"]),
         file_type=config.get("file_type"),
+        headers=config.get("download_headers", {}),
     )
 
     downloaded_file_path = downloader.download(download_task)

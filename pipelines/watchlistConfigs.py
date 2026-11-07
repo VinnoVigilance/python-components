@@ -1323,6 +1323,269 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "HKPF_WANTED_PERSONS_NATIONAL_SECURITY": {
+        "source_name": "HKPF",
+        "list_name": "HKPF_WANTED_PERSONS_NATIONAL_SECURITY",
+        "date_order": "DMY",
+        "download_method": "HTTPS",
+        "url": "https://www.police.gov.hk/info/appeals_public/nsc/en.xml",
+        "file_type": "xml",
+        "root_tags": ["case"],
+        "external_id_path": "id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "item.img",
+                    "pattern": r"(?s)^(?P<path>.+)$",
+                    "outputs": {"path": "photo_path"},
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "output_field": "photo_url",
+                    "template": "https://www.police.gov.hk{photo_path}",
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "output_field": "profile_url",
+                    "template": "https://www.police.gov.hk/ppp_en/06_appeals_public/nsc/{url}",
+                },
+            },
+        ],
+    },
+
+    "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES": {
+        "source_name": "HKPF",
+        "list_name": "HKPF_WANTED_PERSONS_WITH_REWARD_NOTICES",
+        "date_order": "DMY",
+        "download_method": "HTTPS",
+        "url": "https://www.police.gov.hk/info/appeals_public/wanted_persons/w_en.xml",
+        "file_type": "xml",
+        "root_tags": ["case"],
+        "external_id_path": "source_record_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "expand_regex_records",
+                "level": "dataset",
+                "config": {
+                    "input_field": "other",
+                    "pattern": (
+                        r"(?i)(?P<person_text>(?:Wanted Person(?:\s*\(\d+\)|\s+No\.\s*\d+)?"
+                        r"\s*:\s*(?:Male\s+)?|A\s+(?:Chinese\s+)?male\s+)"
+                        r"(?P<person_name>[^,;<\r\n]+),[^<]*)"
+                    ),
+                    "reference_field": "item",
+                    "reference_key": "name",
+                    "match_key": "person_name",
+                    "boundary_pattern": (
+                        r"(?i)(?:Wanted Person(?:\s*\(\d+\)|\s+No\.\s*\d+)?"
+                        r"\s*:\s*(?:Male\s+)?|A\s+(?:Chinese\s+)?male\s+)"
+                    ),
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["id", "person_name"],
+                    "output_field": "source_record_id",
+                    "prefix": "HKPF",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {"output_field": "entity_type", "value": "Individual"},
+            },
+            {
+                "handler": "resolve_reference",
+                "level": "record",
+                "config": {
+                    "key_field": "person_name",
+                    "list_field": "item",
+                    "item_key": "name",
+                    "outputs": {"img": "photo_path", "nameDesc": "person_label"},
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "output_field": "profile_url",
+                    "template": "https://www.police.gov.hk/ppp_en/06_appeals_public/wanted/{url}",
+                },
+            },
+            {
+                "handler": "build_url_from_template",
+                "level": "record",
+                "config": {
+                    "when_field": "photo_path",
+                    "output_field": "photo_url",
+                    "template": "https://www.police.gov.hk{photo_path}",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "person_text",
+                    "pattern": r"(?is).*?(?:born\s+(?:on|in)|Date of Birth)\s+(?P<dob>\d{1,2}\s+[A-Za-z]+\s+\d{4}|[A-Za-z]+\s+\d{4})",
+                    "outputs": {"dob": "birth_date_raw"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "person_text",
+                    "pattern": r"(?is).*?\balias\s+(?P<aliases>[^,<]+)",
+                    "outputs": {"aliases": "aliases_raw"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "person_text",
+                    "pattern": r"(?is).*?(?:Hong Kong Identity Card|HK Identity Card|HKID)\s+No\.?\s*:?\s*(?P<number>[^,<]+)",
+                    "outputs": {"number": "identity_card_raw"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "person_text",
+                    "pattern": r"(?is).*?\babout\s+(?P<height>\d+(?:\.\d+)?m)\s+tall",
+                    "outputs": {"height": "height_raw"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "reward",
+                    "pattern": r"(?i).*?(?P<amount>HK(?:D)?\$\s*[\d,]+(?:\.\d{2})?)",
+                    "outputs": {"amount": "reward_amount"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "other",
+                    "pattern": r"(?is).*?Case Reference:\s*(?P<reference>[^<\r\n]+)",
+                    "outputs": {"reference": "case_reference"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "other",
+                    "pattern": r"(?is).*?(?P<notice>Reward No\.\s*\d+\s+of\s+\d{4}(?:\s*\(Renewal\))?)",
+                    "outputs": {"notice": "reward_notice"},
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "other",
+                    "pattern": r"(?is).*?Date of Expiry:\s*(?P<expiry>\d{4}-\d{2}-\d{2})",
+                    "outputs": {"expiry": "reward_expiry_raw"},
+                },
+            },
+        ],
+    },
+
+    "INTERPOL_UNSC_SPECIAL_NOTICES": {
+        "source_name": "INTERPOL",
+        "list_name": "INTERPOL_UNSC_SPECIAL_NOTICES",
+        "date_order": "YMD",
+        "download_method": "API",
+        "url": "https://ws-public.interpol.int/notices/v1/un/persons",
+        "file_type": "jsonl",
+        "external_id_path": "source_record_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "preprocessing": [
+            {
+                "handler": "enrich_from_attachment",
+                "level": "record",
+                "relative_path_fields": ["attachments_dir"],
+                "config": {
+                    "attachments_dir": "attachments/members",
+                    "key_field": "entity_id",
+                },
+            },
+        ],
+        "api_config": {
+            "transport": "browser",
+            "bypass_config": {
+                "headless": False,
+                "warmup_url": "https://www.interpol.int/How-we-work/Notices/View-UN-Notices-Individuals",
+                "timeout_seconds": 90,
+                "min_request_interval": 0.3,
+            },
+            "endpoints": [
+                {
+                    "url": "https://ws-public.interpol.int/notices/v1/un/persons",
+                    "record_fields": {"record_type": "Individual"},
+                },
+                {
+                    "url": "https://ws-public.interpol.int/notices/v1/un/entities",
+                    "record_fields": {"record_type": "Entity"},
+                },
+            ],
+            "pagination": {
+                "type": "page",
+                "page_param": "page",
+                "size_param": "resultPerPage",
+                "page_size": 160,
+                "start_page": 1,
+            },
+            "faceting": {
+                "enabled": True,
+                "cap": 160,
+                "total_path": "total",
+                "facets": [
+                    {
+                        "type": "enum",
+                        "param": "unResolution",
+                        "values": [
+                            "1267", "1533", "1591", "1970", "1988", "2048",
+                            "2127", "2140", "2206", "2653", "2713", "751",
+                        ],
+                    },
+                    {
+                        "type": "enum",
+                        "param": "unReference",
+                        "values": list("0123456789"),
+                        "disjoint": False,
+                    },
+                ],
+            },
+            "items_path": "_embedded.notices",
+            "detail": {"url_path": "_links.self.href"},
+            "record_shape": {"id_path": "entity_id"},
+            "dedup_path": "source_record_id",
+            "throttle_delay": 0.3,
+            "write_mode": "list_detail",
+        },
+    },
+
      "INTERPOL-RED-NOTICES": {
             "source_name": "INTERPOL",
             "list_name": "INTERPOL-RED-NOTICES",
@@ -1925,5 +2188,692 @@ WATCHLIST_CONFIGS = {
     },
 ],
     },
+    "SC_PH_INCUMBENT_JUSTICES": {
+        "source_name": "SC-PH",
+        "list_name": "SC_PH_INCUMBENT_JUSTICES",
+        "date_order": "MDY",
+        "download_method": "BYPASS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://sc.judiciary.gov.ph/incumbent-justices/"
+        ),
+        "file_type": "html",
+        "source_config": (
+            "config/watchlistSources/"
+            "sc_ph_incumbent_justices.yaml"
+        ),
+        "external_id_path": "source_record_id",
+        "minimum_record_count": 10,
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "navigation_mode": "uc_open",
+            "headless": False,
+            "timeout_seconds": 120,
+            "success_criteria": [
+                "Incumbent Justices",
+            ],
+            "actions": [
+                {
+                    "action": "collect_popup_profiles",
+                    "link_selector": (
+                        "article a[href*='elementor-action']"
+                        "[href*='popup']"
+                    ),
+                    "key_attribute": "href",
+                    "click_mode": "javascript",
+                    "profile_selector": (
+                        "div[data-elementor-type='popup']"
+                    ),
+                    "close_selector": ".dialog-close-button",
+                    "required_selectors": [
+                        "h2",
+                        ".elementor-widget-text-editor",
+                        "img[src^='https://']",
+                    ],
+                    "container_id": "sc-ph-collected-profiles",
+                    "minimum_count": 15,
+                    "minimum_text_length": 100,
+                    "timeout_per_profile": 15,
+                },
+                {
+                    "action": "save_html",
+                    "filename_pattern": (
+                        "{source}_{list}_{timestamp}.html"
+                    ),
+                },
+            ],
+            "validation": {
+                "required_content": [
+                    "Incumbent Justices",
+                    'id="sc-ph-collected-profiles"',
+                    'data-collection-complete="true"',
+                ],
+                "min_size_bytes": 50000,
+            },
+        },
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "list.name_raw",
+                    "pattern": (
+                        r"^(?P<title>Chief Justice|Justice)"
+                        r"\s+(?P<name>.+)$"
+                    ),
+                    "outputs": {
+                        "title": "position_title",
+                        "name": "primary_name",
+                    },
+                },
+            },
+                        {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["primary_name"],
+                    "output_field": "source_record_id",
+                    "prefix": "SC-PH-JUSTICE",
+                },
+            },
+                        {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "jurisdiction_country",
+                    "value": "Philippines",
+                },
+            },
+            
+        ],
+    },
 
+    "SEC_US_PAUSE": {
+        "source_name": "SEC-US",
+        "list_name": "SEC_US_PAUSE",
+        "date_order": "MDY",
+        "download_method": "CRAWLER",
+        "url": (
+            "https://www.sec.gov/enforcement-litigation/"
+            "public-alerts-unregistered-soliciting-entities"
+        ),
+        "file_type": "html",
+        "external_id_path": "source_record_id",
+        "source_config": (
+            "config/watchlistSources/sec_us_pause.yaml"
+        ),
+        "minimum_record_count": 1000,
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["detail_url"],
+                    "output_field": "source_record_id",
+                    "prefix": "SEC-US-PAUSE",
+                },
+            },
+        ],
+    },
+
+
+    "BSP_SENIOR_OFFICIALS": {
+        "source_name": "BSP",
+        "list_name": "BSP_SENIOR_OFFICIALS",
+        "date_order": "DMY",
+        "download_method": "HTTPS",
+        "download_headers": {
+            "User-Agent": "python-requests/2.34.2",
+        },
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": (
+            "https://www.bsp.gov.ph/Pages/AboutTheBank/WhoWeAre/"
+            "OrganizationAndGovernance/GovernanceOfTheBank.aspx"
+        ),
+        "file_type": "html",
+        "source_config": (
+            "config/watchlistSources/bsp_senior_officials.yaml"
+        ),
+        "external_id_path": "source_record_id",
+        "minimum_record_count": 20,
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["list.name"],
+                    "output_field": "source_record_id",
+                    "prefix": "BSP-SENIOR-OFFICIAL",
+                },
+            },
+        ],
+    },
+
+    "CRIMESTOPPERS_UK_MOST_WANTED": {
+        "source_name": "CRIMESTOPPERS-UK",
+        "list_name": "CRIMESTOPPERS_UK_MOST_WANTED",
+        "download_method": "CRAWLER",
+        "url": (
+            "https://crimestoppers-uk.org/"
+            "give-information/most-wanted"
+        ),
+        "file_type": "html",
+        "date_order": "DMY",
+        "external_id_path": "source_record_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "source_config": (
+            "config/watchlistSources/"
+            "crimestoppers_uk_most_wanted.yaml"
+        ),
+        "attachments": [
+            {
+                "scope": "member",
+                "attachment_type": "DOCUMENT",
+                "local_path_field": "detail_file_path",
+                "source_url_field": "detail_url",
+            },
+        ],
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+        ],
+    },
+    
+    "PDEA_MOST_WANTED": {
+        "source_name": "PDEA",
+        "list_name": "PDEA_MOST_WANTED",
+        "download_method": "BYPASS",
+        "url": "https://pdea.gov.ph/most-wanted/",
+        "file_type": "image",
+        "date_order": "DMY",
+        "external_id_path": "unique_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 16,
+
+        "parser": {
+            "mode": "ocr",
+            "layout_path": "config/ocrLayouts/pdea_most_wanted.json",
+        },
+
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "challenge": "cloudflare",
+            "navigation_mode": "safe_get",
+            "headless": False,
+            "timeout_seconds": 120,
+            "success_criteria": [
+                "Most Wanted",
+            ],
+            "actions": [
+                {
+                    "action": "wait",
+                    "type": "selector",
+                    "selector": (
+                        "article#post-377 .entry-content "
+                        "img[alt='Most Wanted']"
+                    ),
+                    "timeout": 90,
+                },
+                {
+                    "action": "save_image",
+                    "image": {
+                        "selector_type": "xpath",
+                        "selector": (
+                            "//article[@id='post-377']"
+                            "//div[contains("
+                            "concat(' ', normalize-space(@class), ' '),"
+                            " ' entry-content ')]"
+                            "//img[@alt='Most Wanted']"
+                        ),
+                        "prefer": "largest_srcset",
+                    },
+                    "timeout_seconds": 45,
+                    "max_size_bytes": 10_000_000,
+                    "max_pixels": 40_000_000,
+                    "min_width": 1000,
+                    "min_height": 800,
+                    "allowed_formats": [
+                        "JPEG",
+                        "PNG",
+                        "WEBP",
+                    ],
+                },
+            ],
+            "validation": {
+                "min_size_bytes": 100_000,
+            },
+        },
+
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                    "overwrite": True,
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["primary_name"],
+                    "output_field": "unique_id",
+                    "prefix": "PDEA-MOST-WANTED",
+                },
+            },
+        ],
+
+        "attachments": [
+            {
+                "scope": "list",
+                "local_files": [
+                    "{source_stem}.source.html",
+                    "{source_stem}.manifest.json",
+                ],
+                "required": True,
+                "source_url": "https://pdea.gov.ph/most-wanted/",
+            },
+        ],
+    },
+
+    "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022": {
+        "source_name": "PNP",
+        "list_name": "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022",
+        "download_method": "BYPASS",
+        "url": (
+            "https://www.spd.ncrpo.pnp.gov.ph/wp-content/uploads/2024/02/"
+            "AsOfOct13_MWPs-with-Reward-criminality_1665621706.pdf"
+        ),
+        "file_type": "pdf",
+        "date_order": "DMY",
+        "external_id_path": "unique_id",
+        "schedule": "every_12_months",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 840,
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "navigation_mode": "safe_get",
+            "headless": False,
+            "timeout_seconds": 90,
+            "actions": [{
+                "action": "save_pdf",
+                "download_mode": "navigation",
+                "url": (
+                    "https://www.spd.ncrpo.pnp.gov.ph/wp-content/uploads/2024/02/"
+                    "AsOfOct13_MWPs-with-Reward-criminality_1665621706.pdf"
+                ),
+                "filename_pattern": "{source}_{list}_{timestamp}.pdf",
+                "timeout_seconds": 60,
+                "max_size_bytes": 10_000_000,
+            }],
+            "validation": {"min_size_bytes": 10_000},
+        },
+        "parser": {
+            "mode": "labeled_blocks",
+            "record_start": "NAME",
+            "label_font_pattern": r"(?i)bold",
+            "end_pattern": r"Thursday,|Summary",
+            "validation": {
+                "page_pattern": (
+                    r"(?m)^Thursday, (?P<reference_date_raw>13 October 2022) "
+                    r"Page \d+ of 97\s*$"
+                ),
+                "expected_page_fields": {"reference_date_raw": "13 October 2022"},
+                "summary_pattern": r"\((?P<record_count>\d+) detail records\)",
+            },
+            "columns": [
+                {
+                    "fields": [
+                        {"label": "NAME", "field": "name_raw"},
+                        {"label": "OFFENSE/S", "field": "offenses_raw", "required": True},
+                        {"label": "ISSUING COURT", "field": "issuing_court_raw"},
+                        {
+                            "label": "CRIMINAL CASE NO.", "field": "case_numbers_raw",
+                            "text_mode": "stored_characters",
+                            "layout_field": "case_numbers_layout_raw",
+                        },
+                    ],
+                },
+                {
+                    "fields": [
+                        {
+                            "label": "ALIAS", "field": "aliases_raw",
+                            "text_mode": "stored_characters",
+                            "layout_field": "aliases_layout_raw",
+                        },
+                        {"label": "REWARD", "field": "reward_raw", "required": True,
+                         "pattern": r"[\d,]+\.\d{2}"},
+                        {"label": "DILG MC NO.", "field": "dilg_mc_raw", "required": True},
+                        {"label": "REGION", "field": "region_raw", "required": True},
+                    ],
+                },
+            ],
+        },
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "name_type", "value": "Primary Name",
+                    "when_field": "name_raw",
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {"output_field": "entity_type", "value": "Individual", "overwrite": True},
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "identity_note",
+                    "value": "Primary name is blank in the source. Identity is based on the listed alias; no primary name has been inferred.",
+                    "when_field": "name_raw",
+                    "when_pattern": r"^\s*$",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    # Keep identity stable when extraction fixes alias wrapping.
+                    "fields": ["name_raw", "aliases_layout_raw", "dilg_mc_raw", "region_raw"],
+                    "output_field": "unique_id",
+                    "prefix": "PNP-REWARDS-CRIMINALITY-2022",
+                },
+            },
+        ],
+    },
+
+    "PNP_PRO9_MOST_WANTED_2024": {
+        "source_name": "PNP",
+        "list_name": "PNP_PRO9_MOST_WANTED_2024",
+        "download_method": "BYPASS",
+        "url": (
+            "https://pro9.pnp.gov.ph/wp-content/uploads/2024/08/"
+            "02-TMWP-PROVINCIAL-LEVEL.pdf"
+        ),
+        "file_type": "pdf",
+        "date_order": "DMY",
+        "external_id_path": "unique_id",
+        "schedule": "monthly",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 34,
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "challenge": "cloudflare",
+            "navigation_mode": "safe_get",
+            "headless": False,
+            "timeout_seconds": 90,
+            "actions": [
+                {
+                    "action": "save_pdf",
+                    "download_mode": "navigation",
+                    "url": (
+                        "https://pro9.pnp.gov.ph/wp-content/uploads/2024/08/"
+                        "02-TMWP-PROVINCIAL-LEVEL.pdf"
+                    ),
+                    "filename_pattern": "{source}_{list}_{timestamp}.pdf",
+                    "timeout_seconds": 60,
+                    "max_size_bytes": 10_000_000,
+                },
+            ],
+            "validation": {
+                "min_size_bytes": 10_000,
+            },
+        },
+        "parser": {
+            "mode": "image_cards",
+            "table_settings": {
+                "vertical_strategy": "lines_strict",
+                "horizontal_strategy": "lines_strict",
+            },
+            "record_pattern": r"(?i)Crime\s*Committed\s*:",
+            "page_pattern": (
+                r"(?m)^(?P<page_heading>(?:PROVINCIAL|CITY)\s+LEVEL\s*-\s*"
+                r"[^:\n]+:\s*TOP\s+10\s+MOST\s+WANTED\s+PERSON\s+CY\s+\d{4})\s*$"
+            ),
+            "caption_field": "name_raw",
+            "caption_font_pattern": r"(?i)bold",
+            "body_field": "details_raw",
+            "required_patterns": {
+                "details_raw": (
+                    r"(?is)(?:1\s*\.\s*)?Crime\s*Committed\s*:\s*.+?"
+                    r"\s*(?:2\s*\.\s*)?Criminal\s*Case(?:\s*(?:No|Nr)\.?)?\s*:\s*.+?"
+                    r"\s*(?:3\s*\.\s*)?Last\s*Known\s*Address\s*:\s*.+"
+                )
+            },
+        },
+        "preprocessing": [
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "page_heading",
+                    "pattern": (
+                        r"(?is)^(?P<list_level>PROVINCIAL|CITY)\s+LEVEL\s*-\s*"
+                        r"(?P<issuing_unit>[^:]+):.*?\bCY\s*(?P<reference_year>\d{4})\s*$"
+                    ),
+                    "outputs": {
+                        "list_level": "list_level_raw",
+                        "issuing_unit": "issuing_unit_raw",
+                        "reference_year": "reference_year_raw",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name_raw",
+                    "pattern": (
+                        r"(?is)^\s*(?P<primary_name>.+?)"
+                        r"(?:\s+A\.?\s*K\.?\s*A\.?\s+(?P<aliases>.+))?\s*$"
+                    ),
+                    "outputs": {
+                        "primary_name": "primary_name",
+                        "aliases": "aliases_raw",
+                    },
+                },
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "details_raw",
+                    "pattern": (
+                        r"(?is)^\s*(?:1\s*\.\s*)?Crime\s*Committed\s*:\s*(?P<offenses>.+?)"
+                        r"\s*(?:2\s*\.\s*)?Criminal\s*Case(?:\s*(?:No|Nr)\.?)?\s*:\s*"
+                        r"(?P<case_numbers>.+?)(?:\s*Crime\s*Activity\s*:\s*(?P<activity>.+?))?"
+                        r"\s*(?:3\s*\.\s*)?Last\s*Known\s*Address\s*:\s*(?P<address>.+?)\s*$"
+                    ),
+                    "outputs": {
+                        "offenses": "offenses_raw",
+                        "case_numbers": "case_numbers_raw",
+                        "activity": "crime_activity_raw",
+                        "address": "last_known_address_raw",
+                    },
+                },
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                    "overwrite": True,
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["primary_name", "issuing_unit_raw"],
+                    "output_field": "unique_id",
+                    "prefix": "PNP-PRO9-MOST-WANTED",
+                },
+            },
+        ],
+    },
+
+    "PNP_SDSPPO_MOST_WANTED": {
+        "source_name": "PNP",
+        "list_name": "PNP_SDSPPO_MOST_WANTED",
+        "download_method": "BYPASS",
+        "url": "https://sdsppo.pro13.pnp.gov.ph/?page_id=288",
+        "file_type": "html",
+        "date_order": "DMY",
+        "external_id_path": "unique_id",
+        "schedule": "weekly",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 18,
+        "parser": {
+            "mode": "ocr",
+            "layout_path": "config/ocrLayouts/pnp_sdsppo_most_wanted.json",
+            "engine": {
+                "use_angle_classification": False
+            },
+            "document": {
+                "recognition_scale": 2
+            }
+        },
+        "bypass_config": {
+            "engine": "stealth_browser",
+            "challenge": "cloudflare",
+            "navigation_mode": "safe_get",
+            "headless": False,
+            "timeout_seconds": 90,
+            "actions": [
+                {
+                    "action": "save_html",
+                    "embed_images": {
+                        "content_selector": "article#post-288 .entry-content",
+                        "expected_count": 4,
+                        "timeout_seconds": 30
+                    }
+                }
+            ],
+            "validation": {
+                "min_size_bytes": 100000
+            }
+        },
+        "preprocessing": [
+            {
+                "handler": "extract_labelled_ocr_fields",
+                "level": "record",
+                "config": {
+                    "input_field": "left_column_lines",
+                    "labels": {
+                        "REGION": "region_raw",
+                        "NAME": "name_raw",
+                        "JOR NO.": "joint_order_raw",
+                        "POSITION": "position_raw",
+                        "CC NO.": "case_numbers_raw"
+                    }
+                }
+            },
+            {
+                "handler": "extract_labelled_ocr_fields",
+                "level": "record",
+                "config": {
+                    "input_field": "right_column_lines",
+                    "labels": {
+                        "ALIAS": "aliases_raw",
+                        "REWARD": "reward_raw",
+                        "OFFENSE/S": "offenses_raw",
+                        "ISSUING COURT": "issuing_court_raw"
+                    }
+                }
+            },
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "name_raw",
+                    "pattern": "(?s)^\\s*(?P<primary_name>[^/]+?)(?:\\s*/\\s*(?P<alternate_name>.+))?\\s*$",
+                    "outputs": {
+                        "primary_name": "primary_name",
+                        "alternate_name": "alternate_name_raw"
+                    }
+                }
+            },
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                    "overwrite": True
+                }
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "primary_name"
+                    ],
+                    "output_field": "unique_id",
+                    "prefix": "PNP-SDSPPO-MOST-WANTED"
+                }
+            }
+        ]
+    },
 }

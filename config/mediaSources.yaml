@@ -10,6 +10,209 @@ global:
 
 
 sources:
+  ONENEWS_PH_POLITICS_AND_OTHER_NEWS_FEATURES:
+    enabled: true
+    active: true
+    source_name: ONENEWS_PH
+    dataset_name: ONENEWS_PH_POLITICS_AND_OTHER_NEWS_FEATURES
+    dataset_category: Media
+    schedule: daily
+    date_order: YMD
+    preserve_url_whitespace: true
+    source_page_url: https://www.onenews.ph/categories/3_politics-and-other-news-features
+    url: https://onecms.cignal.tv/services/api/Articles/GetByCategoryWithPagination
+    acquisition:
+      type: api
+      download_method: API
+    discovery:
+      policy: stop_after_known
+      threshold: 20
+    api_config:
+      params:
+        verticalid: 2
+        categoryid: 3
+        subverticalid: ""
+      pagination:
+        type: page
+        page_param: pageno
+        size_param: pagerow
+        page_size: 10
+        start_page: 1
+      items_path: ""
+      write_mode: record_files
+      record_id_path: id
+      transport: requests
+      timeout: 30
+      throttle_delay: 1
+      page_token:
+        url: https://www.onenews.ph/categories/3_politics-and-other-news-features
+        pattern: 'auth:\{token:"([^"]+)"'
+    parser:
+      type: json
+    identity:
+      external_id:
+        field: id
+      record_key:
+        fields: [source_name, dataset_name, id]
+    preprocessing:
+      - handler: build_url_from_template
+        level: record
+        config:
+          output_field: SourceURL
+          template: "https://www.onenews.ph/articles/{slug}"
+
+  US_TREASURY_PRESS_RELEASES:
+    enabled: true
+    active: true
+    source_name: US_TREASURY
+    dataset_name: US_TREASURY_PRESS_RELEASES
+    dataset_category: Media
+    schedule: daily
+    date_order: MDY
+    source_page_url: https://home.treasury.gov/news/press-releases/
+    url: https://home.treasury.gov/news/press-releases/
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 1
+        randomize_download_delay: true
+        retry_times: 3
+
+    discovery:
+      strategy: json_manifest
+      policy: stop_after_known
+      threshold: 10
+      start_url: https://home.treasury.gov/news-data/press-releases/manifest.json
+      json_manifest: {}
+
+    extraction:
+      SourceURL:
+        source: response_url
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: '(?:/news/press-releases/|(?<=\.gov)/(?!news/press-releases/))([^?#]+?)/?(?:[?#].*)?$'
+      Title:
+        selector: '#block-hamilton-page-title h2'
+        output: text
+      date.originalValue:
+        selector: '.field--name-field-news-publication-date time'
+        output: text
+      BodyText:
+        selector: '.field--name-field-news-body'
+        output: text
+      PdfUrls:
+        selector: '.field--name-field-news-body a[href*=".pdf"], .field--name-field-news-body a[href*=".PDF"]'
+        output: attribute
+        attribute: href
+        multiple: true
+
+    parser:
+      type: html
+    identity:
+      external_id:
+        field: SourceRecordId
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
+  PANAY_NEWS:
+    enabled: true
+    active: true
+    source_name: PANAY_NEWS
+    dataset_name: PANAY_NEWS
+    dataset_category: Media
+    schedule: daily
+    date_order: YMD
+    source_page_url: https://www.panaynews.net/category/news/
+    url: https://www.panaynews.net/wp-json/wp/v2/posts
+
+    acquisition:
+      type: api
+      download_method: API
+
+    discovery:
+      policy: stop_after_known
+      threshold: 10
+
+    api_config:
+      params:
+        # Iloilo, Metro Iloilo, Metro Bacolod, Negros, Nation, Region.
+        categories: "32,39,109,41,40,65"
+        _embed: 1
+        orderby: date
+        order: desc
+      pagination:
+        type: page
+        page_param: page
+        size_param: per_page
+        page_size: 20
+        start_page: 1
+      items_path: ""
+      write_mode: record_files
+      record_id_path: id
+      transport: browser
+      throttle_delay: 1
+      bypass_config:
+        warmup_url: https://www.panaynews.net/
+        headless: true
+        timeout_seconds: 90
+        fetch_timeout_ms: 60000
+        min_request_interval: 1
+
+    parser:
+      type: json
+    identity:
+      external_id:
+        field: id
+      record_key:
+        fields: [source_name, dataset_name, id]
+
+  OMBUDSMAN_PH_LATEST_NEWS:
+    enabled: true
+    active: true
+    source_name: OMBUDSMAN_PH
+    dataset_name: OMBUDSMAN_PH_LATEST_NEWS
+    dataset_category: Media
+    schedule: daily
+    date_order: YMD
+    source_page_url: https://www.ombudsman.gov.ph/?cat=64
+    url: https://www.ombudsman.gov.ph/
+    acquisition:
+      type: api
+      download_method: API
+    discovery:
+      policy: full_scan
+    api_config:
+      params:
+        rest_route: /wp/v2/posts
+        categories: 64
+        orderby: date
+        order: desc
+      pagination:
+        type: offset
+        offset_param: offset
+        size_param: per_page
+        page_size: 100
+        start_page: 0
+      items_path: ""
+      write_mode: record_files
+      record_id_path: id
+      transport: requests
+      timeout: 30
+      retry: 3
+      throttle_delay: 0.5
+    parser:
+      type: json
+    identity:
+      external_id:
+        field: id
+      record_key:
+        fields: [source_name, dataset_name, id]
+
   NBI_PRESS_RELEASES:
     enabled: true
     active: true

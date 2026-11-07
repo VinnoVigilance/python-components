@@ -14,6 +14,10 @@ from ingestion.bypassCollector.actions.saveAction import (
     SavePaginatedHtmlAction,
 )
 from ingestion.bypassCollector.actions.executeJsAction import ExecuteJsAction
+from ingestion.bypassCollector.actions.saveImageAction import SaveImageAction
+from ingestion.bypassCollector.actions.collectPopupProfilesAction import (
+    CollectPopupProfilesAction,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -29,8 +33,11 @@ class ActionExecutor:
             "save_html": SaveHtmlAction(),
             "save_json": SaveJsonAction(),
             "save_pdf": SavePdfAction(),
+            "save_image": SaveImageAction(),
             "save_paginated_html": SavePaginatedHtmlAction(),
             "execute_js": ExecuteJsAction(),
+            "collect_popup_profiles": CollectPopupProfilesAction(),
+
         }
 
     def executeActions(
