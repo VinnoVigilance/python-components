@@ -97,7 +97,7 @@ existing spider path. PNG/JPEG/TIFF and PDF table/text/OCR behavior is unchanged
 ```powershell
 python -m unittest discover -s test/unit/parsing -p "test_*Ocr*.py" -v
 python -m scripts.watchlist.stage_extract PDEA_MOST_WANTED
-python -m jobs.watchlistPiplineJob --source PDEA_MOST_WANTED
+python -m jobs.watchlistPipelineJob --source PDEA_MOST_WANTED
 ```
 
 Unit tests use a fake recognizer and real image/PDF decoding, with no model
