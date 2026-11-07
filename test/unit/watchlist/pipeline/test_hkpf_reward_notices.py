@@ -88,8 +88,8 @@ def test_aliases_rewards_and_case_context_are_preserved(records):
     assert info["Reward Details"] == "Reward No. 1 of 2018 (Renewal) ; Date of Expiry: 2027-10-01"
     assert info["Status"] == "Wanted Person"
     assert row["Measures"] == row["Contacts"] == []
-    assert {c["type"] for c in row["Comments"]} == {"Remarks", "Footnote"}
-    assert all("<br" not in c["text"] for c in row["Comments"])
+    assert {c["Type"] for c in row["Comments"]} == {"Remarks", "Footnote"}
+    assert all("<br" not in c["Text"] for c in row["Comments"])
 
 
 def test_partial_narrative_only_format_change_is_rejected(cases):

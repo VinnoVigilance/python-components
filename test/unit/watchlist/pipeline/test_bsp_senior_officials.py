@@ -141,7 +141,9 @@ def test_mapping_keeps_three_attachment_roles_even_when_images_share_a_url(canon
         {"Type": "Photograph", "URL": "https://example.test/images/assistant.jpg"},
         {"Type": "Profile", "URL": "https://example.test/profiles/assistant.aspx"},
     ]
-    assert record["Comments"] == [{"type": "Additional Info", "text": BIOGRAPHY}]
+    assert [(c["Type"], c["Text"]) for c in record["Comments"]] == [
+        ("Additional Info", BIOGRAPHY)
+    ]
     assert record["Occupations"][0]["Department"] == "Comptrollership Sub-Sector"
     assert record["Occupations"][0]["Note"] == "Assistant Governor | Internal Audit Office"
 

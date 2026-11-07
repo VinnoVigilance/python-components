@@ -79,10 +79,8 @@ SAMPLES = {
 # DNFBP -> "Regulatory".
 #
 # DatasetCategory may be a SET when a list is inherently more than one thing:
-# ATC is both a terrorism designation and a targeted financial sanction, mapped
-# with the `*` handler, so each record produces two Sources[] entries carrying
-# "Crime" and "Sanctions" respectively. A set expects that spread across the
-# entries; a plain string expects that single value on every entry.
+# A set expects the values spread across Sources[] entries; a plain string
+# expects that single value on every entry.
 GOLDEN = {
     "PNP_MOST_WANTED_WITH_REWARDS_CRIMINALITY_2022": {
         "SourceType": "Official", "DatasetCategory": "Law Enforcement",
@@ -141,7 +139,7 @@ GOLDEN = {
         "ListName": "ATC-DESIGNATED-TERRORIST-INDIVIDUALS", "SourceName": "ATC",
     },
     "ATC-DESIGNATED-TERRORIST-GROUPS": {
-        "SourceType": "Official", "DatasetCategory": {"Crime", "Sanctions"},
+        "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "ATC-DESIGNATED-TERRORIST-GROUPS", "SourceName": "ATC",
     },
     "DNFBP": {
