@@ -13,6 +13,7 @@ WATCHLIST_CONFIGS = {
             {
                 "handler": "merge_dfat_split_records",
                 "level": "dataset",
+                "config": {"designations_field": "ProgrammeDesignations"},
             },
         ],
     },

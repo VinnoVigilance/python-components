@@ -502,6 +502,7 @@ class PreProcessingEngine:
 
     def merge_dfat_split_records(self, records, config):
         grouped = {}
+        designations_field = config.get("designations_field")
 
         single_value_fields = {
             "Reference",
@@ -530,6 +531,20 @@ class PreProcessingEngine:
                 }
 
             merged = grouped[base_reference]
+
+            if designations_field:
+                committee = str(record.get("Committees", "")).strip()
+                instrument = str(
+                    record.get("Instrument of Designation", "")
+                ).strip()
+                designation = {
+                    "Committees": "" if committee.upper() in EMPTY_VALUES else committee,
+                    "instrument": "" if instrument.upper() in EMPTY_VALUES else instrument,
+                }
+                if any(designation.values()):
+                    designations = merged.setdefault(designations_field, [])
+                    if designation not in designations:
+                        designations.append(designation)
 
             name_value = str(
                 record.get(

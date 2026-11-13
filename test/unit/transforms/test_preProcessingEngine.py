@@ -367,3 +367,26 @@ class TestPreprocessOrchestrator:
     def test_no_rules_returns_records_unchanged(self, engine):
         records = [{"a": 1}]
         assert engine.preprocess(records, []) == records
+
+
+def test_dfat_merge_preserves_distinct_designation_pairs(engine):
+    rows = [
+        {"Reference": f"123{suffix}", "Committees": committee,
+         "Instrument of Designation": instrument}
+        for suffix, committee, instrument in [
+            ("a", "Committee A", "Instrument X"),
+            ("b", "Committee A", "Instrument Y"),
+            ("c", "Committee A", "Instrument X"),
+            ("d", "N/A", None),
+        ]
+    ]
+
+    merged = engine.merge_dfat_split_records(
+        rows, {"designations_field": "ProgrammeDesignations"}
+    )
+
+    assert len(merged) == 1
+    assert merged[0]["ProgrammeDesignations"] == [
+        {"Committees": "Committee A", "instrument": "Instrument X"},
+        {"Committees": "Committee A", "instrument": "Instrument Y"},
+    ]
