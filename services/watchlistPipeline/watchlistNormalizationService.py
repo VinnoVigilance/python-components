@@ -107,4 +107,28 @@ def normalize_record(
                 if category.strip()
             ]
 
+    risk_category = canonical_record.get("RiskCategory")
+    if risk_category is None:
+        risk_category = {}
+    if not isinstance(risk_category, dict):
+        raise ValueError("RiskCategory must be an object.")
+    risk_entries = risk_category.get("Labels")
+    if risk_entries is None:
+        risk_entries = []
+    if not isinstance(risk_entries, list):
+        raise ValueError("RiskCategory.Labels must be an array.")
+    complete = []
+    for entry in risk_entries:
+        if not isinstance(entry, dict):
+            raise ValueError("RiskCategory.Labels entries must be objects.")
+        origin, value = entry.get("Type"), entry.get("Value")
+        if not origin and not value:
+            continue
+        if not origin or not value:
+            raise ValueError("RiskCategory.Labels entries require both Type and Value.")
+        complete.append(entry)
+    risk_category["Labels"] = complete
+
+    canonical_record["RiskCategory"] = risk_category
+
     return canonical_record
