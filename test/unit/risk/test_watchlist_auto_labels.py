@@ -29,6 +29,8 @@ class WatchlistAutoLabelTests(unittest.TestCase):
             contract=SimpleNamespace(taxonomy_version="sha256:taxonomy"),
         )
         self.classifier.triggers = {}
+        self.classifier.taxonomy = {}
+        self.classifier.lookup_labels = self.classifier.labels.copy()
         self.classifier.calculation_version = "sha256:calculation"
         self.classifier.rules_version = "sha256:rules"
         self.classifier.lookup_calculation_version = "sha256:lookup"
@@ -57,6 +59,7 @@ class WatchlistAutoLabelTests(unittest.TestCase):
         self.assertEqual(categories["LE_GEN"]["explanation"], "list TEST-LIST")
         self.assertNotIn("labelMetadata", result)
         self.assertNotIn("metadata", result)
+        self.assertEqual(result["calculationVersion"], "sha256:calculation")
         self.assertEqual(categories["CR_FRAUD"]["metadata"]["modelVersion"],
                          self.classifier.student.model_version)
 

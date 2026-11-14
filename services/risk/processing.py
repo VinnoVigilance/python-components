@@ -7,6 +7,7 @@ from infrastructure.database.connection import connection_pool
 from infrastructure.database.jobLock import advisory_job_lock
 from intelligence.risk.interface import create_classifier
 from intelligence.risk.result import build_assessment_payload
+from intelligence.risk.watchlistRiskCategory.lookupRules import RiskMappingError
 from repositories import jobStateRepository
 from utils.hashing import calculate_record_hash
 
@@ -18,7 +19,7 @@ class ClassifierLoadError(RuntimeError):
     """The selected classifier cannot initialize for this run."""
 
 
-def _process(connection, repository, item, mode, classify):
+def _process(connection, repository, item, mode, classify, *, subject=None):
     """Persist one complete assessment or expiry in one transaction."""
     action = str(item.get("action", "UPDATE")).upper()
     if action not in {"ADD", "UPDATE", "DELETE"}:
@@ -36,7 +37,43 @@ def _process(connection, repository, item, mode, classify):
                     and current_risk["version_no"] <= source["version_no"]):
                 repository.expire_current(cursor, item["subject_id"])
             return "deleted"
-        details = build_assessment_payload(classify(source["payload"] or {}))
+        if subject == "watchlist":
+            payload = source["payload"] or {}
+            try:
+                risk_category = payload.get("RiskCategory")
+                if not isinstance(risk_category, dict):
+                    raise RiskMappingError(
+                        "RiskCategory", "RiskCategory must be an object. Normalize legacy records before assessment."
+                    )
+                categories = risk_category.get("Labels")
+                if categories is None:
+                    categories = []
+                if not isinstance(categories, list):
+                    raise RiskMappingError("RiskCategory.Labels", "RiskCategory.Labels must be an array.")
+                enabled = risk_category.get("RiskModelEnabled")
+                if isinstance(enabled, str) and not enabled.strip():
+                    enabled = None
+                if enabled is not None and type(enabled) is not bool:
+                    raise RiskMappingError("RiskCategory.RiskModelEnabled", "RiskModelEnabled must be a boolean.")
+                if enabled is not True and not categories:
+                    if not historical:
+                        repository.expire_current(cursor, item["subject_id"])
+                    return "skipped"
+                assessment = classify(payload, run_model=enabled is True)
+            except RiskMappingError as error:
+                sources = payload.get("Sources")
+                list_names = ", ".join(dict.fromkeys(
+                    entry["ListName"].strip() for entry in sources
+                    if isinstance(entry, dict) and isinstance(entry.get("ListName"), str)
+                    and entry["ListName"].strip()
+                )) if isinstance(sources, list) else ""
+                error.add_note(
+                    f"Watchlist risk mapping failed: list={list_names or '<unknown>'!r} field={error.field}"
+                )
+                raise
+        else:
+            assessment = classify(source["payload"] or {})
+        details = build_assessment_payload(assessment)
         if details.get("assessmentStatus") not in {"CLASSIFIED", "SKIPPED_EMPTY_BODY"}:
             raise ValueError("Classifier did not return a completed or explicitly skipped assessment.")
         result_hash = calculate_record_hash(details)
@@ -61,7 +98,7 @@ def _attempt(connection, repository, subject, item, mode, effective_date, classi
     for attempt in range(1, 4):
         try:
             with connection:
-                outcome = _process(connection, repository, item, mode, classify)
+                outcome = _process(connection, repository, item, mode, classify, subject=subject)
             return outcome, None
         except ClassifierLoadError:
             raise
@@ -143,14 +180,22 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
               "last_scanned_date": None, "target_date": None, "pending_count": 0,
               "retried_count": 0, "dates": []}
 
-    def classify(payload):
-        nonlocal classifier
-        if classifier is None:
+    lookup_classifier = None
+
+    def classify(payload, run_model=True):
+        nonlocal classifier, lookup_classifier
+        selected = classifier if run_model else lookup_classifier
+        if selected is None:
             try:
-                classifier = create_classifier(subject, model_path, threads)
+                selected = create_classifier(subject, model_path, threads,
+                                             model_enabled=run_model)
             except Exception as error:
                 raise ClassifierLoadError(f"Cannot initialize {subject} classifier: {error}") from error
-        return classifier.classify(payload)
+            if run_model:
+                classifier = selected
+            else:
+                lookup_classifier = selected
+        return selected.classify(payload)
 
     with advisory_job_lock(lock_id) as acquired:
         if not acquired:

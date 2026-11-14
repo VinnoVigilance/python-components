@@ -89,6 +89,48 @@ class ProcessingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "initial or incremental"):
             run("watchlist", self.repository, 802156604, mode="reprocess")
 
+    def test_missing_risk_category_preserves_existing_assessment(self):
+        with self.assertRaisesRegex(ValueError, "Normalize legacy records"):
+            _process(self.connection, self.repository, self.item,
+                     "incremental", self.classify, subject="watchlist")
+        self.classify.assert_not_called()
+        self.repository.expire_current.assert_not_called()
+        self.repository.insert_risk.assert_not_called()
+
+    def test_current_and_historical_empty_risk_category(self):
+        self.source["payload"]["RiskCategory"] = {"Labels": []}
+        for historical in (False, True):
+            with self.subTest(historical=historical):
+                self.repository.reset_mock()
+                self.repository.find_source_version.return_value = (
+                    {**self.source, "id": 204} if historical else self.source
+                )
+                self.item["source_record_id"] = 204 if historical else 205
+                self.assertEqual(
+                    _process(self.connection, self.repository, self.item,
+                             "incremental", self.classify, subject="watchlist"),
+                    "skipped",
+                )
+                self.assertEqual(self.repository.expire_current.call_count, int(not historical))
+                self.repository.insert_risk.assert_not_called()
+        self.classify.assert_not_called()
+
+    def test_risk_model_flag_controls_inference(self):
+        for enabled, labels in (
+            (True, []),
+            (False, [{"Type": "List", "Value": "Sanctions"}]),
+        ):
+            with self.subTest(enabled=enabled):
+                payload = {"RiskCategory": {"RiskModelEnabled": enabled, "Labels": labels}}
+                self.source["payload"] = payload
+                self.classify.reset_mock()
+                self.assertEqual(
+                    _process(self.connection, self.repository, self.item,
+                             "incremental", self.classify, subject="watchlist"),
+                    "versioned",
+                )
+                self.classify.assert_called_once_with(payload, run_model=enabled)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -79,7 +79,6 @@ WATCHLIST_CONFIGS = {
 
     "DNFBP": {
         "source_name": "AMLC",
-        "use_dataset_category_as_risk_label": 0,
         "date_order": "MDY",
         "list_name": "DNFBP",
         "download_method": "Manual",
@@ -2158,18 +2157,6 @@ WATCHLIST_CONFIGS = {
 
     "IDB_SANCTIONED_ENTITIES": {
         "source_name": "IDB",
-        "structured_risk_mappings": [
-            {
-                "field": "additionalInfo",
-                "value_key": "Value",
-                "type_key": "Type",
-                "type_value": "Prohibited Practice",
-                "labels": {
-                    "Fraud": "Crime-Fraud",
-                    "Corruption": "Crime-Corruption",
-                },
-            },
-        ],
         "list_name": "IDB_SANCTIONED_ENTITIES",
         "date_order": "YMD",
         "download_method": "API",
