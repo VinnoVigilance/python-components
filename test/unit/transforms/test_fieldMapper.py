@@ -64,6 +64,17 @@ class TestConcatPathLabels:
     def test_literal_only_expression_is_unchanged(self):
         assert self._join('"Known"|"reference"', {}) == "Known reference"
 
+    def test_optional_groups_only_include_labels_with_values(self):
+        expression = '("Programme description:"|description)|("Authority:"|authority)'
+        assert self._join(expression, {"authority": "Act 2020"}) == "Authority: Act 2020"
+        assert self._join(expression, {"description": "Sanctions", "authority": "Act 2020"}) == (
+            "Programme description: Sanctions Authority: Act 2020"
+        )
+
+    def test_item_fallback_accepts_scalar_but_not_object(self):
+        assert self._join("$item", "Act 2020") == "Act 2020"
+        assert self._join("$item", {"description": "Sanctions"}) == ""
+
 
 @pytest.mark.parametrize("value", ["Official", '"Official"', "PEP", '"PEP"'])
 def test_constant_handler_accepts_quoted_and_unquoted_values(value):
@@ -201,6 +212,21 @@ class TestDetectEntityType:
 
 
 class TestMappingEngineEndToEnd:
+    @pytest.mark.parametrize("value, expected", [("true", True), ("false", False)])
+    def test_grouped_risk_model_setting_remains_a_boolean(self, value, expected):
+        rules = [Rule("Individual", "RiskCategory.RiskModelEnabled", "boolean",
+                      "risk", "constant", value)]
+        assert MappingEngine(rules).map_record({})["RiskCategory"]["RiskModelEnabled"] is expected
+
+    def test_constant_list_risk_label_is_not_discarded(self):
+        rules = [
+            Rule("Individual", "RiskCategory.Labels[].Type", "string", "risk", "constant", "List"),
+            Rule("Individual", "RiskCategory.Labels[].Value", "string", "risk", "constant", "Regulatory"),
+        ]
+        assert MappingEngine(rules).map_record({})["RiskCategory"]["Labels"] == [
+            {"Type": "List", "Value": "Regulatory"}
+        ]
+
     def test_aircraft_uses_aircraft_rules_instead_of_individual_rules(self):
         rules = [
             Rule("Aircraft", "model", "string", None, "path", "model"),

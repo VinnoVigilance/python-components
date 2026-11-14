@@ -234,7 +234,8 @@ def coerce_to_field_type(value: Any, target_type: Optional[str]) -> Any:
     list. When a source path resolves to several values -- for example UN
     publishes several <VALUE> under one LAST_DAY_UPDATED, so DateUpdated would
     otherwise become ["2016-10-13", "2020-11-02"] -- collapse to a single value
-    so the declared type holds. Array fields are left untouched.
+    so the declared type holds. Array fields are left untouched. Boolean
+    fields accept only true or false (or blank for an unset value).
 
     We keep the *last* non-empty value, not the first. The scalar fields that
     actually receive a list are "latest/updated" fields (a modified-date
@@ -245,14 +246,27 @@ def coerce_to_field_type(value: Any, target_type: Optional[str]) -> Any:
     first value instead (or a date-aware max for unordered input), it changes
     here and nowhere else.
     """
-    if str(target_type or "").strip().lower() in {"array", "list"}:
+    field_type = str(target_type or "").strip().lower()
+    if field_type in {"array", "list"}:
         return value
 
     if isinstance(value, list):
         for item in reversed(value):
             if not is_empty_value(item):
-                return item
-        return ""
+                value = item
+                break
+        else:
+            value = ""
+
+    if field_type == "boolean":
+        if value is None or str(value).strip() == "":
+            return None
+        if type(value) is bool:
+            return value
+        normalized = str(value).strip().lower()
+        if normalized in {"true", "false"}:
+            return normalized == "true"
+        raise ValueError(f"Expected a boolean mapping value, got {value!r}.")
 
     return value
 
@@ -309,7 +323,7 @@ def default_value(target_type: str):
     if t in ["array", "list"]:
         return []
 
-    if t in ["json", "raw"]:
+    if t in ["json", "raw", "boolean"]:
         return None
 
     return ""
@@ -606,23 +620,64 @@ class ListExpandHandler(BaseHandler):
 
 
 class ConcatPathHandler(BaseHandler):
-    """Join literals and paths, suppressing labels when every path is empty."""
+    """Join literals and paths, suppressing labels when every path is empty.
+
+    Parenthesized groups apply that rule to their own paths. A group
+    contributes a single fragment to the surrounding note.
+
+    `$item` uses the current expanded item if it is a scalar. This lets a
+    rule accept a legacy list of strings alongside newer lists of objects.
+    """
 
     def handle(self, rule, raw_json, item=None, anchor=None):
         if not rule.source_value:
             return ""
 
-        parts = [
-            p.strip()
-            for p in str(rule.source_value).split("|")
-            if p.strip()
-        ]
+        parts = self._split_parts(str(rule.source_value))
+        return self._join_parts(parts, raw_json, item, anchor)
+
+    @staticmethod
+    def _split_parts(expression):
+        # Keep the legacy pipe split for ordinary expressions. In a group,
+        # parentheses inside quoted text do not close the group.
+        parts = []
+        group = None
+        depth = 0
+        for token in expression.split("|"):
+            token = token.strip()
+            if group is None:
+                if not token.startswith("("):
+                    if token:
+                        parts.append(token)
+                    continue
+                group = []
+            group.append(token)
+            unquoted = re.sub(r"""(?:"[^"]*"|'[^']*')""", "", token)
+            depth += unquoted.count("(") - unquoted.count(")")
+            if depth == 0 and token.endswith(")"):
+                content = "|".join(group)[1:-1]
+                parts.append(tuple(p.strip() for p in content.split("|") if p.strip()))
+                group = None
+        if group is not None:
+            # Treat an unmatched opener as legacy path text.
+            parts.extend(part for part in group if part)
+        return parts
+
+    def _join_parts(self, parts, raw_json, item, anchor, *, require_path=False):
 
         values = []
         has_path = False
         has_path_value = False
 
         for part in parts:
+            if isinstance(part, tuple):
+                has_path = True
+                fragment = self._join_parts(part, raw_json, item, anchor, require_path=True)
+                if fragment:
+                    has_path_value = True
+                    values.append(fragment)
+                continue
+
             # Check if it's a literal string (enclosed in quotes)
             if (part.startswith('"') and part.endswith('"')) or \
                (part.startswith("'") and part.endswith("'")):
@@ -631,20 +686,25 @@ class ConcatPathHandler(BaseHandler):
                 if literal_value:
                     values.append(literal_value)
             else:
-                # It's a path - resolve it from context
                 has_path = True
-                value = resolve_in_context(raw_json, part, item, anchor)
-                
+                if part == "$item":
+                    value = (
+                        None if isinstance(item, (dict, list))
+                        else drop_placeholder(item)
+                    )
+                else:
+                    value = resolve_in_context(raw_json, part, item, anchor)
+
                 if is_empty_value(value):
                     continue
-                
+
                 value = str(value).strip()
-                
+
                 if value:
                     has_path_value = True
                     values.append(value)
 
-        if has_path and not has_path_value:
+        if (has_path or require_path) and not has_path_value:
             return ""
 
         return " ".join(values)
@@ -832,8 +892,7 @@ class ConditionalPathHandler(BaseHandler):
             cond_path, cond_value, return_expr = parts
             expected_values = get_expected_values(cond_value)
 
-
-            if item is not None:
+            if item is not None or "[]" not in cond_path:
                 actual = resolve_in_context(
                     raw_json,
                     cond_path,
@@ -841,9 +900,7 @@ class ConditionalPathHandler(BaseHandler):
                     anchor=anchor
                 )
 
-                actual_value = str(actual or "").strip().lower()
-
-                if actual_value in expected_values:
+                if str(actual or "").strip().lower() in expected_values:
 
                     if return_expr.startswith('"') and return_expr.endswith('"'):
                         return unquote(return_expr)
@@ -872,9 +929,7 @@ class ConditionalPathHandler(BaseHandler):
                     )
 
                     actual = JsonPath.get(current_item, short_cond)
-                    actual_value = str(actual or "").strip().lower()
-
-                    if actual_value in expected_values:
+                    if str(actual or "").strip().lower() in expected_values:
 
                         if return_expr.startswith('"') and return_expr.endswith('"'):
                             return unquote(return_expr)
@@ -986,7 +1041,8 @@ class SchemaBuilder:
         scalars = []
 
         for rule in rules:
-            if rule.group:
+            # A group can contain scalar settings beside its array entries.
+            if rule.group and "[]" in rule.target_path:
                 grouped[rule.group].append(rule)
             else:
                 scalars.append(rule)
@@ -1162,6 +1218,10 @@ class GroupProcessor:
 
             if has_source_identity:
                 return [obj]
+
+        # A list-wide risk assertion consists entirely of mapped constants.
+        if group_root == "RiskCategory.Labels" and obj.get("Type") in ("List", "Record") and obj.get("Value"):
+            return [obj]
 
         return []
 
@@ -1372,7 +1432,8 @@ class MappingEngine:
         scalar_rules = []
 
         for rule in rules:
-            if rule.group:
+            # Map grouped scalar settings directly; only array paths form items.
+            if rule.group and "[]" in rule.target_path:
                 grouped[rule.group].append(rule)
             else:
                 scalar_rules.append(rule)
