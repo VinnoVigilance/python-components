@@ -31,7 +31,7 @@ pytestmark = pytest.mark.unit
 MAPPING_FILE = Path(__file__).resolve().parents[2].parent / "data" / "rules" / "mapping.xlsx"
 
 # Field Type values transforms/fieldMapper.default_value() understands.
-KNOWN_FIELD_TYPES = {"string", "array", "object", "dict", "list", "json", "raw"}
+KNOWN_FIELD_TYPES = {"string", "array", "object", "dict", "list", "json", "raw", "boolean"}
 
 # Entity categories detect_entity_type() can actually produce; a rule tagged
 # with anything else would never be applied.
@@ -95,18 +95,23 @@ def test_every_source_type_is_a_known_handler(mapping_df):
 
 
 def test_group_rows_target_a_single_array(mapping_df):
-    """All rows sharing a Group must write into the same array root, e.g. every
-    'sources' row targets Sources[...]. A group spanning two arrays is a bug."""
+    """Require one array root per group and keep scalar siblings under its object."""
     rows = mapping_df[mapping_df["Group"].notna() & mapping_df["Field"].notna()]
 
     inconsistent = {}
     for group, group_rows in rows.groupby("Group"):
-        roots = {
-            str(field).split("[]")[0].strip()
-            for field in group_rows["Field"]
-        }
-        if len(roots) > 1:
-            inconsistent[str(group)] = sorted(roots)
+        paths = [str(field).strip() for field in group_rows["Field"]]
+        arrays = {path.split("[]", 1)[0] for path in paths if "[]" in path}
+        scalars = [path for path in paths if "[]" not in path]
+        if len(arrays) == 1:
+            parent, _, _ = next(iter(arrays)).rpartition(".")
+            valid = not scalars or (
+                bool(parent) and all(path.startswith(parent + ".") for path in scalars)
+            )
+        else:
+            valid = not arrays and len({path.rpartition(".")[0] for path in scalars}) == 1
+        if not valid:
+            inconsistent[str(group)] = sorted(paths)
 
     assert not inconsistent, f"Group(s) targeting multiple array roots: {inconsistent}"
 

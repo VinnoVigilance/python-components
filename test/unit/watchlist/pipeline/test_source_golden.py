@@ -101,7 +101,7 @@ GOLDEN = {
         "ListName": "BSP_SENIOR_OFFICIALS", "SourceName": "BSP",
     },
     "INTERPOL_UNSC_SPECIAL_NOTICES": {
-        "SourceType": "Official", "DatasetCategory": "Law Enforcement",
+        "SourceType": "Official", "DatasetCategory": "Sanctions",
         "ListName": "INTERPOL_UNSC_SPECIAL_NOTICES", "SourceName": "INTERPOL",
     },
     "OFAC-SDN": {
