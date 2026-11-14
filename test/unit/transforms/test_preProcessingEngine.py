@@ -23,6 +23,51 @@ def engine():
     return PreProcessingEngine()
 
 
+@pytest.mark.parametrize("source", ["OFAC-SDN", "OFAC-NON-SDN"])
+@pytest.mark.parametrize(
+    ("authorities", "expected"),
+    [
+        ({"text": " Authority A "}, "Authority A"),
+        (
+            [{"text": "Authority A"}, {"text": " "}, {"id": "3"}, {"text": "Authority B"}],
+            "Authority A; Authority B",
+        ),
+        ([], None),
+        (None, None),
+    ],
+)
+def test_ofac_preprocessing_joins_record_authorities(engine, source, authorities, expected):
+    record = {} if authorities is None else {
+        "legalAuthorities": {"legalAuthority": authorities}
+    }
+
+    result, = engine.preprocess([record], WATCHLIST_CONFIGS[source]["preprocessing"])
+
+    if expected is None:
+        assert "legalAuthoritiesText" not in result
+    else:
+        assert result["legalAuthoritiesText"] == expected
+    if authorities is not None:
+        assert result["legalAuthorities"] == {"legalAuthority": authorities}
+
+
+def test_join_object_field_values_supports_other_source_layouts(engine):
+    record = {"designations": {"instruments": [
+        {"details": {"title": "Order A"}},
+        {"details": {"title": "Order B"}},
+    ]}}
+    config = {
+        "source_path": "designations.instruments",
+        "value_path": "details.title",
+        "target_field": "instrumentTitles",
+        "separator": " / ",
+    }
+
+    result = engine.join_object_field_values(record, config)
+
+    assert result["instrumentTitles"] == "Order A / Order B"
+
+
 class TestDetectEntityType:
     def test_org_keyword_is_entity(self, engine):
         record = engine.detect_entity_type(

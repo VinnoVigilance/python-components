@@ -1329,6 +1329,39 @@ class PreProcessingEngine:
         record.update(outputs)
         return record
 
+    def join_object_field_values(self, record, config):
+        """Join nonblank text from an object or list into a separate top-level field.
+
+        source_path is relative to the record and value_path to each object.
+        Values retain source order. Missing or non-string values are skipped.
+        """
+        source_path = config["source_path"]
+        value_path = config["value_path"]
+        target_field = config["target_field"]
+        separator = config.get("separator", "; ")
+
+        if not target_field or "." in target_field or target_field == source_path.split(".", 1)[0]:
+            raise ValueError("target_field must be a separate top-level field")
+
+        items = self._resolve_field(record, source_path)
+        if isinstance(items, dict):
+            items = [items]
+        if not isinstance(items, list):
+            return record
+
+        texts = []
+        for item in items:
+            value = self._resolve_field(item, value_path)
+            if isinstance(value, str):
+                value = value.strip()
+                if value:
+                    texts.append(value)
+
+        if texts:
+            record[target_field] = separator.join(texts)
+
+        return record
+
     def normalize_empty_fields(self, record, config):
         """Normalize source empty markers in flat or dotted fields."""
 
