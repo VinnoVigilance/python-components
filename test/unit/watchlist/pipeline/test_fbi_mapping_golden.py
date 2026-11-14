@@ -6,7 +6,7 @@ of them are protected by the shape-only conformance test:
 
   * Identifiers -- ONE canonical array carries TWO different source fields
     (``uid`` and ``ncic``), distinguished only by their ``Note``.
-  * Comments[].text -- pulled from THREE raw fields (``description * caution *
+  * Comments[].Text -- pulled from THREE raw fields (``description * caution *
     details``) and HTML-stripped by the post-norm ``SANITIZE_HTML`` rule.
   * additionalInfo[] -- a ``*`` multi-branch of Type/Value pairs where branches
     whose value is empty (Warning/Reward/Build/... on this record) are DROPPED.

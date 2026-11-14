@@ -689,6 +689,7 @@ def crawl_source(
                 0,
             )
         ),
+        discovery_retry_items=discovery_summary.get("discovery_retry_items", []),
         reached_source_end=(
             discovery_summary.get(
                 "reached_source_end"

@@ -1,6 +1,8 @@
 """To-do list of Media items that failed and must be retried by later runs."""
 
 from datetime import datetime, timezone
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -27,12 +29,16 @@ def _candidate_keys(
         acquired.get("detail_url"),
         extracted.get("SourceURL"),
         acquired.get("detail_file_path"),
+        acquired.get("discovery_retry_key"),
     )
     return [str(key) for key in keys if key]
 
 
 def _retry_item(acquired: dict[str, Any]) -> dict[str, Any] | None:
     """Keep what a later run needs to retry one failed item."""
+
+    if acquired.get("discovery_retry_item"):
+        return dict(acquired["discovery_retry_item"])
 
     detail_file_path = acquired.get("detail_file_path")
 
@@ -64,6 +70,7 @@ def update_items(
     dataset_name: str,
     acquired_records: list[dict[str, Any]],
     record_results: list[dict[str, Any]],
+    discovery_retry_items: list[dict[str, Any]] | None = None,
 ) -> dict[str, int]:
     """Remove items that reached Core; add or update items that failed."""
 
@@ -76,6 +83,21 @@ def update_items(
     added = 0
     removed = 0
     unretryable = 0
+
+    for discovery in discovery_retry_items or []:
+        # Use the article URL when present, otherwise retain the full entry and
+        # surrounding context for manual review without relying on position.
+        entry = discovery.get("entry")
+        identity = discovery.get("entry_url")
+        identity = identity or [entry, discovery.get("previous_entry"), discovery.get("next_entry")]
+        fingerprint = json.dumps([discovery["index_file_url"], identity], sort_keys=True, ensure_ascii=False)
+        key = "discovery:" + hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+        previous = items.get(key, {})
+        items[key] = {**discovery, "record_key": key,
+                      "attempts": previous.get("attempts", 0) + 1,
+                      "first_failed_at": previous.get("first_failed_at", now),
+                      "last_failed_at": now, "error_stage": "DISCOVERY"}
+        added += not bool(previous)
 
     for acquired, result in zip(acquired_records, record_results):
         keys = _candidate_keys(acquired, result)

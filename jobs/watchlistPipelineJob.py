@@ -2,9 +2,9 @@
 
 Run with:
 
-    python -m jobs.watchlistPiplineJob
-    python -m jobs.watchlistPiplineJob --source CFTC-RED-LIST
-    python -m jobs.watchlistPiplineJob --retry-only
+    python -m jobs.watchlistPipelineJob
+    python -m jobs.watchlistPipelineJob --source CFTC-RED-LIST
+    python -m jobs.watchlistPipelineJob --retry-only
 """
 
 import argparse

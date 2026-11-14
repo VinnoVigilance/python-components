@@ -74,6 +74,7 @@ class MediaAcquisitionResult:
     selected_detail_count: int = 0
     missing_detail_count: int = 0
     discovery_failed_count: int = 0
+    discovery_retry_items: list[dict[str, Any]] = field(default_factory=list)
     identity_failure_count: int = 0
     reached_source_end: bool | None = None
     stop_reason: str = "UNEXPECTED_STOP"
@@ -97,6 +98,7 @@ class MediaSourceAcquisitionResult:
     selected_detail_count: int = 0
     missing_detail_count: int = 0
     discovery_failed_count: int = 0
+    discovery_retry_items: list[dict[str, Any]] = field(default_factory=list)
     identity_failure_count: int = 0
     reached_source_end: bool | None = None
     stop_reason: str = "UNEXPECTED_STOP"
@@ -366,6 +368,7 @@ class MediaAcquisitionService:
                         "error": str(error),
                         "error_stage": "RAW_PERSISTENCE",
                         "error_type": type(error).__name__,
+                        "discovery_retry_key": record.get("discovery_retry_key"),
                     }
                 )
 
@@ -399,6 +402,7 @@ class MediaAcquisitionService:
             discovery_failed_count=(
                 source_result.discovery_failed_count
             ),
+            discovery_retry_items=source_result.discovery_retry_items,
             identity_failure_count=(
                 source_result.identity_failure_count
             ),
@@ -558,6 +562,7 @@ class MediaAcquisitionService:
                         0,
                     ),
                 ),
+                discovery_retry_items=getattr(crawl_result, "discovery_retry_items", []),
                 identity_failure_count=getattr(
                     crawl_result,
                     "identity_failure_count",
@@ -633,7 +638,9 @@ class MediaAcquisitionService:
             if item["kind"] == "fetch"
         ]
 
-        if fetch_items:
+        discovery_items = [item for item in items if item["kind"] == "json_manifest_entry"]
+
+        if fetch_items or discovery_items:
             fetch_strategy = str(
                 source_config.get(
                     "acquisition",
@@ -657,6 +664,7 @@ class MediaAcquisitionService:
                         / "downloads"
                     ),
                     detail_items=fetch_items,
+                    discovery_items=discovery_items,
                 ),
             )
 
@@ -669,9 +677,10 @@ class MediaAcquisitionService:
             discovered_count=len(items),
             new_count=len(items),
             selected_detail_count=len(records),
+            missing_detail_count=max(len(items) - len(records), 0),
             reached_source_end=True,
             stop_reason="TODO_RETRY",
-            completed_safely=True,
+            completed_safely=len(records) >= len(items),
         )
 
     @staticmethod
@@ -1149,6 +1158,7 @@ class MediaAcquisitionService:
             ),
 
             "failed": False,
+            "discovery_retry_key": record.get("discovery_retry_key"),
         }
 
     # =====================================================

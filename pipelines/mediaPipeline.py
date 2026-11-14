@@ -572,6 +572,7 @@ def run_media_pipeline(
             dataset_name=dataset_name,
             acquired_records=acquisition_result.records,
             record_results=record_results,
+            discovery_retry_items=getattr(acquisition_result, "discovery_retry_items", []),
         )
 
     # =====================================================

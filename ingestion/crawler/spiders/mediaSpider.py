@@ -1,10 +1,13 @@
 import hashlib
 import re
+from datetime import date
 from typing import Any
+from urllib.parse import urlparse
 
 import scrapy
 
 from scrapy.http import HtmlResponse
+from services.adverseMediaPipeline.mediaIdentityService import MediaIdentityService
 
 
 class MediaSpider(scrapy.Spider):
@@ -74,8 +77,10 @@ class MediaSpider(scrapy.Spider):
         Start every discovery run from the first/newest page.
         """
 
-        if self.task.detail_items:
-            for item in self.task.detail_items:
+        detail_items = getattr(self.task, "detail_items", None) or []
+        discovery_items = getattr(self.task, "discovery_items", None) or []
+        if detail_items or discovery_items:
+            for item in detail_items:
                 yield scrapy.Request(
                     url=item["detail_url"],
                     callback=self.parse_detail,
@@ -83,12 +88,32 @@ class MediaSpider(scrapy.Spider):
                     cb_kwargs=self.detail_item_kwargs(item),
                     dont_filter=True,
                 )
+            for item in discovery_items:
+                index_url = item["index_file_url"]
+                start_url = self.discovery_config.get("start_url", self.task.url)
+                if (urlparse(index_url).scheme, urlparse(index_url).netloc) != (urlparse(start_url).scheme, urlparse(start_url).netloc):
+                    yield self._failed_json_entry_retry(item, "Index URL is not on the source host")
+                    continue
+                yield scrapy.Request(
+                    url=index_url, callback=self.retry_json_entry,
+                    errback=self.retry_json_entry_failed,
+                    cb_kwargs={"retry_item": item}, dont_filter=True,
+                )
             return
 
         start_url = self.discovery_config.get(
             "start_url",
             self.task.url,
         )
+
+        if self.discovery_config.get("strategy") == "json_manifest":
+            yield scrapy.Request(
+                url=start_url,
+                callback=self.parse_json_manifest,
+                errback=self.json_discovery_failed,
+                dont_filter=True,
+            )
+            return
 
         start_page = int(
             self.discovery_config.get(
@@ -105,6 +130,228 @@ class MediaSpider(scrapy.Spider):
             },
             dont_filter=True,
         )
+
+    def json_discovery_failed(self, failure):
+        """A failed manifest or shard must never count as a complete scan."""
+        self.logger.error("JSON discovery request failed: %s", failure)
+        self.discovery_service.mark_discovery_failure("JSON_DISCOVERY_FETCH_FAILED")
+
+    def parse_json_manifest(self, response):
+        """Read an ordered manifest and request its first JSON item file."""
+        config = self.discovery_config.get("json_manifest", {})
+        try:
+            manifest = response.json()
+            shards = manifest[config.get("shards_field", "shards")]
+            if not isinstance(shards, list) or not shards:
+                raise ValueError("manifest has no shards")
+            urls = []
+            counts = []
+            for shard in shards:
+                path = shard[config.get("path_field", "path")]
+                count = shard[config.get("count_field", "count")]
+                if not isinstance(path, str) or not path:
+                    raise ValueError("manifest shard path is missing")
+                if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+                    raise ValueError("manifest shard count is invalid")
+                url = response.urljoin(path)
+                if (urlparse(url).scheme, urlparse(url).netloc) != (urlparse(response.url).scheme, urlparse(response.url).netloc):
+                    raise ValueError("manifest shard must be on the same host")
+                urls.append(url)
+                counts.append(count)
+        except (KeyError, TypeError, ValueError) as exc:
+            self.logger.error("Invalid JSON manifest: %s", exc)
+            self.discovery_service.mark_discovery_failure("INVALID_JSON_MANIFEST")
+            return
+
+        yield scrapy.Request(
+            urls[0], callback=self.parse_json_shard,
+            errback=self.json_discovery_failed,
+            cb_kwargs={"urls": urls, "counts": counts, "index": 0,
+                       "previous_date": None},
+        )
+
+    def parse_json_shard(self, response, urls, counts, index, previous_date):
+        """Discover URLs from ordered JSON items."""
+        config = self.discovery_config.get("json_manifest", {})
+        try:
+            items = response.json()[config.get("items_field", "items")]
+            if not isinstance(items, list) or len(items) != counts[index]:
+                raise ValueError("shard item count does not match manifest")
+            checked = []
+            last_date = previous_date
+            for position, item in enumerate(items, start=1):
+                try:
+                    raw_date = item[config.get("date_field", "date")]
+                    item_date = date.fromisoformat(raw_date).isoformat()
+                    href = item[config.get("url_field", "url")]
+                    if not isinstance(href, str) or not href:
+                        raise ValueError("item URL is missing")
+                    url = response.urljoin(href)
+                    if (urlparse(url).scheme, urlparse(url).netloc) != (urlparse(response.url).scheme, urlparse(response.url).netloc):
+                        raise ValueError("item URL must be on the same host")
+                    if last_date and item_date > last_date:
+                        raise ValueError("items are not in descending date order")
+                    checked.append((item_date, url))
+                    last_date = item_date
+                except (KeyError, TypeError, ValueError) as exc:
+                    self.logger.error(
+                        "Invalid JSON item in %s at position %s: %s; item=%r",
+                        response.url, position, exc, item,
+                    )
+                    # An invalid item breaks the assumption behind stopping at
+                    # known records, so continue through the remaining files.
+                    self.discovery_service.mark_discovery_failure(
+                        "INVALID_JSON_ITEM", prevent_known_stop=True,
+                        retry_item={
+                            "kind": "json_manifest_entry",
+                            "index_file_url": response.url,
+                            "position": position,
+                            "entry": item,
+                            "entry_url": item.get(config.get("url_field", "url")) if isinstance(item, dict) else None,
+                            "previous_entry": items[position - 2] if position > 1 else None,
+                            "next_entry": items[position] if position < len(items) else None,
+                            "error": str(exc),
+                        },
+                    )
+                    last_date = None
+        except (KeyError, TypeError, ValueError) as exc:
+            self.logger.error("Invalid JSON shard %s: %s", response.url, exc)
+            self.discovery_service.mark_discovery_failure("INVALID_JSON_SHARD")
+            return
+
+        for _, detail_url in checked:
+            request, should_stop = self._discover_detail(detail_url)
+            if request is not None:
+                yield request
+            if should_stop:
+                return
+
+        if index + 1 < len(urls):
+            yield scrapy.Request(
+                urls[index + 1], callback=self.parse_json_shard,
+                errback=self.json_discovery_failed,
+                cb_kwargs={"urls": urls, "counts": counts, "index": index + 1,
+                           "previous_date": last_date},
+            )
+        else:
+            self.discovery_service.mark_source_end()
+
+    def _failed_json_entry_retry(self, retry_item, error):
+        """Return an unresolved discovery item through the existing to-do pipeline."""
+        record = {
+            "record_key": retry_item["record_key"], "failed": True,
+            "discovery_retry_item": retry_item, "error": str(error),
+            "error_stage": "DISCOVERY", "error_type": "DiscoveryRetryError",
+        }
+        self.records.append(record)
+        return record
+
+    def retry_json_entry_failed(self, failure):
+        retry_item = failure.request.cb_kwargs["retry_item"]
+        yield self._failed_json_entry_retry(retry_item, failure.getErrorMessage())
+
+    def retry_json_entry(self, response, retry_item):
+        """Retry an entry identified by a unique article URL, never by position."""
+        config = self.discovery_config.get("json_manifest", {})
+        url_field = config.get("url_field", "url")
+        date_field = config.get("date_field", "date")
+        original_url = retry_item.get("entry_url")
+        try:
+            expected = urlparse(retry_item["index_file_url"])
+            actual = urlparse(response.url)
+            if (expected.scheme, expected.netloc) != (actual.scheme, actual.netloc):
+                raise ValueError("Index response redirected to another host")
+            items = response.json()[config.get("items_field", "items")]
+            if not isinstance(items, list) or not isinstance(original_url, str) or not original_url:
+                raise ValueError("Cannot safely identify the original entry; manual review required")
+            matches = [(i, item) for i, item in enumerate(items)
+                       if isinstance(item, dict) and item.get(url_field) == original_url]
+            if len(matches) != 1:
+                raise ValueError("Original entry is missing or ambiguous; manual review required")
+            index, item = matches[0]
+            item_date = date.fromisoformat(item[date_field])
+            for neighbor_index in (index - 1, index + 1):
+                if 0 <= neighbor_index < len(items):
+                    neighbor_date = date.fromisoformat(items[neighbor_index][date_field])
+                    if ((neighbor_index < index and neighbor_date < item_date) or
+                            (neighbor_index > index and neighbor_date > item_date)):
+                        raise ValueError("Entry is not in descending date order")
+            detail_url = response.urljoin(original_url)
+            if (urlparse(detail_url).scheme, urlparse(detail_url).netloc) != (urlparse(response.url).scheme, urlparse(response.url).netloc):
+                raise ValueError("item URL must be on the same host")
+            source_record_id = self._extract_source_record_id(detail_url)
+            record_key = MediaIdentityService.generate_record_key(
+                source_config=self.source_config,
+                record={"SourceURL": detail_url, "SourceRecordId": source_record_id},
+            )
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            yield self._failed_json_entry_retry(retry_item, exc)
+            return
+        yield scrapy.Request(
+            detail_url, callback=self.parse_detail, errback=self.detail_failed,
+            cb_kwargs={"record_key": record_key, "is_known": False,
+                       "source_record_id": source_record_id, "identity_fields": {},
+                       "discovery_retry_key": retry_item["record_key"]},
+            dont_filter=True,
+        )
+
+    def _discover_detail(self, detail_url, link_node=None):
+        """Apply shared identity and selection rules to one discovered detail URL."""
+        try:
+            source_record_id = self._extract_source_record_id(detail_url)
+            identity_fields = (
+                self._extract_identity_fields(link_node) if link_node is not None else {}
+            )
+            record_key = self.discovery_service.build_record_key({
+                "SourceURL": detail_url,
+                "SourceRecordId": source_record_id,
+                **identity_fields,
+            })
+        except Exception as exc:
+            # Preserve the listing parser's existing error handling: unexpected
+            # identity errors remain visible instead of being swallowed.
+            if link_node is not None and not isinstance(exc, ValueError):
+                raise
+            self.discovery_service.record_identity_failure()
+            self.logger.warning("Could not build media identity for URL %s: %s", detail_url, exc)
+            return None, False
+
+        # Ignore duplicate links before they affect
+        # KNOWN counters.
+        if record_key in self.seen_record_keys:
+            self.logger.debug("Duplicate media link ignored | key=%s", record_key)
+            return None, False
+        self.seen_record_keys.add(record_key)
+
+        try:
+            is_known, should_stop = self.discovery_service.check_record_key(record_key)
+        except Exception as exc:
+            self.discovery_service.record_identity_failure()
+            self.logger.warning("Could not check media record key=%s: %s", record_key, exc)
+            return None, False
+
+        self.logger.info("Media discovered | key=%s | known=%s", record_key, is_known)
+        # A full scan fetches known records again so
+        # content_hash can detect an updated article.
+        # stop_after_known sources skip known detail
+        # downloads and use them only as the safe
+        # incremental stopping signal.
+        if is_known and self.discovery_policy != "full_scan":
+            self.logger.info("Known Media detail download skipped | key=%s", record_key)
+            return None, should_stop
+
+        self.discovery_service.record_detail_selected()
+        return scrapy.Request(
+            url=detail_url,
+            callback=self.parse_detail,
+            errback=self.detail_failed,
+            cb_kwargs={
+                "record_key": record_key,
+                "is_known": is_known,
+                "source_record_id": source_record_id,
+                "identity_fields": identity_fields,
+            },
+        ), should_stop
 
     def parse_listing(
         self,
@@ -198,114 +445,9 @@ class MediaSpider(scrapy.Spider):
                 href
             )
 
-            try:
-                source_record_id = (
-                    self._extract_source_record_id(
-                        detail_url
-                    )
-                )
-
-                identity_fields = (
-                    self._extract_identity_fields(
-                        link_node
-                    )
-                )
-
-                candidate_record = {
-                    "SourceURL": detail_url,
-                    "SourceRecordId": source_record_id,
-                    **identity_fields,
-                }
-
-                record_key = (
-                    self.discovery_service
-                    .build_record_key(
-                        candidate_record
-                    )
-                )
-
-            except ValueError as exc:
-                self.discovery_service.record_identity_failure()
-                self.logger.warning(
-                    "Could not build media identity "
-                    "for URL %s: %s",
-                    detail_url,
-                    exc,
-                )
-                continue
-
-            # Ignore duplicate links before they affect
-            # KNOWN counters.
-            if record_key in self.seen_record_keys:
-                self.logger.debug(
-                    "Duplicate media link ignored | key=%s",
-                    record_key,
-                )
-                continue
-
-            self.seen_record_keys.add(
-                record_key
-            )
-
-            try:
-                (
-                    is_known,
-                    should_stop,
-                ) = (
-                    self.discovery_service
-                    .check_record_key(
-                        record_key
-                    )
-                )
-
-            except Exception as exc:
-                self.discovery_service.record_identity_failure()
-                self.logger.warning(
-                    "Could not check media record "
-                    "key=%s: %s",
-                    record_key,
-                    exc,
-                )
-                continue
-
-            self.logger.info(
-                "Media discovered | key=%s | known=%s",
-                record_key,
-                is_known,
-            )
-
-            # A full scan fetches known records again so
-            # content_hash can detect an updated article.
-            # stop_after_known sources skip known detail
-            # downloads and use them only as the safe
-            # incremental stopping signal.
-            should_fetch_detail = (
-                not is_known
-                or self.discovery_policy
-                == "full_scan"
-            )
-
-            if should_fetch_detail:
-                self.discovery_service.record_detail_selected()
-
-                yield scrapy.Request(
-                    url=detail_url,
-                    callback=self.parse_detail,
-                    errback=self.detail_failed,
-                    cb_kwargs={
-                        "record_key": record_key,
-                        "is_known": is_known,
-                        "source_record_id": source_record_id,
-                        "identity_fields": identity_fields,
-                    },
-                )
-
-            else:
-                self.logger.info(
-                    "Known Media detail download skipped "
-                    "| key=%s",
-                    record_key,
-                )
+            request, should_stop = self._discover_detail(detail_url, link_node)
+            if request is not None:
+                yield request
 
             if should_stop:
                 should_stop_discovery = True
@@ -461,6 +603,7 @@ class MediaSpider(scrapy.Spider):
         is_known: bool,
         source_record_id: str | None,
         identity_fields: dict[str, Any] | None = None,
+        discovery_retry_key: str | None = None,
     ):
         """
         Save original HTML first, then extract fields.
@@ -501,6 +644,7 @@ class MediaSpider(scrapy.Spider):
                     "is_known": is_known,
                     "source_record_id": source_record_id,
                     "identity_fields": identity_fields,
+                    "discovery_retry_key": discovery_retry_key,
                 },
                 error=str(error),
                 error_type=type(error).__name__,
@@ -535,6 +679,7 @@ class MediaSpider(scrapy.Spider):
             "is_known": is_known,
             "detail_file_path": detail_file_path,
             "extracted": extracted_record,
+            "discovery_retry_key": discovery_retry_key,
         }
 
         self.records.append(
@@ -584,6 +729,7 @@ class MediaSpider(scrapy.Spider):
             "detail_url": detail_url,
             "source_record_id": details.get("source_record_id"),
             "identity_fields": details.get("identity_fields") or {},
+            "discovery_retry_key": details.get("discovery_retry_key"),
             "detail_file_path": None,
             "extracted": None,
             "failed": True,

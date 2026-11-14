@@ -332,7 +332,9 @@ def _build_transport(task: ApiCollectorTask):
     if task.transport == "browser":
         return BrowserTransport(task.bypass_config)
 
-    return RequestsTransport(headers=task.headers, timeout=task.timeout)
+    return RequestsTransport(
+        headers=task.headers, timeout=task.timeout, page_token=task.page_token
+    )
 
 
 def _dedup_pages(

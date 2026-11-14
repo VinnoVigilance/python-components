@@ -18,6 +18,7 @@ from transforms.preNormalization import (
     DateFormatHandler,
     EnumHandler,
     FlattenDictHandler,
+    HtmlUnescapeHandler,
     LanguageNameHandler,
     PreNormalizationEngine,
     RegexExtractAllHandler,
@@ -30,6 +31,13 @@ from transforms.preNormalization import (
 )
 
 pytestmark = pytest.mark.unit
+
+
+def test_html_unescape_decodes_one_layer_and_preserves_non_strings():
+    handler = HtmlUnescapeHandler()
+    assert handler.normalize("Fish &amp;amp; chips", "") == "Fish &amp; chips"
+    assert handler.normalize(None, "") is None
+    assert handler.normalize(["&amp;"], "") == ["&amp;"]
 
 
 class TestFlattenDictHandler:

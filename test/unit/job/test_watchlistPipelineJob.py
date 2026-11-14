@@ -1,4 +1,4 @@
-"""Unit tests for jobs/watchlistPiplineJob.py (hold -> WAITING, retry pass, CLI flags)."""
+"""Unit tests for jobs/watchlistPipelineJob.py (hold -> WAITING, retry pass, CLI flags)."""
 
 import os
 from contextlib import nullcontext
@@ -11,7 +11,7 @@ os.environ.setdefault("DB_PASSWORD", "test_dummy")
 os.environ.setdefault("STORAGE_SECRET_KEY_INGESTION", "test_dummy")
 
 import config.loggingConfig as loggingConfig  # noqa: E402
-import jobs.watchlistPiplineJob as job  # noqa: E402
+import jobs.watchlistPipelineJob as job  # noqa: E402
 import pipelines.watchlistPipeline as wp  # noqa: E402
 from repositories import jobStateRepository  # noqa: E402
 from services.job.jobRunner import SourceOutcome  # noqa: E402

@@ -1,3 +1,4 @@
+import html
 import json
 import re
 import pandas as pd
@@ -15,6 +16,13 @@ class BaseHandler:
     def normalize(self, value, rule):
 
         raise NotImplementedError
+
+
+class HtmlUnescapeHandler(BaseHandler):
+    """Decode one HTML entity layer; use target_field to keep the original."""
+
+    def normalize(self, value, rule):
+        return html.unescape(value) if isinstance(value, str) else value
 
 
 # =========================================================
@@ -469,6 +477,7 @@ class LanguageNameHandler(BaseHandler):
 # =========================================================
 
 HANDLERS = {
+    "html_unescape": HtmlUnescapeHandler(),
     "enum": EnumHandler(),
     "enum_lookup": EnumHandler(mode="lookup"),
     "enum_add_field": EnumHandler(mode="add_field"),

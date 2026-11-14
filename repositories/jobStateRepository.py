@@ -56,7 +56,7 @@ def export_pending_csv(kind: str, path: Path) -> int:
             rows.append({
                 "source": name,
                 "key": item.get("record_id") or item.get("record_key"),
-                "url": item.get("detail_url") or item.get("detail_file_path"),
+                "url": item.get("detail_url") or item.get("detail_file_path") or item.get("index_file_url"),
                 "attempts": item.get("attempts", state.get("attempts")),
                 "error": item.get("error"),
                 "broken_on_source": bool(item.get("permanent")),
