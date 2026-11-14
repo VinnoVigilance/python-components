@@ -1,2 +1,5 @@
 research/watchlistRiskClassification/cache/student_e5small_v6/*.safetensors filter=lfs diff=lfs merge=lfs -text
 intelligence/risk/watchlistRiskCategory/models/*/*.safetensors filter=lfs diff=lfs merge=lfs -text
+
+# Keep checksum-verified watchlist model metadata byte-identical across platforms.
+intelligence/risk/watchlistRiskCategory/models/student-e5small-v6/*.json text eol=lf

@@ -145,7 +145,7 @@ def test_mapping_keeps_three_attachment_roles_even_when_images_share_a_url(canon
         ("Additional Info", BIOGRAPHY)
     ]
     assert record["Occupations"][0]["Department"] == "Comptrollership Sub-Sector"
-    assert record["Occupations"][0]["Note"] == "Assistant Governor | Internal Audit Office"
+    assert record["Occupations"][0]["Note"] == "Affiliation: Assistant Governor | Internal Audit Office"
 
 
 def test_mapping_creates_jurisdiction_without_a_country_field_in_raw(canonical):

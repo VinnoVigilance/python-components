@@ -123,9 +123,9 @@
   },
   "validation_status": "v6 requires fresh independent evaluation",
   "files_sha256": {
-    "config.json": "5656456e77732b4117221d82563d0d099135d1a533b8c798f45b99f8d8fc80b2",
-    "tokenizer.json": "41afa0ea6683b445a509006f45162ccea64db9aaaca0a5c11ce3ab7526323b96",
-    "tokenizer_config.json": "4a0889ef5175b1a838fe2e6e5aace5252f453889b0480eff7a6a7fe90eefc99e",
+    "config.json": "bfd8a2813d7bc22cb6b26d534e8ecc21374966491acdc7420c11cfba531a343b",
+    "tokenizer.json": "10816bb98a3963b4dbf61ecaf409d96927a1c7867e0b9cfbd7baed2bc3d49af7",
+    "tokenizer_config.json": "4c9a12db838c9f97f50869806999f75d7a9a4e0f3e70a063fe9b03ed8daab229",
     "model.safetensors": "6ac36d64dfb8d50d58cf5aae2a2c66ee28271c6b6bbbe41dc9e3b7f26713b41d"
   },
   "research_sources_sha256": {

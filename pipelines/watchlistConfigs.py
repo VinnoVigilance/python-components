@@ -1,3 +1,14 @@
+def _ofac_authority_preprocessing():
+    return {
+        "handler": "join_object_field_values",
+        "config": {
+            "source_path": "legalAuthorities.legalAuthority",
+            "value_path": "text",
+            "target_field": "legalAuthoritiesText",
+        },
+    }
+
+
 WATCHLIST_CONFIGS = {
     "DFAT": {
         "source_name": "DFAT",
@@ -13,6 +24,7 @@ WATCHLIST_CONFIGS = {
             {
                 "handler": "merge_dfat_split_records",
                 "level": "dataset",
+                "config": {"designations_field": "ProgrammeDesignations"},
             },
         ],
     },
@@ -28,6 +40,7 @@ WATCHLIST_CONFIGS = {
         "file_type": "xml",
         "root_tags": ["entity"],
         "external_id_path": "id",
+        "preprocessing": [_ofac_authority_preprocessing()],
         "schedule": "daily",
         "versioning_strategy": "continuous",
     },
@@ -44,6 +57,7 @@ WATCHLIST_CONFIGS = {
         "file_type": "xml",
         "root_tags": ["entity"],
         "external_id_path": "id",
+        "preprocessing": [_ofac_authority_preprocessing()],
         "schedule": "daily",
     },
 

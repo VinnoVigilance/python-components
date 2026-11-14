@@ -1,9 +1,9 @@
 """Combine frozen lookup rules and CPU student predictions for a watchlist member."""
 
-import re
 from pathlib import Path
 
 from intelligence.risk.result import calculation_version, implementation_version
+from intelligence.risk.labelContract import load_taxonomy
 from intelligence.risk.watchlistRiskCategory import highlighter, lookupRules, watchlistText
 from intelligence.risk.watchlistRiskCategory.student import VICTIM_LABEL, WatchlistStudent
 
@@ -11,29 +11,53 @@ from intelligence.risk.watchlistRiskCategory.student import VICTIM_LABEL, Watchl
 class WatchlistRiskClassifier:
     """Calculate a watchlist assessment without database access."""
 
-    def __init__(self, model_path=None, threads=4):
-        self.student = WatchlistStudent(model_path, threads)
-        contract = self.student.contract
-        self.labels = dict(zip(contract.artifact_labels, zip(contract.label_ids, contract.display_labels)))
-        scope = set(self.student.manifest["text_labels"])
-        self.triggers = highlighter.compile_triggers(
-            {key: values for key, values in highlighter.TAXONOMY_TRIGGERS.items() if key in scope},
-            {key: values for key, values in highlighter.EXTRA_TRIGGERS.items() if key in scope},
-        )
+    def __init__(self, model_path=None, threads=4, model_enabled=True):
+        self.student = WatchlistStudent(model_path, threads) if model_enabled else None
+        self.taxonomy_version, self.taxonomy = load_taxonomy()
+        self.lookup_labels = {item["display_name"]: (label_id, item["display_name"])
+                              for label_id, item in self.taxonomy.items()}
         self.rules_version = implementation_version([lookupRules.__file__])
         self.runtime_version = implementation_version([
             __file__, highlighter.__file__, watchlistText.__file__,
             Path(__file__).parent / "watchlistRiskCategory/student.py",
             Path(__file__).parent / "labelContract.py", Path(__file__).parent / "result.py",
         ])
+        self.lookup_calculation_version = calculation_version(self.rules_version, self.runtime_version)
+        if self.student is None:
+            return
+        contract = self.student.contract
+        if self.taxonomy_version != contract.taxonomy_version:
+            raise ValueError("Watchlist model and risk taxonomy versions disagree.")
+        self.labels = dict(zip(contract.artifact_labels, zip(contract.label_ids, contract.display_labels)))
+        scope = set(self.student.manifest["text_labels"])
+        self.triggers = highlighter.compile_triggers(
+            {key: values for key, values in highlighter.TAXONOMY_TRIGGERS.items() if key in scope},
+            {key: values for key, values in highlighter.EXTRA_TRIGGERS.items() if key in scope},
+        )
         self.calculation_version = calculation_version(
             self.student.artifact_version, self.student.policy_version,
             self.rules_version, self.runtime_version,
         )
-        self.lookup_calculation_version = calculation_version(self.rules_version, self.runtime_version)
 
     def classify(self, payload):
         """Return labels and passage decisions tied to the frozen model recipe."""
+        categories = {}
+        for name, explanation in lookupRules.record_rule_labels(payload, self.taxonomy).items():
+            label_id, display_name = self.lookup_labels[name]
+            categories[label_id] = {"riskCategoryId": label_id, "riskCategoryName": display_name,
+                                    "method": "lookup", "explanation": explanation,
+                                    "metadata": {
+                                        "rulesVersion": self.rules_version,
+                                        "calculationVersion": self.lookup_calculation_version,
+                                    }}
+        if self.student is None:
+            return {
+                "assessmentStatus": "CLASSIFIED",
+                "riskCategories": [categories[key] for key in sorted(categories)],
+                "reviewRequired": [],
+                "taxonomyVersion": self.taxonomy_version,
+                "calculationVersion": self.lookup_calculation_version,
+            }
         sources = list(dict.fromkeys(
             item["ListName"].strip() for item in payload.get("Sources") or []
             if isinstance(item, dict) and isinstance(item.get("ListName"), str) and item["ListName"].strip()
@@ -41,7 +65,7 @@ class WatchlistRiskClassifier:
         if len(sources) != 1:
             raise ValueError("A source member assessment requires exactly one distinct Sources[].ListName.")
         source = sources[0]
-        text = watchlistText.render(payload, source)
+        text = watchlistText.render(payload)
         units = highlighter.split_units(text)
         candidates = highlighter.flag_units(units, self.triggers, source=source, version="v6")
         names, texts = [], []
@@ -53,18 +77,9 @@ class WatchlistRiskClassifier:
             texts.append(f"{units[index][0]}: {units[index][1]} || {before} [...] {after}")
         if candidates:
             names.append(VICTIM_LABEL)
-            texts.append(re.sub(r"^Source list:.*\n", "", text)[:self.student.policy["victim_record_chars"]])
+            texts.append(text[:self.student.policy["victim_record_chars"]])
         scores = self.student.score(names, texts)
         victim = bool(candidates) and scores[-1] >= self.student.policy["victim_threshold"]
-        categories = {}
-        for name in lookupRules.record_rule_labels(source, payload):
-            label_id, display_name = self.labels[name]
-            categories[label_id] = {"riskCategoryId": label_id, "riskCategoryName": display_name,
-                                    "method": "lookup", "explanation": "",
-                                    "metadata": {
-                                        "rulesVersion": self.rules_version,
-                                        "calculationVersion": self.lookup_calculation_version,
-                                    }}
         lookup_ids = set(categories)
         review_required = {}
         auto_apply_ids = set(self.student.policy["auto_apply_text_label_ids"])
@@ -95,4 +110,5 @@ class WatchlistRiskClassifier:
             "riskCategories": [categories[key] for key in sorted(categories)],
             "reviewRequired": [review_required[key] for key in sorted(review_required)],
             "taxonomyVersion": self.student.contract.taxonomy_version,
+            "calculationVersion": self.calculation_version,
         }

@@ -41,7 +41,7 @@ def test_only_failed_id_is_retried_without_rescanning_later_dates(runtime, monke
     broken = True
     visited = []
 
-    def process(connection, repo, work, mode, classify):
+    def process(connection, repo, work, mode, classify, *, subject):
         visited.append(work["id"])
         if work["id"] == 2 and broken:
             raise ValueError("temporary failure")
