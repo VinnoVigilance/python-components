@@ -67,3 +67,6 @@ docs/field-mapper-guide.md
 docs/server-and-pgadmin-guide.md
 
 /data/ocr/
+
+/intelligence/entityExtraction/models/ensemble-v1/*
+!/intelligence/entityExtraction/models/ensemble-v1/manifest.json

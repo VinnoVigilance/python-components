@@ -2890,4 +2890,67 @@ WATCHLIST_CONFIGS = {
             }
         ]
     },
+
+    "FINRA_INDIVIDUALS_BARRED": {
+        "source_name": "FINRA",
+        "list_name": "FINRA_INDIVIDUALS_BARRED",
+        "download_method": "HTTPS",
+        "url": (
+            "https://www.finra.org/rules-guidance/enforcement/"
+            "individuals-barred-finra"
+        ),
+        "file_type": "html",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "source_config": (
+            "config/watchlistSources/finra_individuals_barred.yaml"
+        ),
+        "external_id_path": "source_record_id",
+        "minimum_record_count": 5000,
+        "date_order": "MDY",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "enrich_profiles": True,
+            "record_shape": {
+                "id_path": "source_record_id",
+            },
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "Mozilla/5.0",
+            },
+            "timeout": 30,
+
+            "retry": 6,
+            "retry_delay_seconds": 5,
+            "retry_backoff_multiplier": 2,
+            "retry_max_delay_seconds": 60,
+
+            "throttle_delay": 0.5,
+            
+            "detail": {
+                "max_workers": 30,
+                "retry_rounds": 3,
+                "id_path": "list.crd",
+                "url_template": (
+                    "https://api.brokercheck.finra.org/"
+                    "search/individual/{id}"
+                ),
+                "items_path": "hits.hits",
+                "content_path": "_source.content",
+                "content_is_json": True,
+                "response_id_path": "basicInformation.individualId",
+            },
+        },
+
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+        ],
+    },
 }

@@ -6,7 +6,11 @@ from typing import Any
 
 from infrastructure.database.connection import connection_pool
 from infrastructure.storage import seaweedClient
-from ingestion.apiCollector.interface import ApiCollectorTask, collect
+from ingestion.apiCollector.interface import (
+    ApiCollectorTask,
+    collect,
+    collect_profiles,
+)
 from ingestion.crawler.interface import crawl
 from ingestion.crawler.models import CrawlerTask
 from ingestion.downloader.models import DownloadTask
@@ -16,6 +20,7 @@ from repositories import jobStateRepository
 from repositories import watchlistFileLogRepository
 from repositories import watchlistFileRepository
 from utils.hashing import calculate_file_hash
+from parsing.jsonlParser import JsonlParser
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -29,7 +34,11 @@ class AcquisitionResult:
     broken_details: list[dict[str, Any]] = field(default_factory=list)
 
 
-def acquire_source(config: dict[str, Any], downloader: Any) -> AcquisitionResult:
+def acquire_source(
+    config: dict[str, Any],
+    downloader: Any,
+    source_file_path=None,
+) -> AcquisitionResult:
     """Acquire a source and return a consistent acquisition result."""
 
     if str(config.get("download_method", "")).upper() == "CRAWLER":
@@ -66,12 +75,59 @@ def acquire_source(config: dict[str, Any], downloader: Any) -> AcquisitionResult
             broken_details=broken,
         )
 
-    source_file_path = acquire_source_file(
-        config=config,
-        downloader=downloader,
+    source_file_path = (
+        Path(source_file_path).resolve()
+        if source_file_path is not None
+        else acquire_source_file(
+            config=config,
+            downloader=downloader,
+        )
     )
 
-    return AcquisitionResult(source_file_path=source_file_path)
+    if config.get("api_config", {}).get("enrich_profiles"):
+        if source_file_path.suffix.lower() != ".jsonl":
+            result = crawl(CrawlerTask(
+                url=config["url"],
+                source_name=config["source_name"],
+                list_name=config["list_name"],
+                source_config_path=str(
+                    (ROOT_DIR / config["source_config"]).resolve()
+                ),
+                source_file_path=str(source_file_path),
+                download_dir=str(
+                    ROOT_DIR / "data" / "downloads"
+                ),
+            ))
+
+            records = list(result.records)
+            minimum = int(
+                config.get("minimum_record_count", 1)
+            )
+
+            if len(records) < minimum:
+                raise ValueError(
+                    f"Only {len(records)} listing records; "
+                    f"expected at least {minimum}"
+                )
+
+            source_file_path = Path(collect_profiles(
+                ApiCollectorTask.from_config(config),
+                records,
+                source_file_path,
+            ))
+
+        records = list(
+            JsonlParser().parse(source_file_path, config)
+        )
+
+        return AcquisitionResult(
+            source_file_path=source_file_path,
+            records=records,
+        )
+
+    return AcquisitionResult(
+        source_file_path=source_file_path
+    )
 
 
 class CrawlOnHold(Exception):

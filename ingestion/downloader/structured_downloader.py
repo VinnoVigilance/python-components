@@ -62,6 +62,8 @@ def _build_final_filename(
 
     timestamp = downloaded_at.strftime("%Y%m%d_%H%M%S")
     extension = Path(original_name).suffix
+    if not extension and task.file_type:
+        extension = f".{task.file_type.lstrip('.')}"
 
     return f"{task.list_name}_{timestamp}{extension}"
 

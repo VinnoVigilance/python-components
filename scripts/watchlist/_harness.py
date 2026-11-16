@@ -113,6 +113,16 @@ def stage_ingest(config: dict) -> Path | None:
 def stage_extract(config: dict, source_file=None) -> tuple[list[dict], Path | None]:
     """Parser (file) or spider (crawler / saved_html) -> raw records + the source file used."""
     extraction_method = str(config.get("extraction_method", "")).upper()
+    if config.get("api_config", {}).get("enrich_profiles"):
+        acquisition = watchlistFileService.acquire_source(
+            config=config,
+            downloader=downloader,
+            source_file_path=source_file,
+        )
+        return (
+            list(acquisition.records or []),
+            Path(acquisition.source_file_path),
+        )
 
     if is_crawler(config):
         result = crawl(
