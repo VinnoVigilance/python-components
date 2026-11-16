@@ -9,6 +9,7 @@ from intelligence.risk.interface import create_classifier
 from intelligence.risk.result import build_assessment_payload
 from intelligence.risk.watchlistRiskCategory.lookupRules import RiskMappingError
 from repositories import jobStateRepository
+from services.incremental.deltaScan import destination_delta_window, iter_effective_dates
 from utils.hashing import calculate_record_hash
 
 
@@ -28,9 +29,20 @@ def _process(connection, repository, item, mode, classify, *, subject=None):
               if mode == "incremental" else repository.find_current_source(connection, item["subject_id"]))
     if source is None or source["subject_id"] != item["subject_id"]:
         raise LookupError(f"Missing matching source version for {item['subject_id']}.")
+    if subject == "media" and action != "DELETE" and source["change_type"] == "DELETED":
+        logger.warning("Skipping deleted media source %s", source["id"])
+        return "skipped"
     latest = repository.find_current_source(connection, item["subject_id"]) if mode == "incremental" else source
     historical = latest is None or latest["id"] != source["id"]
     with connection.cursor() as cursor:
+        if subject == "media" and action == "DELETE":
+            if latest and latest["version_no"] > source["version_no"]:
+                return "skipped"
+            current_risk = repository.find_current_risk(cursor, item["subject_id"])
+            if not current_risk or current_risk["version_no"] > source["version_no"]:
+                return "skipped"
+            repository.expire_current(cursor, item["subject_id"])
+            return "deleted"
         if action == "DELETE" or source["change_type"] == "DELETED":
             current_risk = repository.find_current_risk(cursor, item["subject_id"])
             if (not historical and current_risk
@@ -205,6 +217,12 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
             state = jobStateRepository.load_state("risk", subject) or {}
             pending_items = state.setdefault("items", {})
             target_date = effective_date if effective_date is not None else date.today()
+            if mode == "incremental" and subject == "media":
+                with connection:
+                    with connection.cursor() as cursor:
+                        media_baseline, target_date = destination_delta_window(
+                            cursor, repository.latest_risk_date, through=effective_date,
+                        )
 
             def record_result(item, item_mode, item_date, error):
                 key = f"{item_mode}:{item['id']}"
@@ -247,11 +265,14 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
                     result[outcome + "_count"] += 1
 
             if mode == "incremental":
-                with connection:
-                    with connection.cursor() as cursor:
-                        baseline = repository.latest_risk_date(cursor)
+                if subject == "media":
+                    frontier = media_baseline
+                else:
+                    with connection:
+                        with connection.cursor() as cursor:
+                            baseline = repository.latest_risk_date(cursor)
+                    frontier = date.fromisoformat(state["next_date"]) if state.get("next_date") else baseline
                 result["target_date"] = target_date
-                frontier = date.fromisoformat(state["next_date"]) if state.get("next_date") else baseline
                 starts = [frontier] if frontier else []
                 for key in ("inflight_date", "replay_from"):
                     if state.get(key):
@@ -265,9 +286,9 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
                 next_date = None
                 last_available = None
 
-            while not result["limit_reached"] and (mode == "initial" or (
-                    next_date is not None and last_available is not None
-                    and next_date <= last_available)):
+            effective_dates = iter_effective_dates(next_date, last_available)
+            next_date = next(effective_dates, None)
+            while not result["limit_reached"] and (mode == "initial" or next_date is not None):
                 if max_rows and result["processed_count"] >= max_rows:
                     result["limit_reached"] = True
                     break
@@ -298,7 +319,7 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
                                          (next_date + timedelta(days=1)).isoformat())
                 state.pop("inflight_date", None)
                 jobStateRepository.save_state("risk", subject, state)
-                next_date += timedelta(days=1)
+                next_date = next(effective_dates, None)
 
             result["pending_count"] = len(pending_items)
             if result["limit_reached"]:

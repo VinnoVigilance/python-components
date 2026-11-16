@@ -36,7 +36,7 @@ def runtime(monkeypatch):
     return repository, records
 
 
-def test_only_failed_id_is_retried_without_rescanning_later_dates(runtime, monkeypatch):
+def test_failed_id_is_retried_even_outside_new_destination_window(runtime, monkeypatch):
     repository, _ = runtime
     broken = True
     visited = []
@@ -58,6 +58,7 @@ def test_only_failed_id_is_retried_without_rescanning_later_dates(runtime, monke
     assert state["items"]["incremental:2"]["effective_date"] == "2026-10-02"
 
     broken = False
+    repository.latest_risk_date.return_value = date(2026, 10, 21)
     visited.clear()
     repository.find_delta_batch.reset_mock()
     result = processing.run("media", repository, 1, effective_date=date(2026, 10, 21))
@@ -72,6 +73,7 @@ def test_only_failed_id_is_retried_without_rescanning_later_dates(runtime, monke
 
 def test_exhausted_retry_remains_queued_while_new_dates_advance(runtime, monkeypatch):
     repository, _ = runtime
+    repository.latest_risk_date.return_value = date(2026, 10, 21)
     jobStateRepository.save_state("risk", "media", {
         "next_date": "2026-10-21", "items": {"incremental:2": saved_item()},
     })
@@ -130,6 +132,7 @@ def test_retry_uses_row_budget_before_new_scans(runtime, monkeypatch):
 
 def test_future_pending_item_is_preserved_for_later_target(runtime, monkeypatch):
     repository, _ = runtime
+    repository.latest_risk_date.return_value = date(2026, 10, 21)
     jobStateRepository.save_state("risk", "media", {
         "next_date": "2026-10-21", "items": {"incremental:22": saved_item(22, "2026-10-22")},
     })
@@ -210,3 +213,65 @@ def test_record_retries_are_bounded_and_counted_once(runtime, monkeypatch, failu
     assert result["processed_count"] == 1
     assert process.call_count == min(failures + 1, 3)
     assert result["failed_count"] == int(failures == 3)
+
+
+
+
+
+def test_media_scans_destination_window_even_with_saved_next_date(runtime, monkeypatch):
+    repository, records = runtime
+    start = date(2026, 10, 2)
+    end = date(2026, 10, 4)
+    repository.latest_risk_date.return_value = start
+    connection = processing.connection_pool.getconn.return_value
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = (end,)
+    records.clear()
+    records.update({start: [item(30)], end: [item(10)]})
+    jobStateRepository.save_state("risk", "media", {"next_date": end.isoformat()})
+    process = MagicMock(return_value="skipped")
+    monkeypatch.setattr(processing, "_process", process)
+
+    result = processing.run("media", repository, 1)
+
+    cursor.execute.assert_called_once_with("SELECT CURRENT_DATE")
+    assert [entry["effective_date"] for entry in result["dates"]] == [
+        start, date(2026, 10, 3), end,
+    ]
+    assert [entry.args[2]["id"] for entry in process.call_args_list] == [30, 10]
+
+
+@pytest.mark.parametrize(("current_source_version", "risk_version", "outcome"), [
+    (None, 2, "deleted"),
+    (3, 2, "skipped"),
+    (None, 3, "skipped"),
+    (None, None, "skipped"),
+])
+def test_media_delete_protects_newer_results(
+    current_source_version, risk_version, outcome,
+):
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    repository = MagicMock()
+    work = {**item(2), "action": "DELETE"}
+    source = {"id": work["source_record_id"], "subject_id": work["subject_id"],
+              "change_type": "DELETED", "version_no": 2}
+    repository.find_source_version.return_value = source
+    repository.find_current_source.return_value = (
+        {**source, "id": 103, "version_no": current_source_version}
+        if current_source_version is not None else None
+    )
+    repository.find_current_risk.return_value = (
+        {"version_no": risk_version} if risk_version is not None else None
+    )
+    classify = MagicMock()
+
+    assert processing._process(
+        connection, repository, work, "incremental", classify, subject="media",
+    ) == outcome
+
+    classify.assert_not_called()
+    if outcome == "deleted":
+        repository.expire_current.assert_called_once_with(cursor, work["subject_id"])
+    else:
+        repository.expire_current.assert_not_called()
