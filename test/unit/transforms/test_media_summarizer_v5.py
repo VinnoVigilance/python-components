@@ -1,7 +1,7 @@
 """Contract checks for exact, adaptive CPU news highlights."""
 import html
 import unittest
-from transforms.mediaSummarizer import Summarizer, sentence_split, normalize
+from intelligence.summary.mediaSummarizer import Summarizer, sentence_split, normalize
 
 
 class NewsHighlightTests(unittest.TestCase):

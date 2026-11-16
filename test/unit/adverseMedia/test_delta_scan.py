@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from services.incremental.deltaScan import destination_delta_window, iter_effective_dates
+from services.common.incrementalDeltaScan import destination_delta_window, iter_effective_dates
 
 
 def test_destination_window_includes_every_day_in_order():

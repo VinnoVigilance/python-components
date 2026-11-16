@@ -1,9 +1,9 @@
 """Prepare article analysis for the media post-processing repository."""
 
-from intelligence.adverseNews.predictor import DECISION_THRESHOLD, MODEL_SHA256, MODEL_VERSION
+from intelligence.adverseStatus.predictor import DECISION_THRESHOLD, MODEL_SHA256, MODEL_VERSION
 from infrastructure.database.connection import get_db_connection
-from repositories.adverseMedia import mediaPostProcessingRepository as repository
-from transforms.mediaSummarizer import Summarizer, VERSION as SUMMARIZER_VERSION
+from repositories.mediaPostProcess import mediaRecordPostProcessRepository as repository
+from intelligence.summary.mediaSummarizer import Summarizer, VERSION as SUMMARIZER_VERSION
 from utils.hashing import calculate_record_hash
 
 

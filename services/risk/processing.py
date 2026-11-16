@@ -9,7 +9,7 @@ from intelligence.risk.interface import create_classifier
 from intelligence.risk.result import build_assessment_payload
 from intelligence.risk.watchlistRiskCategory.lookupRules import RiskMappingError
 from repositories import jobStateRepository
-from services.incremental.deltaScan import destination_delta_window, iter_effective_dates
+from services.common.incrementalDeltaScan import destination_delta_window, iter_effective_dates
 from utils.hashing import calculate_record_hash
 
 

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from scipy.sparse import csr_matrix
 
-from intelligence.adverseNews import predictor
+from intelligence.adverseStatus import predictor
 
 
 def test_prediction_preserves_order_and_uses_text_only(tmp_path, monkeypatch):

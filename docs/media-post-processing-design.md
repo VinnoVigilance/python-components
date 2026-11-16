@@ -10,10 +10,10 @@ The following paths show the implementation responsibilities. The pipeline uses 
 | --- | --- |
 | `pipelines/mediaPostProcessingPipeline.py` | Callable entry point. Validate the run mode, select and page through work using the repository, pass bounded batches to the service, and return run totals. |
 | `services/adverseMediaPipeline/mediaPostProcessingService.py` | Translate canonical article records into processor inputs, call both processors, build the payload and manifest, and apply the hash comparison and write policy. Own the transaction for each article. |
-| `repositories/adverseMedia/mediaPostProcessingRepository.py` | Execute SQL for core and delta reads, source lookups and locks, and result lookup, expiry and insertion. Use the service's transaction for writes. |
-| `transforms/mediaSummarizer.py` | Existing summarizer implementation. It selects sentences from article text and does not depend on normalization or the database. |
-| `intelligence/adverseNews/predictor.py` | Load and verify the frozen adverse-news model and expose batched prediction. |
-| `intelligence/adverseNews/models/adverse-news-word-char-lsa200-rbf-svm-v1/` | Versioned model bundle. Keep training, evaluation and offline CLI code on the research branch. |
+| `repositories/mediaPostProcess/mediaRecordPostProcessRepository.py` | Execute SQL for core and delta reads, source lookups and locks, and result lookup, expiry and insertion. Use the service's transaction for writes. |
+| `intelligence/summary/mediaSummarizer.py` | Existing summarizer implementation. It selects sentences from article text and does not depend on normalization or the database. |
+| `intelligence/adverseStatus/predictor.py` | Load and verify the frozen adverse-news model and expose batched prediction. |
+| `intelligence/adverseStatus/models/adverse-news-word-char-lsa200-rbf-svm-v1/` | Versioned model bundle. Keep training, evaluation and offline CLI code on the research branch. |
 
 Call the pipeline from Python for the initial implementation. The pipeline owns the predictor for the duration of the call and gives the service access to it for scoring. The downstream table described below consumes the saved result.
 
@@ -85,7 +85,7 @@ VVIF Data Insertion Guideline v1.6, PDF pages 41–50, specifies **watchlist** d
 
 Media ingestion inserts new article versions and closes replaced versions. The checked application code contains no media removal path. The media delta schema permits ADD, UPDATE and DELETE. The application calls the deployed generator, so review its definition and observed action counts before drawing conclusions about what it emits. Media post-processing and media risk expire the active result for a valid DELETE delta and retain its history.
 
-The shared window policy in services/incremental/deltaScan.py gets the latest insertion date from a module's destination repository and the current date from PostgreSQL. Each repository owns its SQL and table names. The incremental service yields each calendar day in the inclusive window in order. Both pipelines finish paging one effective date before moving to the next. For example, a November 13 start and a November 15 end scan November 13, 14 and 15 in order. Media risk uses the same start rule on regular runs and preserves explicit replay and interrupted-date recovery. An empty destination requires an initial load unless media risk has explicit recovery work.
+The shared window policy in services/common/incrementalDeltaScan.py gets the latest insertion date from a module's destination repository and the current date from PostgreSQL. Each repository owns its SQL and table names. The incremental service yields each calendar day in the inclusive window in order. Both pipelines finish paging one effective date before moving to the next. For example, a November 13 start and a November 15 end scan November 13, 14 and 15 in order. Media risk uses the same start rule on regular runs and preserves explicit replay and interrupted-date recovery. An empty destination requires an initial load unless media risk has explicit recovery work.
 
 Coordinate with delta generation because pagination is not a snapshot of a regenerating table.
 

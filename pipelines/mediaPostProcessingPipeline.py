@@ -5,10 +5,10 @@ from itertools import groupby
 from time import perf_counter
 
 from infrastructure.database.connection import get_db_connection
-from intelligence.adverseNews.predictor import AdverseNewsPredictor
-from repositories.adverseMedia import mediaPostProcessingRepository as repository
+from intelligence.adverseStatus.predictor import AdverseNewsPredictor
+from repositories.mediaPostProcess import mediaRecordPostProcessRepository as repository
 from services.adverseMediaPipeline.mediaPostProcessingService import MediaPostProcessingService
-from services.incremental.deltaScan import destination_delta_window, iter_effective_dates
+from services.common.incrementalDeltaScan import destination_delta_window, iter_effective_dates
 
 
 logger = logging.getLogger(__name__)
