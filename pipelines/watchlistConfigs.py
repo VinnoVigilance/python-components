@@ -2953,4 +2953,49 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+
+    "SAM_EXCLUSIONS": {
+        "source_name": "GSA",
+        "date_order": "MDY",
+        "list_name": "SAM_EXCLUSIONS",
+        "download_method": "HTTPS",
+        "url": (
+            "https://api.sam.gov/data-services/v1/extracts"
+        ),
+
+        "download_file_type": "zip",
+        "file_type": "csv",
+
+        "download_params": {
+            "fileType": "EXCLUSION",
+            "sensitivity": "PUBLIC",
+            "frequency": "DAILY",
+            "version": "V2",
+        },
+        "download_params_env": {
+            "api_key": "SAM_API_KEY",
+        },
+        "download_timeout": 180,
+        "download_retry": 1,
+
+        "external_id_path": "SAM Number",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 100000,
+        "preprocessing": [
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "Classification",
+                    "pattern": r"^(?P<value>.*)$",
+                    "outputs": {
+                        "value": "SourceClassification",
+                    },
+                },
+            },
+        ],
+    },
+
 }
+

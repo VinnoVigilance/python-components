@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import os
 
 from infrastructure.database.connection import connection_pool
 from infrastructure.storage import seaweedClient
@@ -350,24 +351,48 @@ def _download_source_file(
     config: dict[str, Any],
     downloader: Any,
 ) -> Path:
-    """Resolve the download URL and download the source file."""
-
     download_url = resolve_url(config)
+
+    params = dict(config.get("download_params") or {})
+
+    for name, env_name in (
+        config.get("download_params_env") or {}
+    ).items():
+        value = os.getenv(env_name)
+
+        if value is None or not value.strip():
+            raise ValueError(
+                "Required environment variable is missing: "
+                f"{env_name}"
+            )
+
+        params[name] = value
 
     download_task = DownloadTask(
         url=download_url,
         source_name=config["source_name"],
-        list_name=config.get("list_name", config["source_name"]),
-        file_type=config.get("file_type"),
-        headers=config.get("download_headers", {}),
+        list_name=config.get(
+            "list_name",
+            config["source_name"],
+        ),
+        file_type=(
+            config.get("download_file_type")
+            or config.get("file_type")
+        ),
+        params=params,
+        headers=config.get("download_headers") or {},
+        filename=config.get("download_filename"),
+        timeout=config.get("download_timeout", 30),
+        retry=config.get("download_retry", 3),
     )
 
     downloaded_file_path = downloader.download(download_task)
     source_file_path = Path(downloaded_file_path).resolve()
 
-    if not source_file_path.exists():
+    if not source_file_path.is_file():
         raise FileNotFoundError(
-            f"Downloaded source file was not found: {source_file_path}"
+            "Downloaded source file was not found: "
+            f"{source_file_path}"
         )
 
     return source_file_path
@@ -620,3 +645,4 @@ def insert_file_log(
 
     finally:
         connection_pool.putconn(connection)
+

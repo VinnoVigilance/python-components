@@ -62,11 +62,11 @@ def _build_final_filename(
 
     timestamp = downloaded_at.strftime("%Y%m%d_%H%M%S")
     extension = Path(original_name).suffix
+
     if not extension and task.file_type:
-        extension = f".{task.file_type.lstrip('.')}"
+        extension = "." + task.file_type.lower().lstrip(".")
 
     return f"{task.list_name}_{timestamp}{extension}"
-
 
 def download_file(task: DownloadTask) -> str:
     downloaded_at = datetime.now()
@@ -122,6 +122,7 @@ def download_file(task: DownloadTask) -> str:
             response = requests.get(
                 task.url,
                 headers=headers,
+                params=task.params,
                 timeout=task.timeout,
                 stream=True,
                 allow_redirects=True,
@@ -173,10 +174,16 @@ def download_file(task: DownloadTask) -> str:
                 perf_counter() - started,
                 2,
             )
+
             http_status = getattr(
                 getattr(error, "response", None),
                 "status_code",
                 None,
+            )
+
+            safe_error = (
+                f"{type(error).__name__}: "
+                f"host={host} http_status={http_status}"
             )
 
             logger.warning(
@@ -190,7 +197,7 @@ def download_file(task: DownloadTask) -> str:
                 duration,
                 http_status,
                 type(error).__name__,
-                error,
+                safe_error,
                 extra={
                     "event": "HTTP_DOWNLOAD_FAILED",
                     "stage": "DOWNLOAD",
@@ -201,14 +208,14 @@ def download_file(task: DownloadTask) -> str:
                         "duration_seconds": duration,
                         "http_status": http_status,
                         "error_type": type(error).__name__,
-                        "error": str(error),
+                        "error": safe_error,
                     },
                 },
             )
 
             if attempt == task.retry:
-                raise
+                raise RuntimeError(safe_error) from None
 
     raise RuntimeError(
-        f"Failed to download source file: {task.url}"
+        f"Failed to download source file: host={host}"
     )

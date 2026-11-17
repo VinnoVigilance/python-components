@@ -5,6 +5,7 @@ from copy import deepcopy
 from datetime import date, datetime
 import re
 import unicodedata
+from transforms.post_normalization.dateResolver import MAX_YEAR
 
 from inscriptis import get_text
 import logging
@@ -69,8 +70,19 @@ def empty_dependency_handler(entity, rule, config=None):
     entity[tgt_list_name] = tgt_list
 
 
-def _iso_or_blank(text, date_order):
-    """Full date -> ISO 'YYYY-MM-DD'; non-date -> ''; partial -> None (keep as written)."""
+def _iso_or_blank(text, date_order, *, allow_extended_years=False):
+    if allow_extended_years:
+        raw = str(text or "").strip()
+
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+            try:
+                candidate = date.fromisoformat(raw)
+            except ValueError:
+                pass
+            else:
+                if candidate.year > MAX_YEAR:
+                    return candidate.isoformat()
+
     parsed = parse_date_string(text, date_order)
 
     if parsed and parsed[0] and parsed[1] and parsed[2]:
@@ -80,7 +92,6 @@ def _iso_or_blank(text, date_order):
         return ""
 
     return None
-
 
 def date_normalization_handler(entity, rule, config=None):
     # If a DATE_NORMALIZATION rule is running then date_order genuinely
@@ -122,7 +133,11 @@ def date_normalization_handler(entity, rule, config=None):
                 # Only a whole date earns an ISO value (the resolver's own rule);
                 # a non-date (empty, junk, PERMANENT) is blanked so a permanent
                 # measure reads as "no end", partial dates are left as written.
-                iso = _iso_or_blank(item.get(leaf), date_order)
+                iso = _iso_or_blank(
+                    item.get(leaf),
+                    date_order,
+                    allow_extended_years=(leaf == "EndDate"),
+                )
 
                 if iso is not None:
                     item[leaf] = iso
