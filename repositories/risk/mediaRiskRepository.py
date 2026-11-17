@@ -4,9 +4,8 @@ from psycopg2.extras import Json, RealDictCursor
 
 
 def latest_risk_date(cursor):
-    cursor.execute("SELECT MAX(created_at) FROM core.media_risk_category")
-    value = cursor.fetchone()[0]
-    return value.astimezone().date() if value else None
+    cursor.execute("SELECT MAX(created_at)::date FROM core.media_risk_category")
+    return cursor.fetchone()[0]
 
 
 def find_scan_end(cursor, mode, effective_date=None):

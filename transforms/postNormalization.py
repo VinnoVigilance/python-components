@@ -10,7 +10,6 @@ from transforms.post_normalization.dateResolver import MAX_YEAR
 from inscriptis import get_text
 import logging
 
-from transforms.post_normalization.summarizer import Summarizer
 
 from transforms.post_normalization.dateResolver import (
     parse_date_string,
@@ -31,11 +30,6 @@ from transforms.searchEnrichment import (
 )
 
 logger = logging.getLogger(__name__)
-
-_MEDIA_SUMMARIZER = Summarizer(
-    engine="hybrid",
-    sentences=0,
-)
 
 def empty_dependency_handler(entity, rule, config=None):
     condition_path = rule["condition_path"]
@@ -253,56 +247,6 @@ def normalize_body_text_handler(entity, rule, config=None):
     content["BodyText"] = normalized_text.strip()
 
 
-def generate_media_summary_handler(entity, rule, config=None):
-    """
-    Generate media summary when Content.Summary is empty.
-    Uses the normalized Content.BodyText.
-    """
-
-    content = entity.get("Content")
-
-    if not isinstance(content, dict):
-        return
-
-    # 1. Preserve existing source summary
-    existing_summary = content.get("Summary")
-
-    if existing_summary is not None:
-        if not isinstance(existing_summary, str):
-            return
-
-        if existing_summary.strip():
-            return
-
-    # 2. Get normalized body text
-    body_text = content.get("BodyText")
-
-    if not isinstance(body_text, str) or not body_text.strip():
-        return
-
-    # 3. Generate summary
-    try:
-        result = _MEDIA_SUMMARIZER.summarize(
-            body_text,
-            title=content.get("Title") if isinstance(content.get("Title"), str) else "",
-        )
-
-    except Exception:
-        logger.exception("Media summarization failed")
-        return
-
-    # 4. Save accepted summary
-    if result.status == "AUTO_CANDIDATE" and result.summary.strip():
-        content["Summary"] = result.summary
-
-    # 5. Log summaries requiring review
-    elif result.status == "MANUAL_REVIEW":
-        logger.warning(
-            "Media summary requires review: %s",
-            result.flags,
-        )
-
-
 def deduplicate_all_arrays_handler(entity, rule, config=None):
 
     def make_hashable(value):
@@ -362,7 +306,6 @@ _SEARCH_TRANSFORMS = {
     "COUNTRY_CODE": country_to_iso2,
     "COUNTRY_NAME": country_code_to_name,
     "NORMALIZE_NUMBER": normalize_number,
-    "GENERATE_MEDIA_SUMMARY": generate_media_summary_handler,
 }
 
 
@@ -681,7 +624,6 @@ HANDLERS = {
     "SEARCH_ENRICH": search_enrich_handler,
     "DEDUPLICATE_ALL_ARRAYS": deduplicate_all_arrays_handler,
     "DATE_COMPONENT_NORMALIZE": date_component_handler,
-    "GENERATE_MEDIA_SUMMARY": generate_media_summary_handler,
 }
 
 
