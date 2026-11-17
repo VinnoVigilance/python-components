@@ -1,0 +1,41 @@
+fetch_strategy: saved_html
+record_mode: listing_only
+
+discovery:
+  selector_type: xpath
+  row_selector: "//table//tr[td[@data-th='CRD']]"
+  detail_link_selector_type: xpath
+  detail_link_selector: "./td[@data-th='Individual Name']//a"
+  detail_link_attribute: href
+
+list_fields:
+  crd:
+    selector: "normalize-space(./td[@data-th='CRD'])"
+    selector_type: xpath
+    value: text
+
+  name:
+    selector: "./td[@data-th='Individual Name']//text()[not(ancestor::sup)]"
+    selector_type: xpath
+    value: text
+    join: " "
+
+  reference_url:
+    selector: "(./td[@data-th='Individual Name']//a)[1]/@href"
+    selector_type: xpath
+    value: text
+
+  footnote_refs:
+    selector: "./td[@data-th='Individual Name']//sup//text()"
+    selector_type: xpath
+    value: text
+    multiple: true
+
+record_id:
+  strategy: field
+  source: crd
+
+storage:
+  save_listing_page: false
+  save_detail_pages: false
+  

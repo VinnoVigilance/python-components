@@ -2890,4 +2890,112 @@ WATCHLIST_CONFIGS = {
             }
         ]
     },
+
+    "FINRA_INDIVIDUALS_BARRED": {
+        "source_name": "FINRA",
+        "list_name": "FINRA_INDIVIDUALS_BARRED",
+        "download_method": "HTTPS",
+        "url": (
+            "https://www.finra.org/rules-guidance/enforcement/"
+            "individuals-barred-finra"
+        ),
+        "file_type": "html",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "source_config": (
+            "config/watchlistSources/finra_individuals_barred.yaml"
+        ),
+        "external_id_path": "source_record_id",
+        "minimum_record_count": 5000,
+        "date_order": "MDY",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "api_config": {
+            "enrich_profiles": True,
+            "record_shape": {
+                "id_path": "source_record_id",
+            },
+            "headers": {
+                "Accept": "application/json",
+                "User-Agent": "Mozilla/5.0",
+            },
+            "timeout": 30,
+
+            "retry": 6,
+            "retry_delay_seconds": 5,
+            "retry_backoff_multiplier": 2,
+            "retry_max_delay_seconds": 60,
+
+            "throttle_delay": 0.5,
+            
+            "detail": {
+                "max_workers": 30,
+                "retry_rounds": 3,
+                "id_path": "list.crd",
+                "url_template": (
+                    "https://api.brokercheck.finra.org/"
+                    "search/individual/{id}"
+                ),
+                "items_path": "hits.hits",
+                "content_path": "_source.content",
+                "content_is_json": True,
+                "response_id_path": "basicInformation.individualId",
+            },
+        },
+
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Individual",
+                },
+            },
+        ],
+    },
+
+    "SAM_EXCLUSIONS": {
+        "source_name": "GSA",
+        "date_order": "MDY",
+        "list_name": "SAM_EXCLUSIONS",
+        "download_method": "HTTPS",
+        "url": (
+            "https://api.sam.gov/data-services/v1/extracts"
+        ),
+
+        "download_file_type": "zip",
+        "file_type": "csv",
+
+        "download_params": {
+            "fileType": "EXCLUSION",
+            "sensitivity": "PUBLIC",
+            "frequency": "DAILY",
+            "version": "V2",
+        },
+        "download_params_env": {
+            "api_key": "SAM_API_KEY",
+        },
+        "download_timeout": 180,
+        "download_retry": 1,
+
+        "external_id_path": "SAM Number",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "minimum_record_count": 100000,
+        "preprocessing": [
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "Classification",
+                    "pattern": r"^(?P<value>.*)$",
+                    "outputs": {
+                        "value": "SourceClassification",
+                    },
+                },
+            },
+        ],
+    },
+
 }
+

@@ -1,4 +1,9 @@
-from .collector import collect_artifacts, collect_source
+from .collector import (
+    collect_artifacts,
+    collect_profiles,
+    collect_source,
+)
+
 from .models import ApiCollectionResult, ApiCollectorTask
 
 __all__ = [
@@ -6,6 +11,7 @@ __all__ = [
     "collect_artifacts",
     "ApiCollectionResult",
     "ApiCollectorTask",
+    "collect_profiles",
 ]
 
 

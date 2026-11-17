@@ -277,7 +277,7 @@ if __name__ == "__main__":
 
     try:
         pipeline_result = run_watchlist_pipeline(
-            watchlist_name="BIS-DPL"
+            watchlist_name="FINRA_INDIVIDUALS_BARRED"
         )
 
         pprint(pipeline_result)
