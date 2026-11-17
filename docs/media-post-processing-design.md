@@ -9,7 +9,7 @@ The following paths show the implementation responsibilities. The pipeline uses 
 | File or directory | Responsibility |
 | --- | --- |
 | `pipelines/mediaPostProcessingPipeline.py` | Callable entry point. Validate the run mode, select and page through work using the repository, pass bounded batches to the service, and return run totals. |
-| `services/adverseMediaPipeline/mediaPostProcessingService.py` | Translate canonical article records into processor inputs, call both processors, build the payload and manifest, and apply the hash comparison and write policy. Own the transaction for each article. |
+| `services/adverseMediaPostProcessPipeline/mediaPostProcessingService.py` | Translate canonical article records into processor inputs, call both processors, build the payload and manifest, and apply the hash comparison and write policy. Own the transaction for each article. |
 | `repositories/mediaPostProcess/mediaRecordPostProcessRepository.py` | Execute SQL for core and delta reads, source lookups and locks, and result lookup, expiry and insertion. Use the service's transaction for writes. |
 | `intelligence/summary/mediaSummarizer.py` | Existing summarizer implementation. It selects sentences from article text and does not depend on normalization or the database. |
 | `intelligence/adverseStatus/predictor.py` | Load and verify the frozen adverse-news model and expose batched prediction. |

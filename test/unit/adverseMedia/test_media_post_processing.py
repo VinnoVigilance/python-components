@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock, call
 import pytest
 
 from pipelines import mediaPostProcessingPipeline as pipeline
-from services.adverseMediaPipeline import mediaPostProcessingService as service
+from services.adverseMediaPostProcessPipeline import mediaPostProcessingService as service
 from utils.hashing import calculate_record_hash
 
 

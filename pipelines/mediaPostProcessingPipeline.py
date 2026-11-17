@@ -7,7 +7,7 @@ from time import perf_counter
 from infrastructure.database.connection import get_db_connection
 from intelligence.adverseStatus.predictor import AdverseNewsPredictor
 from repositories.mediaPostProcess import mediaRecordPostProcessRepository as repository
-from services.adverseMediaPipeline.mediaPostProcessingService import MediaPostProcessingService
+from services.adverseMediaPostProcessPipeline.mediaPostProcessingService import MediaPostProcessingService
 from services.common.incrementalDeltaScan import destination_delta_window, iter_effective_dates
 
 
