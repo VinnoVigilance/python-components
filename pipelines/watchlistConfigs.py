@@ -998,6 +998,46 @@ WATCHLIST_CONFIGS = {
         },
     },
 
+    "US_STATE_FTO": {
+        "source_name": "US_STATE",
+        "list_name": "US_STATE_FTO",
+        "date_order": "MDY",
+        "download_method": "HTTPS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": "https://www.state.gov/foreign-terrorist-organizations/",
+        "file_type": "html",
+        "download_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/126.0.0.0 Safari/537.36"
+            ),
+        },
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/us_state_fto.yaml",
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["list.name"],
+                    "output_field": "source_record_id",
+                    "prefix": "US_STATE_FTO",
+                },
+            },
+        ],
+    },
+
     "US-STATE-TERRORIST-EXCLUSION": {
         "source_name": "US-STATE",
         "list_name": "US-STATE-TERRORIST-EXCLUSION",
