@@ -3141,5 +3141,61 @@ WATCHLIST_CONFIGS = {
             },
         ],
     },
+    "SAM_FASCSA_EXCLUSIONS": {
+        "source_name": "GSA",
+        "date_order": "MDY",
+        "list_name": "SAM_FASCSA_EXCLUSIONS",
+        "download_method": "HTTPS",
+        "url": (
+            "https://api.sam.gov/data-services/v1/extracts"
+        ),
+
+        "file_type": "csv",
+
+        "download_date_param": {
+            "name": "fileName",
+            "format": "FASCSAOrders%y%j.CSV",
+            "timezone": "America/New_York",
+            "publication_hour": 7,
+        },
+        "download_params_env": {
+            "api_key": "SAM_API_KEY",
+        },
+        "download_timeout": 180,
+        "download_retry": 1,
+
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "required_csv_columns": [
+            "Classification", "Name", "First", "Last", "Excluding Agency",
+            "Active Date",
+        ],
+        "preprocessing": [
+            {
+                "handler": "split_field_regex",
+                "level": "record",
+                "config": {
+                    "input_field": "Classification",
+                    "pattern": r"^(?P<value>.*)$",
+                    "outputs": {
+                        "value": "SourceClassification",
+                    },
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "Classification", "Name", "First", "Middle", "Last", "Suffix",
+                        "Unique Entity ID", "CAGE", "Excluding Agency", "Active Date",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "SAM_FASCSA_EXCLUSIONS",
+                },
+            },
+        ],
+    },
 }
 

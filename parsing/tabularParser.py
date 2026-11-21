@@ -26,6 +26,9 @@ class TabularParser:
 
         if file_type == "csv":
             df = pd.read_csv(file_path, dtype=str)
+            missing = set(config.get("required_csv_columns", ())) - set(df.columns)
+            if missing:
+                raise ValueError(f"Missing CSV columns: {', '.join(sorted(missing))}")
         elif file_type in ("xlsx", "xls"):
             df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str)
         else:

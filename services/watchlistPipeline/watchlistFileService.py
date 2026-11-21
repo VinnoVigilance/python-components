@@ -1,6 +1,7 @@
 import mimetypes
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
 import os
@@ -354,6 +355,13 @@ def _download_source_file(
     download_url = resolve_url(config)
 
     params = dict(config.get("download_params") or {})
+    date_param = config.get("download_date_param")
+    if date_param:
+        local_time = datetime.now(ZoneInfo(date_param["timezone"]))
+        extract_date = local_time.date()
+        if local_time.hour < date_param["publication_hour"]:
+            extract_date -= timedelta(days=1)
+        params[date_param["name"]] = extract_date.strftime(date_param["format"])
 
     for name, env_name in (
         config.get("download_params_env") or {}
