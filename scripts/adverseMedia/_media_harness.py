@@ -24,6 +24,7 @@ import sys
 from contextlib import redirect_stdout
 from copy import deepcopy
 from pathlib import Path
+from time import monotonic
 
 import yaml
 
@@ -72,6 +73,8 @@ class _NoDbDiscoveryService:
         self.source_config = source_config
         self.max_records = max_records
         self.discovered = 0
+        self.started_at = monotonic()
+        self.last_progress_at = self.started_at
 
     def build_record_key(self, record: dict) -> str:
         return MediaIdentityService.generate_record_key(
@@ -80,6 +83,14 @@ class _NoDbDiscoveryService:
 
     def check_record_key(self, record_key: str) -> tuple[bool, bool]:
         self.discovered += 1
+        now = monotonic()
+        if self.discovered == 1 or self.discovered % 1000 == 0 or now - self.last_progress_at >= 60:
+            elapsed = int(now - self.started_at)
+            hours, remainder = divmod(elapsed, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            total = f" / {self.max_records:,} limit" if self.max_records is not None else " (total unknown)"
+            print(f"Discovery: {self.discovered:,}{total} URLs checked | elapsed {hours:02d}:{minutes:02d}:{seconds:02d}", flush=True)
+            self.last_progress_at = now
         should_stop = (
             self.max_records is not None
             and self.discovered >= self.max_records

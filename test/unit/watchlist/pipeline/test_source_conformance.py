@@ -76,7 +76,7 @@ SAMPLES = {
     "EBRD_INELIGIBLE_ENTITIES": "EBRD_INELIGIBLE_ENTITIES_raw_sample.jsonl",
 }
 
-VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel"}
+VALID_ENTITY_TYPES = {"Individual", "Entity", "Vessel", "Aircraft"}
 
 # Tokens that are never legitimate real data, so they must never appear in the
 # canonical output. NOTE: "NA" is deliberately NOT here -- it is Namibia's ISO
@@ -93,7 +93,8 @@ def _schema(list_name):
         root = rule.target_path.split("[]")[0].split(".")[0].strip()
         if not root:
             continue
-        roots[root] = roots.get(root, False) or ("[]" in rule.target_path)
+        first_segment = rule.target_path.split(".", 1)[0].strip()
+        roots[root] = roots.get(root, False) or first_segment.endswith("[]")
     return roots
 
 
@@ -145,6 +146,11 @@ class TestSourceConformance:
         schema = _schema(list_name)
 
         for rec in _canonical_records(list_name):
+            risk = rec.get("RiskCategory")
+            assert isinstance(risk, dict), f"{list_name}.RiskCategory must be an object"
+            assert isinstance(risk.get("Labels"), list), f"{list_name}.RiskCategory.Labels must be an array"
+            if "RiskModelEnabled" in risk:
+                assert isinstance(risk["RiskModelEnabled"], bool)
             for key, value in rec.items():
                 if key not in schema:
                     continue

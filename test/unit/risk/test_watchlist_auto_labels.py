@@ -29,6 +29,8 @@ class WatchlistAutoLabelTests(unittest.TestCase):
             contract=SimpleNamespace(taxonomy_version="sha256:taxonomy"),
         )
         self.classifier.triggers = {}
+        self.classifier.taxonomy = {}
+        self.classifier.lookup_labels = self.classifier.labels.copy()
         self.classifier.calculation_version = "sha256:calculation"
         self.classifier.rules_version = "sha256:rules"
         self.classifier.lookup_calculation_version = "sha256:lookup"
@@ -44,7 +46,7 @@ class WatchlistAutoLabelTests(unittest.TestCase):
                 patch("intelligence.risk.watchlistRiskClassifier.highlighter.split_units", return_value=units), \
                 patch("intelligence.risk.watchlistRiskClassifier.highlighter.flag_units", return_value=candidates), \
                 patch("intelligence.risk.watchlistRiskClassifier.lookupRules.record_rule_labels",
-                      return_value=["Law Enforcement"]):
+                      return_value={"Law Enforcement": "list TEST-LIST"}):
             result = self.classifier.classify(self.payload)
 
         categories = {item["riskCategoryId"]: item for item in result["riskCategories"]}
@@ -53,10 +55,11 @@ class WatchlistAutoLabelTests(unittest.TestCase):
         self.assertEqual(len(categories["CR_FRAUD"]["evidence"]), 2)
         self.assertEqual([item["riskCategoryId"] for item in result["reviewRequired"]], ["PEP_GEN"])
         for item in result["riskCategories"] + result["reviewRequired"]:
-            self.assertEqual(item["explanation"], "")
             self.assertIn("calculationVersion", item["metadata"])
+        self.assertEqual(categories["LE_GEN"]["explanation"], "list TEST-LIST")
         self.assertNotIn("labelMetadata", result)
         self.assertNotIn("metadata", result)
+        self.assertEqual(result["calculationVersion"], "sha256:calculation")
         self.assertEqual(categories["CR_FRAUD"]["metadata"]["modelVersion"],
                          self.classifier.student.model_version)
 
@@ -68,7 +71,7 @@ class WatchlistAutoLabelTests(unittest.TestCase):
                 patch("intelligence.risk.watchlistRiskClassifier.highlighter.flag_units",
                       return_value=[(0, "Crime-Fraud", "")]), \
                 patch("intelligence.risk.watchlistRiskClassifier.lookupRules.record_rule_labels",
-                      return_value=["Crime-Fraud"]):
+                      return_value={"Crime-Fraud": "structured fraud"}):
             result = self.classifier.classify(self.payload)
 
         self.assertEqual(len(result["riskCategories"]), 1)
@@ -87,7 +90,7 @@ class WatchlistAutoLabelTests(unittest.TestCase):
                 patch("intelligence.risk.watchlistRiskClassifier.highlighter.flag_units",
                       return_value=[(0, "Crime-Fraud", "")]), \
                 patch("intelligence.risk.watchlistRiskClassifier.lookupRules.record_rule_labels",
-                      return_value=["Law Enforcement"]):
+                      return_value={"Law Enforcement": "list TEST-LIST"}):
             result = self.classifier.classify(self.payload)
         self.assertEqual([item["riskCategoryId"] for item in result["riskCategories"]], ["LE_GEN"])
         self.assertEqual(result["reviewRequired"], [])

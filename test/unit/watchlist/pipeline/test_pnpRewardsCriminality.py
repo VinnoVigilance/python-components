@@ -39,7 +39,7 @@ def test_complete_document_reaches_canonical_output(source):
         assert row["EntityType"] == "Individual"
         assert row["Sources"][0]["SourceName"] == "PNP"
         assert row["Sources"][0]["ListName"] == KEY
-        assert row["Sources"][0]["DatasetCategory"] == "Law Enforcement"
+        assert row["Sources"][0]["DatasetCategory"] == ["Law Enforcement"]
         assert info(row)["List Reference Date"] == "13 October 2022"
         assert not row["Addresses"]
         assert not row["Countries"]

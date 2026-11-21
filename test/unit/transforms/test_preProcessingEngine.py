@@ -23,6 +23,68 @@ def engine():
     return PreProcessingEngine()
 
 
+@pytest.mark.parametrize("source", ["OFAC-SDN", "OFAC-NON-SDN"])
+@pytest.mark.parametrize(
+    ("authorities", "expected"),
+    [
+        ({"text": " Authority A "}, "Authority A"),
+        (
+            [{"text": "Authority A"}, {"text": " "}, {"id": "3"}, {"text": "Authority B"}],
+            "Authority A; Authority B",
+        ),
+        ([], None),
+        (None, None),
+        ({"id": "authority-without-text"}, None),
+        ({"text": 42}, None),
+    ],
+)
+def test_ofac_preprocessing_joins_record_authorities(engine, source, authorities, expected):
+    record = {} if authorities is None else {
+        "legalAuthorities": {"legalAuthority": authorities}
+    }
+
+    result, = engine.preprocess([record], WATCHLIST_CONFIGS[source]["preprocessing"])
+
+    if expected is None:
+        assert "legalAuthoritiesText" not in result
+    else:
+        assert result["legalAuthoritiesText"] == expected
+    if authorities is not None:
+        assert result["legalAuthorities"] == {"legalAuthority": authorities}
+
+
+@pytest.mark.parametrize("source", ["OFAC-SDN", "OFAC-NON-SDN"])
+def test_ofac_declarative_preprocessing_keeps_authorities_specific_to_each_record(engine, source):
+    records = [
+        {"legalAuthorities": {"legalAuthority": [{"text": "Authority A"}]}},
+        {"legalAuthorities": {"legalAuthority": {"text": "Authority B"}}},
+        {},
+    ]
+    results = engine.preprocess(records, WATCHLIST_CONFIGS[source]["preprocessing"])
+    assert [record.get("legalAuthoritiesText") for record in results] == [
+        "Authority A", "Authority B", None,
+    ]
+    assert results[0]["legalAuthorities"] == {"legalAuthority": [{"text": "Authority A"}]}
+    assert results[1]["legalAuthorities"] == {"legalAuthority": {"text": "Authority B"}}
+
+
+def test_join_object_field_values_supports_other_source_layouts(engine):
+    record = {"designations": {"instruments": [
+        {"details": {"title": "Order A"}},
+        {"details": {"title": "Order B"}},
+    ]}}
+    config = {
+        "source_path": "designations.instruments",
+        "value_path": "details.title",
+        "target_field": "instrumentTitles",
+        "separator": " / ",
+    }
+
+    result = engine.join_object_field_values(record, config)
+
+    assert result["instrumentTitles"] == "Order A / Order B"
+
+
 class TestDetectEntityType:
     def test_org_keyword_is_entity(self, engine):
         record = engine.detect_entity_type(
@@ -367,3 +429,26 @@ class TestPreprocessOrchestrator:
     def test_no_rules_returns_records_unchanged(self, engine):
         records = [{"a": 1}]
         assert engine.preprocess(records, []) == records
+
+
+def test_dfat_merge_preserves_distinct_designation_pairs(engine):
+    rows = [
+        {"Reference": f"123{suffix}", "Committees": committee,
+         "Instrument of Designation": instrument}
+        for suffix, committee, instrument in [
+            ("a", "Committee A", "Instrument X"),
+            ("b", "Committee A", "Instrument Y"),
+            ("c", "Committee A", "Instrument X"),
+            ("d", "N/A", None),
+        ]
+    ]
+
+    merged = engine.merge_dfat_split_records(
+        rows, {"designations_field": "ProgrammeDesignations"}
+    )
+
+    assert len(merged) == 1
+    assert merged[0]["ProgrammeDesignations"] == [
+        {"Committees": "Committee A", "instrument": "Instrument X"},
+        {"Committees": "Committee A", "instrument": "Instrument Y"},
+    ]

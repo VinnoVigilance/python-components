@@ -6,10 +6,6 @@ SKIP_FIELD = re.compile(r"^(source list|entity type|website|email|tel|fax|gender
 FIELD = re.compile(r"^([A-Z][A-Za-z ]{1,40}?) ?: ")
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"“(])")
 HAS_LETTERS = re.compile(r"[^\W\d_]{3,}")
-SKIP_LABEL_FIELDS = {"PEP": {"Programs"}}
-NAME_ONLY_PROGRAMS = {"OFAC-SDN", "OFAC-NON-SDN", "UN-SANCTIONS", "EU-FINANCIAL-SANCTIONS", "EU-TRAVEL-BAN", "UKSL",
-                      "SECO-SANCTIONS", "DFAT", "EU-DESIGNATED-VESSELS", "ATC-DESIGNATED-TERRORIST-INDIVIDUALS",
-                      "ATC-DESIGNATED-TERRORIST-GROUPS", "US-STATE-TERRORIST-EXCLUSION", "FBI-WANTED"}
 BOILERPLATE_FIELDS = {"US-STATE-TERRORIST-EXCLUSION": {"Additional info"}, "PH-HOUSE-MEMBERS": {"Additional info"}}
 BOILERPLATE_UNIT = re.compile(r"Rewards For Justice|^\s*(?:Council (?:Decision|Regulation|Implementing)|Executive Order)", re.I)
 FIGHTING_BEFORE = re.compile(r"\b(?:anti|counter|countering|against|combat(?:ing|ting)|prevention of)\s+(?:\w+\s+)?$")
@@ -142,8 +138,8 @@ def split_units(text):
 
 
 def is_boilerplate(source, field, unit):
-    """v5: programme / category names, a list's standard legal text and act titles are never evidence."""
-    return ((field == "Programs" and source in NAME_ONLY_PROGRAMS) or field in BOILERPLATE_FIELDS.get(source, ())
+    """Skip source-specific boilerplate fields and passages matching standard legal text or act titles."""
+    return (field in BOILERPLATE_FIELDS.get(source, ())
             or bool(BOILERPLATE_UNIT.search(unit)))
 
 
@@ -160,8 +156,6 @@ def flag_units(units, triggers, source=None, version="v5"):
             continue
         u = fold(unit)
         for label, rx in triggers.items():
-            if field in SKIP_LABEL_FIELDS.get(label, ()):
-                continue
             hits = sorted({m.group(0) for m in rx.finditer(u) if version < "v6" or not fighting(u, m)})
             if hits:
                 out.append((k, label, hits))
