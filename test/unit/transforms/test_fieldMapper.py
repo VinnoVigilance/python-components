@@ -32,6 +32,28 @@ from transforms.fieldMapper import (
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("entity_type", ["Individual", "Entity"])
+def test_mapped_comment_fields_match_strict_search_schema(entity_type):
+    from pathlib import Path
+    import yaml
+
+    schema_file = Path(__file__).resolve().parents[3] / "config" / "searchSchemas" / "watchlist.yaml"
+    schema = yaml.safe_load(schema_file.read_text())
+    comment_schema = schema["mapping"]["properties"]["payload"]["properties"]["Comments"]
+    mapper = MappingEngine([
+        Rule(entity_type, "Comments[].Type", "string", "comments", "constant", '"Additional Info"'),
+        Rule(entity_type, "Comments[].Text", "string", "comments", "path", "source_note"),
+    ])
+    result = mapper.map_record({"entity_type": entity_type, "source_note": "Directory context"})
+    assert result["Comments"] == [{"Type": "Additional Info", "Text": "Directory context"}]
+    assert schema["mapping"]["properties"]["payload"]["dynamic"] == "strict"
+    assert comment_schema["type"] == "nested"
+    for comment in result["Comments"]:
+        assert set(comment) <= set(comment_schema["properties"])
+    assert comment_schema["properties"]["Type"]["type"] == "keyword"
+    assert comment_schema["properties"]["Text"]["type"] == "text"
+
+
 class TestConcatPathLabels:
     def _join(self, expression, item):
         rule = Rule("Individual", "Identifiers[].Note", "string",

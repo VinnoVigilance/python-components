@@ -549,10 +549,10 @@ mapping:
 
           properties:
 
-            type:
+            Type:
               type: keyword
 
-            text:
+            Text:
               type: text
 
 
