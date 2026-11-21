@@ -66,15 +66,18 @@ def resolve_by_link_text(
         f"{link_text}"
     )
 
-def resolve_latest_year_page(cfg: dict) -> str:
+def resolve_latest_year_page(cfg: dict, *, last_year: int | None = None) -> str:
     """Resolve one linked file from a predictable annual edition page.
 
     Check years newest first. Skip HTTP 404s and the configured missing-page
     redirect. The first remaining page must have the expected h1 or h2 heading
     and exactly one distinct link with the configured file suffix.
+    Supply last_year to bound historical discovery; set first_year to the
+    same year to resolve an exact edition without falling back to another.
     """
     first_year = cfg["first_year"]
-    last_year = date.today().year + cfg["years_ahead"]
+    if last_year is None:
+        last_year = date.today().year + cfg["years_ahead"]
     timeout = cfg.get("timeout", 30)
     suffix = cfg["download_path_suffix"].lower()
     missing_redirect_url = cfg.get("missing_redirect_url")
