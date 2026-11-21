@@ -28,7 +28,8 @@ def _make_empty_schema(db_connection):
                 id bigint PRIMARY KEY, media_record_id bigint NOT NULL,
                 vv_media_id bigint NOT NULL, media_version int NOT NULL,
                 analysis_payload jsonb NOT NULL, post_process_hash text NOT NULL,
-                is_current boolean NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
+                is_current boolean NOT NULL DEFAULT true, to_date timestamptz,
+                created_at timestamptz NOT NULL DEFAULT now()
             );
             CREATE TABLE core.media_member_post_process (
                 id bigserial PRIMARY KEY,

@@ -10,6 +10,58 @@ global:
 
 
 sources:
+  SUPREME_COURT_PH_DECISIONS_AND_SIGNED_RESOLUTIONS:
+    enabled: true
+    active: true
+    source_name: SUPREME_COURT_PH
+    dataset_name: SUPREME_COURT_PH_DECISIONS_AND_SIGNED_RESOLUTIONS
+    dataset_category: Crime / Judicial Records
+    schedule: daily
+    date_order: MDY
+    source_page_url: https://elibrary.judiciary.gov.ph/thebookshelf/1
+    url: https://elibrary.judiciary.gov.ph/thebookshelf/1
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 1
+        retry_times: 3
+    discovery:
+      strategy: dated_month_archive
+      policy: stop_after_known
+      threshold: 20
+      month_link_selector: 'a[href*="/thebookshelf/docmonth/"]'
+      article:
+        link_selector: 'a[href*="/thebookshelf/showdocs/1/"]'
+    extraction:
+      SourceURL:
+        source: response_url
+      SourceRecordId:
+        source: response_url
+        strategy: regex
+        pattern: '/showdocs/1/(\d+)'
+      Title:
+        selector: '#left .single_content h3'
+        output: text
+      date.originalValue:
+        selector: '#left .single_content h2:contains("[")'
+        output: text
+        extraction:
+          strategy: regex
+          pattern: '([A-Za-z]+\s+\d{1,2},\s+\d{4})'
+      BodyText:
+        selector: '#left .single_content'
+        output: text
+    parser:
+      type: html
+    identity:
+      external_id:
+        field: SourceRecordId
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
   ONENEWS_PH_POLITICS_AND_OTHER_NEWS_FEATURES:
     enabled: true
     active: true

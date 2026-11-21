@@ -1,6 +1,6 @@
 import hashlib
 import re
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -95,7 +95,7 @@ class MediaSpider(scrapy.Spider):
                     yield self._failed_json_entry_retry(item, "Index URL is not on the source host")
                     continue
                 yield scrapy.Request(
-                    url=index_url, callback=self.retry_json_entry,
+                    url=index_url, callback=(self.retry_month_index if item.get("kind") == "month_index" else self.retry_json_entry),
                     errback=self.retry_json_entry_failed,
                     cb_kwargs={"retry_item": item}, dont_filter=True,
                 )
@@ -115,6 +115,11 @@ class MediaSpider(scrapy.Spider):
             )
             return
 
+        if self.discovery_config.get("strategy") == "dated_month_archive":
+            yield scrapy.Request(start_url, callback=self.parse_month_archive,
+                                 errback=self.json_discovery_failed, dont_filter=True)
+            return
+
         start_page = int(
             self.discovery_config.get(
                 "start_page",
@@ -130,6 +135,98 @@ class MediaSpider(scrapy.Spider):
             },
             dont_filter=True,
         )
+
+    def parse_month_archive(self, response):
+        """Visit month indexes serially so URL checks follow decision dates."""
+        months = {}
+        for href in response.css(self.discovery_config["month_link_selector"] + "::attr(href)").getall():
+            url = response.urljoin(href)
+            match = re.search(r"/docmonth/([A-Za-z]{3})/(\d{4})/1/?$", url)
+            if not match or urlparse(url).netloc != urlparse(response.url).netloc:
+                self.discovery_service.mark_discovery_failure("INVALID_MONTH_URL")
+                return
+            try:
+                month = datetime.strptime(match.group(1), "%b").month
+            except ValueError:
+                self.discovery_service.mark_discovery_failure("INVALID_MONTH_URL")
+                return
+            months[(int(match.group(2)), month)] = url
+        if not months:
+            self.discovery_service.mark_discovery_failure("EMPTY_MONTH_ARCHIVE")
+            return
+        newest = getattr(self.discovery_service, "stop_after_known", False)
+        urls = [months[key] for key in sorted(months, reverse=newest)]
+        yield scrapy.Request(urls[0], callback=self.parse_month_index,
+                             errback=self.month_index_failed,
+                             cb_kwargs={"urls": urls, "index": 0, "newest": newest})
+
+    def _month_entries(self, response):
+        nodes = response.css(self.discovery_config["article"]["link_selector"])
+        entries = []
+        try:
+            month = re.search(r"/docmonth/([A-Za-z]{3})/(\d{4})/1/?$", response.url)
+            headings = " ".join(response.css("#left h3::text").getall())
+            if not month or not re.search(rf"\b{month.group(1)}\s+{month.group(2)}\s*\|\s*Decisions\s*/\s*Signed Resolutions", headings, re.I):
+                raise ValueError("Month heading is missing or does not match URL")
+            for node in nodes:
+                label = " ".join(node.xpath(".//text()").getall())
+                match = re.search(r"([A-Za-z]+\s+\d{1,2},\s+\d{4})\s*$", label)
+                if not match or not node.attrib.get("href"):
+                    raise ValueError("Missing decision date or URL")
+                entries.append((datetime.strptime(match.group(1), "%B %d, %Y"), node))
+        except ValueError:
+            raise
+        return entries
+
+    def parse_month_index(self, response, urls, index, newest):
+        try:
+            entries = self._month_entries(response)
+        except ValueError as exc:
+            self.logger.error("Invalid month index %s: %s", response.url, exc)
+            self.discovery_service.mark_discovery_failure("INVALID_MONTH_INDEX", retry_item={"kind": "month_index", "index_file_url": response.url, "error": str(exc)})
+            return
+        for _, node in sorted(entries, key=lambda entry: entry[0], reverse=newest):
+            request, stop = self._discover_detail(response.urljoin(node.attrib["href"]), node)
+            if request is not None:
+                yield request
+            if stop:
+                return
+        if index + 1 == len(urls):
+            self.discovery_service.mark_source_end()
+        else:
+            yield scrapy.Request(urls[index + 1], callback=self.parse_month_index,
+                                 errback=self.month_index_failed,
+                                 cb_kwargs={"urls": urls, "index": index + 1, "newest": newest})
+
+    def month_index_failed(self, failure):
+        url = failure.request.url
+        self.logger.error("Month index request failed: %s", failure)
+        self.discovery_service.mark_discovery_failure("MONTH_INDEX_FETCH_FAILED", retry_item={"kind": "month_index", "index_file_url": url, "error": failure.getErrorMessage()})
+
+    def retry_month_index(self, response, retry_item):
+        """Rediscover every decision in a failed month, then clear the month item."""
+        try:
+            expected = urlparse(retry_item["index_file_url"])
+            actual = urlparse(response.url)
+            if (expected.scheme, expected.netloc) != (actual.scheme, actual.netloc):
+                raise ValueError("Month response redirected to another host")
+            entries = self._month_entries(response)
+            requests = []
+            for _, node in sorted(entries, key=lambda entry: entry[0]):
+                url = response.urljoin(node.attrib["href"])
+                parsed = urlparse(url)
+                if (parsed.scheme, parsed.netloc) != (actual.scheme, actual.netloc):
+                    raise ValueError("Decision URL is not on the source host")
+                source_id = self._extract_source_record_id(url)
+                key = MediaIdentityService.generate_record_key(source_config=self.source_config, record={"SourceURL": url, "SourceRecordId": source_id})
+                requests.append(scrapy.Request(url, callback=self.parse_detail, errback=self.detail_failed, cb_kwargs={"record_key": key, "is_known": False, "source_record_id": source_id, "identity_fields": {}}, dont_filter=True))
+        except (KeyError, TypeError, ValueError) as exc:
+            yield self._failed_json_entry_retry(retry_item, exc)
+            return
+        marker = {"record_key": retry_item["record_key"], "discovery_retry_complete": True}
+        self.records.append(marker)
+        yield marker
+        yield from requests
 
     def json_discovery_failed(self, failure):
         """A failed manifest or shard must never count as a complete scan."""
