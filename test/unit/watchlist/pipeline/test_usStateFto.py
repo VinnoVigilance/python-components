@@ -96,7 +96,7 @@ def test_primary_name_amendment_is_preserved_without_self_alias(records):
     assert "July 2, 2019" in row["Names"][0]["Note"]
 
 
-def test_source_identity_risk_and_original_text_survive_real_workbook_mapping(records):
+def test_source_identity_risk_and_empty_comments_follow_workbook_mapping(records):
     _, raw, canonical = records
     by_id = {r["EntityId"]: r for r in canonical.values()}
     for original in raw:
@@ -112,7 +112,7 @@ def test_source_identity_risk_and_original_text_survive_real_workbook_mapping(re
         assert {(x["Type"], x["Value"]) for x in row["RiskCategory"]["Labels"]} == {
             ("List", "Sanctions"), ("List", "Terrorism / Terrorist Financing"),
         }
-        assert row["Comments"][0]["Text"] == original["list"]["name"]
+        assert row["Comments"] == []
         assert row["Names"][0]["Normalized_Name"]
         assert row["Measures"][0]["Status"] == "Active"
 
