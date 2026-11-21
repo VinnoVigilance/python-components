@@ -1,6 +1,7 @@
 from ingestion.urlResolver.linkResolver import (
     resolve_by_link_text,
     resolve_json_list_filter,
+    resolve_latest_year_page,
 )
 
 
@@ -29,6 +30,9 @@ def resolve_url(config):
         return resolve_json_list_filter(
             cfg=resolver_config,
         )
+
+    if resolver_type == "latest_year_page":
+        return resolve_latest_year_page(resolver_config)
 
     raise ValueError(
         f"Unsupported URL resolver type: "
