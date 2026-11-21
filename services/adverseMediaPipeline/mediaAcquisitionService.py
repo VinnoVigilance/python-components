@@ -299,6 +299,9 @@ class MediaAcquisitionService:
         for record in acquired_records:
 
             try:
+                if record.get("discovery_retry_complete"):
+                    processed_results.append(record)
+                    continue
                 if record.get("failed"):
                     failed_count += 1
                     record.setdefault(
@@ -638,7 +641,7 @@ class MediaAcquisitionService:
             if item["kind"] == "fetch"
         ]
 
-        discovery_items = [item for item in items if item["kind"] == "json_manifest_entry"]
+        discovery_items = [item for item in items if item["kind"] in {"json_manifest_entry", "month_index"}]
 
         if fetch_items or discovery_items:
             fetch_strategy = str(

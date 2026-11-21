@@ -309,6 +309,10 @@ def run_media_pipeline(
 
         try:
 
+            if acquired_record.get("discovery_retry_complete"):
+                record_results.append({"record_key": record_key, "status": "SKIPPED"})
+                continue
+
             # -------------------------------------------------
             # Acquisition failure
             # -------------------------------------------------
