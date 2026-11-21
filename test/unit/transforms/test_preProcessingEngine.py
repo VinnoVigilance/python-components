@@ -34,6 +34,8 @@ def engine():
         ),
         ([], None),
         (None, None),
+        ({"id": "authority-without-text"}, None),
+        ({"text": 42}, None),
     ],
 )
 def test_ofac_preprocessing_joins_record_authorities(engine, source, authorities, expected):
@@ -49,6 +51,21 @@ def test_ofac_preprocessing_joins_record_authorities(engine, source, authorities
         assert result["legalAuthoritiesText"] == expected
     if authorities is not None:
         assert result["legalAuthorities"] == {"legalAuthority": authorities}
+
+
+@pytest.mark.parametrize("source", ["OFAC-SDN", "OFAC-NON-SDN"])
+def test_ofac_declarative_preprocessing_keeps_authorities_specific_to_each_record(engine, source):
+    records = [
+        {"legalAuthorities": {"legalAuthority": [{"text": "Authority A"}]}},
+        {"legalAuthorities": {"legalAuthority": {"text": "Authority B"}}},
+        {},
+    ]
+    results = engine.preprocess(records, WATCHLIST_CONFIGS[source]["preprocessing"])
+    assert [record.get("legalAuthoritiesText") for record in results] == [
+        "Authority A", "Authority B", None,
+    ]
+    assert results[0]["legalAuthorities"] == {"legalAuthority": [{"text": "Authority A"}]}
+    assert results[1]["legalAuthorities"] == {"legalAuthority": {"text": "Authority B"}}
 
 
 def test_join_object_field_values_supports_other_source_layouts(engine):

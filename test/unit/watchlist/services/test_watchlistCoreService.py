@@ -440,6 +440,88 @@ def test_delete_detection_is_skipped_for_non_continuous_lists(
     assert result["deleted_count"] == 0
 
 
+def test_dbm_config_retires_assignment_absent_from_new_directory(monkeypatch):
+    from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+
+    gone_member = {
+        "id": 77, "vv_member_id": "old-assignment", "source_id": 1,
+        "list_type_id": 2, "external_id": "OLD-POSITION",
+        "entity_type_id": 5, "version_no": 2,
+        "record_hash": "OLD-HASH", "full_payload": {},
+    }
+    repository, _ = _setup(
+        monkeypatch,
+        raw_records=[{"id": 11, "external_id": "NEW-POSITION", "raw_json": {}}],
+        current_member=None,
+        deleted_members=[gone_member],
+    )
+
+    result = _run(WATCHLIST_CONFIGS["DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"])
+
+    assert result["new_count"] == 1
+    assert result["deleted_count"] == 1
+    repository.close_current_member.assert_called_once_with(
+        cursor=repository.close_current_member.call_args.kwargs["cursor"],
+        core_member_id=77,
+    )
+    deletion = repository.insert_deleted_member.call_args.kwargs
+    assert deletion["current_member"] == gone_member
+    assert deletion["watchlist_file_id"] == 100
+
+
+@pytest.mark.parametrize("failure", ["empty", "normalization"])
+def test_dbm_does_not_retire_assignments_when_core_processing_fails(monkeypatch, failure):
+    from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+
+    repository, _ = _setup(
+        monkeypatch,
+        raw_records=[] if failure == "empty" else [
+            {"id": 11, "external_id": "PRESENT", "raw_json": {}}
+        ],
+        current_member=None,
+    )
+    if failure == "normalization":
+        core.watchlistNormalizationService.normalize_record.side_effect = ValueError("invalid record")
+
+    with pytest.raises(ValueError):
+        _run(WATCHLIST_CONFIGS["DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"])
+
+    repository.find_deleted_current_members.assert_not_called()
+    repository.insert_deleted_member.assert_not_called()
+
+
+def test_dbm_retiring_one_position_does_not_retire_same_person_other_position(monkeypatch):
+    from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+    from transforms.preProcessingEngine import PreProcessingEngine
+
+    config = WATCHLIST_CONFIGS["DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"]
+    assignments = PreProcessingEngine().preprocess([
+        {"record_kind": "listing", "printed_name": "SAME OFFICIAL", "role": role,
+         "source_path": ["national_government", "records", index]}
+        for index, role in enumerate(("Secretary", "Chairperson"))
+    ], config["preprocessing"])
+    retained, removed = assignments
+    assert retained["source_record_id"] != removed["source_record_id"]
+    gone_member = {
+        "id": 77, "vv_member_id": "removed-assignment", "source_id": 1,
+        "list_type_id": 2, "external_id": removed["source_record_id"],
+        "entity_type_id": 5, "version_no": 2,
+        "record_hash": "OLD-HASH", "full_payload": {},
+    }
+    repository, _ = _setup(
+        monkeypatch,
+        raw_records=[{"id": 11, "external_id": retained["source_record_id"], "raw_json": retained}],
+        current_member={"id": 88, "change_type": "NEW", "record_hash": "HASH-NEW"},
+        deleted_members=[gone_member],
+    )
+    result = _run(config)
+    assert result["skipped_count"] == 1
+    assert result["deleted_count"] == 1
+    assert repository.close_current_member.call_args.kwargs["core_member_id"] == 77
+    assert repository.close_current_member.call_count == 1
+    assert repository.insert_deleted_member.call_args.kwargs["current_member"]["external_id"] == removed["source_record_id"]
+
+
 def test_success_is_logged_at_the_end(
     monkeypatch,
 ):
