@@ -1,14 +1,3 @@
-def _ofac_authority_preprocessing():
-    return {
-        "handler": "join_object_field_values",
-        "config": {
-            "source_path": "legalAuthorities.legalAuthority",
-            "value_path": "text",
-            "target_field": "legalAuthoritiesText",
-        },
-    }
-
-
 WATCHLIST_CONFIGS = {
     "DFAT": {
         "source_name": "DFAT",
@@ -40,7 +29,16 @@ WATCHLIST_CONFIGS = {
         "file_type": "xml",
         "root_tags": ["entity"],
         "external_id_path": "id",
-        "preprocessing": [_ofac_authority_preprocessing()],
+        "preprocessing": [
+            {
+                "handler": "join_object_field_values",
+                "config": {
+                    "source_path": "legalAuthorities.legalAuthority",
+                    "value_path": "text",
+                    "target_field": "legalAuthoritiesText",
+                },
+            },
+        ],
         "schedule": "daily",
         "versioning_strategy": "continuous",
     },
@@ -57,7 +55,16 @@ WATCHLIST_CONFIGS = {
         "file_type": "xml",
         "root_tags": ["entity"],
         "external_id_path": "id",
-        "preprocessing": [_ofac_authority_preprocessing()],
+        "preprocessing": [
+            {
+                "handler": "join_object_field_values",
+                "config": {
+                    "source_path": "legalAuthorities.legalAuthority",
+                    "value_path": "text",
+                    "target_field": "legalAuthoritiesText",
+                },
+            },
+        ],
         "schedule": "daily",
     },
 
@@ -996,6 +1003,46 @@ WATCHLIST_CONFIGS = {
                 "min_size_bytes": 10000,
             },
         },
+    },
+
+    "US_STATE_FTO": {
+        "source_name": "US_STATE",
+        "list_name": "US_STATE_FTO",
+        "date_order": "MDY",
+        "download_method": "HTTPS",
+        "extraction_method": "SAVED_HTML_SPIDER",
+        "url": "https://www.state.gov/foreign-terrorist-organizations/",
+        "file_type": "html",
+        "download_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/126.0.0.0 Safari/537.36"
+            ),
+        },
+        "external_id_path": "source_record_id",
+        "schedule": "daily",
+        "versioning_strategy": "continuous",
+        "source_config": "config/watchlistSources/us_state_fto.yaml",
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": ["list.name"],
+                    "output_field": "source_record_id",
+                    "prefix": "US_STATE_FTO",
+                },
+            },
+        ],
     },
 
     "US-STATE-TERRORIST-EXCLUSION": {
@@ -2997,5 +3044,102 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
+    "DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY": {
+        "source_name": "BPM_PH",
+        "list_name": "DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY",
+        # No source dates are mapped; canonical date strings use ISO order.
+        "date_order": "YMD",
+        "download_method": "HTTPS",
+        "url_resolver": {
+            "type": "latest_year_page",
+            # If DBM changes the annual page URLs, search for the highest year
+            # matching Government Directory (YYYY English Version).
+            # https://www.dbm.gov.ph/index.php/component/finder/search?Itemid=116&q=directory
+            "page_url_template": (
+                "https://www.dbm.gov.ph/index.php/government-directory/"
+                "{year}-english-version"
+            ),
+            "page_heading_template": "Government Directory ({year} English Version)",
+            "first_year": 2018,
+            "years_ahead": 5,
+            # DBM redirects missing edition pages to its home page.
+            "missing_redirect_url": "https://www.dbm.gov.ph/index.php",
+            "download_path_suffix": ".pdf",
+            "timeout": 60,
+        },
+        "file_type": "pdf",
+        "require_pdf_header": True,
+        "download_timeout": 120,
+        "parser": {"mode": "dbm_directory"},
+        "external_id_path": "source_record_id",
+        # Each annual directory replaces the previous active assignment set.
+        "versioning_strategy": "continuous",
+        # All nine reviewed editions exceed 5,000 listings. Reject major
+        # extraction loss before a partial snapshot can retire assignments.
+        "minimum_record_count": 5000,
+        "preprocessing": [
+            {
+                "handler": "prepare_dbm_directory",
+                "level": "dataset",
+                "config": {
+                    "person_id": {
+                        "fields": ["assignment_key"],
+                        "output_field": "source_record_id",
+                        "prefix": "DBM_PH",
+                    },
+                },
+            },
+        ],
+    },
+
+    "METI_FOREIGN_END_USER_LIST": {
+        "source_name": "METI",
+        "list_name": "METI_FOREIGN_END_USER_LIST",
+        "date_order": "YMD",
+        "download_method": "HTTPS",
+        "url": "https://www.meti.go.jp/policy/anpo/law00.html#userlist",
+        "file_type": "xlsx",
+        "sheet_name": "ユーザーリスト",
+        "external_id_path": "source_record_id",
+        "schedule": "every_7_days",
+        "versioning_strategy": "continuous",
+        "download_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/130.0.0.0 Safari/537.36"
+            ),
+        },
+        "url_resolver": {
+            "type": "link_text",
+            "source_page_url": "https://www.meti.go.jp/policy/anpo/law00.html#userlist",
+            "value": "外国ユーザーリスト",
+            "link_selector": "#userlist a[href$='.xlsx']",
+            "encoding": "utf-8",
+            "timeout": 30,
+        },
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "企業名､組織名\nCompany or Organization",
+                        "国名、地域名\nCountry or Region",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "METI_FOREIGN_END_USER_LIST",
+                },
+            },
+        ],
+    },
 }
 

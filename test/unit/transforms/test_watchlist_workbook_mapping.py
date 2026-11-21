@@ -1,6 +1,7 @@
 """Check watchlist output using the configured ingestion and workbook rules."""
 
 from pathlib import Path
+from copy import deepcopy
 
 import pandas as pd
 import pytest
@@ -91,6 +92,57 @@ def test_dnfbp_preserves_explicit_disabled_risk_model(entity_type):
     mapper = MappingEngine(load_rules(RULES / "mapping.xlsx", "DNFBP"))
     result = mapper.map_record({"entity_type": entity_type})
     assert result["RiskCategory"]["RiskModelEnabled"] is False
+
+
+@pytest.mark.parametrize("listing_details", [False, True])
+def test_dbm_individual_only_keeps_office_context_without_entity_links(pre_normalizer, listing_details):
+    source = "DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"
+    # This is an active gate on the committed, user-managed workbook rules.
+    raw = {"printed_name": "EXAMPLE PRESIDENT", "role": "President", "record_kind": "listing",
+           "source_path": ["national_government", "executive_branch", "records", 0],
+           "name_source": {"source_page": 7, "text": "EXAMPLE PRESIDENT"},
+           "context": [{"source_path": ["office_of_the_president"], "fields": {
+               "heading": {"source_page": 7, "text": "OFFICE OF THE PRESIDENT"},
+               "header_lines": [{"source_page": 7, "text": "12 Example Street"},
+                                {"source_page": 7, "text": "Trunkline: (02) 8000-0000"}],
+           }}]}
+    if listing_details:
+        raw["address_lines"] = [{"source_page": 7, "text": "34 Listing Street"}]
+        raw["contact_lines"] = [
+            {"source_page": 7, "text": "(02) 8000-1111 loc. 1234"},
+            {"source_page": 7, "text": "official@example.gov.ph"},
+        ]
+    prepared = PreProcessingEngine().preprocess([raw], WATCHLIST_CONFIGS[source]["preprocessing"])
+    person, = [map_workbook_record(source, row, pre_normalizer) for row in prepared]
+    assert person["EntityType"] == "Individual"
+    assert person["RiskCategory"] == {"RiskModelEnabled": False,
+                                      "Labels": [{"Type": "List", "Value": "PEP"}]}
+    assert person["Occupations"][0]["Organization"] == "OFFICE OF THE PRESIDENT"
+    assert person["Occupations"][0]["OccupationTitle"] == "President"
+    assert person["EntityId"] == prepared[0]["source_record_id"]
+    assert person["Sources"][0]["SourceRecordId"] == person["EntityId"]
+    assert person["Sources"][0]["Note"] == "PDF page: 7"
+    assert not person["Relationships"]
+    if listing_details:
+        assert [item["Value"] for item in person["Contacts"]] == [
+            "(02) 8000-1111 ext. 1234", "official@example.gov.ph",
+        ]
+        assert [item["FullAddress"] for item in person["Addresses"]] == ["34 Listing Street"]
+        assert "Organization office address: 12 Example Street" in person["Occupations"][0]["Note"]
+    else:
+        assert not person["Contacts"]
+        assert person["Addresses"][0]["FullAddress"] == "12 Example Street"
+        assert "Shared office address" in person["Addresses"][0]["Note"]
+        assert "12 Example Street" not in person["Occupations"][0]["Note"]
+    assert "Organization phone: (02) 8000-0000" in person["Occupations"][0]["Note"]
+    from transforms.postNormalization import PostNormalizationEngine
+    post = PostNormalizationEngine(pd.read_excel(RULES / "postNormalization.xlsx"), WATCHLIST_CONFIGS[source])
+    for record in (person,):
+        expected = deepcopy(record)
+        canonical = post.post_normalize_record(record)
+        assert canonical["RiskCategory"] == expected["RiskCategory"]
+        assert canonical["EntityId"] == expected["EntityId"]
+        assert canonical["Relationships"] == expected["Relationships"]
 
 
 def test_dfat_keeps_description_and_instrument_with_each_programme(pre_normalizer):

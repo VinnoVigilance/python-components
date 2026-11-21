@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, Mock, call
 import pytest
 
 from pipelines import mediaPostProcessingPipeline as pipeline
-from services.adverseMediaPipeline import mediaPostProcessingService as service
+from repositories.mediaPostProcess import mediaRecordPostProcessRepository as result_repository
+from services.adverseMediaPostProcessPipeline import mediaPostProcessingService as service
 from utils.hashing import calculate_record_hash
 
 
@@ -147,3 +148,54 @@ def test_save_result_writes_only_when_payload_changes(monkeypatch, existing_hash
         expected.append(call.insert_result(cursor, record))
     assert repository.mock_calls == expected
     assert result == {"action": action, "id": 271 if action == "UNCHANGED" else 272}
+
+
+def test_expiry_closes_both_date_and_current_flag():
+    """The ALTER makes the flag writable; changing to_date no longer updates it."""
+    cursor = Mock(rowcount=1)
+
+    result_repository.expire_result(cursor, 271)
+
+    query, parameters = cursor.execute.call_args.args
+    assignments = query.upper().split("SET", 1)[1].split("WHERE", 1)[0]
+    assert "IS_CURRENT = FALSE" in assignments
+    assert "TO_DATE = NOW()" in assignments
+    assert parameters == (271,)
+
+
+def test_expiry_rejects_missing_or_already_expired_result():
+    with pytest.raises(RuntimeError, match="Could not expire"):
+        result_repository.expire_result(Mock(rowcount=0), 271)
+
+
+def test_insert_explicitly_opens_current_result():
+    cursor = Mock()
+    cursor.fetchone.return_value = (272,)
+    record = {
+        "media_record_id": 9008, "vv_media_id": 410, "media_version": 2,
+        "analysis_payload": {}, "processor_manifest": {}, "post_process_hash": "hash",
+    }
+
+    assert result_repository.insert_result(cursor, record) == 272
+
+    query, parameters = cursor.execute.call_args.args
+    columns, values = query.upper().split("VALUES", 1)
+    assert "IS_CURRENT" in columns
+    assert "TO_DATE" in columns
+    assert "NOW(), NULL, TRUE" in values
+    assert parameters[:3] == (9008, 410, 2)
+
+
+def test_delete_expires_once_and_replay_preserves_history(monkeypatch):
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    monkeypatch.setattr(service, "get_db_connection", lambda: nullcontext(connection))
+    repository = Mock()
+    repository.lock_delete_source.return_value = True
+    repository.find_current_result.side_effect = [(271, "hash", 1), None]
+    monkeypatch.setattr(service, "repository", repository)
+    record = {"id": 9008, "vv_media_id": 410, "version_no": 2}
+
+    assert service.MediaPostProcessingService.expire_deleted_article(record) == "deleted"
+    assert service.MediaPostProcessingService.expire_deleted_article(record) == "unchanged"
+    repository.expire_result.assert_called_once_with(cursor, 271)

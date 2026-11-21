@@ -1,6 +1,7 @@
 import html
 import json
 import re
+from datetime import datetime
 import pandas as pd
 import pycountry
 from pathlib import Path
@@ -16,6 +17,77 @@ class BaseHandler:
     def normalize(self, value, rule):
 
         raise NotImplementedError
+
+
+class DesignationNamesHandler(BaseHandler):
+    """Parse name cells with AKA/former names and dated alias amendments.
+
+    Opt-in through a workbook rule. The raw cell must be preserved by using
+    target_field. Em dashes delimit amendments; en dashes can belong to names.
+    Unrecognised amendment syntax raises instead of silently losing history.
+    """
+
+    def normalize(self, value, rule):
+        if not isinstance(value, str) or not value.strip():
+            return value
+
+        sections = re.split(r"\s*—\s*", value.strip())
+        base = sections[0].strip()
+        aliases = []
+
+        def add_alias(name, kind="AKA", note=""):
+            name = name.strip()
+            if not name:
+                raise ValueError("Designation contains an empty alias")
+            for item in aliases:
+                if item["value"].casefold() == name.casefold() and item["type"] == kind:
+                    if note and note not in item["note"]:
+                        item["note"] = "; ".join(filter(None, [item["note"], note]))
+                    return
+            aliases.append({"type": kind, "value": name, "note": note})
+
+        # Only explicit AKA markers separate a base name at a comma.
+        parts = re.split(r",\s*(?:aka|a\.k\.a\.)\s+", base, flags=re.IGNORECASE)
+        base = parts[0]
+        inline_aliases = parts[1:]
+        parenthetical = re.fullmatch(r"(.+?)\s*\(([^()]*)\)\s*", base)
+        if parenthetical:
+            base, text = parenthetical.groups()
+            base = base.strip()
+            former = re.match(r"formerly\s+(.+)", text, re.IGNORECASE)
+            if former:
+                add_alias(former.group(1), "Former Name")
+            else:
+                # Do not mistake dates or explanatory history for alias names.
+                if re.search(r"\b(?:Amendment|\d{4})\b", text, re.IGNORECASE):
+                    raise ValueError("Unsupported designation parenthetical: " + text)
+                for name in re.split(r",\s*", text):
+                    add_alias(name)
+        elif "(" in base or ")" in base:
+            raise ValueError("Unsupported designation parentheses: " + base)
+
+        for name in inline_aliases:
+            add_alias(name)
+
+        primary_notes = []
+        for section in sections[1:]:
+            match = re.fullmatch(
+                r"(.+?)\s+Amendments?\s*\(([A-Za-z]+\s+\d{1,2},\s+\d{4})\)",
+                section.strip(),
+            )
+            if not match:
+                raise ValueError("Unsupported designation amendment: " + section)
+            names, published = match.groups()
+            # Validate the date, but preserve the source's written form in notes.
+            datetime.strptime(published, "%B %d, %Y")
+            note = "Added to the designation by amendment published " + published + "."
+            for name in re.split(r",\s*(?:and\s+)?|\s+and\s+", names):
+                if name.strip().casefold() == base.casefold():
+                    primary_notes.append("Designation amendment published " + published + ".")
+                else:
+                    add_alias(name, note=note)
+
+        return {"primary_name": base, "primary_note": " ".join(primary_notes), "aliases": aliases}
 
 
 class HtmlUnescapeHandler(BaseHandler):
@@ -477,6 +549,7 @@ class LanguageNameHandler(BaseHandler):
 # =========================================================
 
 HANDLERS = {
+    "designation_names": DesignationNamesHandler(),
     "html_unescape": HtmlUnescapeHandler(),
     "enum": EnumHandler(),
     "enum_lookup": EnumHandler(mode="lookup"),

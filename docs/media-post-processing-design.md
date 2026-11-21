@@ -9,7 +9,7 @@ The following paths show the implementation responsibilities. The pipeline uses 
 | File or directory | Responsibility |
 | --- | --- |
 | `pipelines/mediaPostProcessingPipeline.py` | Callable entry point. Validate the run mode, select and page through work using the repository, pass bounded batches to the service, and return run totals. |
-| `services/adverseMediaPipeline/mediaPostProcessingService.py` | Translate canonical article records into processor inputs, call both processors, build the payload and manifest, and apply the hash comparison and write policy. Own the transaction for each article. |
+| `services/adverseMediaPostProcessPipeline/mediaPostProcessingService.py` | Translate canonical article records into processor inputs, call both processors, build the payload and manifest, and apply the hash comparison and write policy. Own the transaction for each article. |
 | `repositories/mediaPostProcess/mediaRecordPostProcessRepository.py` | Execute SQL for core and delta reads, source lookups and locks, and result lookup, expiry and insertion. Use the service's transaction for writes. |
 | `intelligence/summary/mediaSummarizer.py` | Existing summarizer implementation. It selects sentences from article text and does not depend on normalization or the database. |
 | `intelligence/adverseStatus/predictor.py` | Load and verify the frozen adverse-news model and expose batched prediction. |
@@ -99,13 +99,15 @@ Hash the canonical `analysis_payload` with the existing `utils.hashing.calculate
 | --- | --- |
 | None | Insert the calculated payload, hash, processor manifest, article ID and source version. |
 | Matching hash | No insert and no update. The saved source version and manifest still describe the last changed result. |
-| Different hash | Set the previous row's `to_date` and insert the new row with the same timestamp as `from_date`, null `to_date`, and its own processor manifest. Do both in one transaction. |
+| Different hash | Set the previous row's `to_date` and `is_current = FALSE`, then insert the new row with the same timestamp as `from_date`, null `to_date`, `is_current = TRUE`, and its own processor manifest. Do both in one transaction. |
 
-The supplied DDL derives `is_current` from `to_date IS NULL`; do not write the flag directly. Keep the old payload, hash, manifest, source identity, and creation timestamp unchanged. The supplied SQL is design reference material. Its index is on `media_record_id`. Verify the deployed index and check for duplicate current rows by `vv_media_id` before the first run. The application uses the existing server table. Serialize writes by logical article and recheck source and result state inside the transaction, including the case where no destination row exists yet.
+The November 18, 2026 ALTER script removes the generated expression from `is_current` in both `core.media_record_post_process` and `core.media_member_post_process`, making it a writable Boolean with `DEFAULT TRUE` and `NOT NULL`. Apply that schema update before deploying this writer. The application explicitly sets `is_current = FALSE` together with `to_date` on expiry and inserts new results with `is_current = TRUE` and null `to_date`, following the media ingestion and risk repositories. Keep the old payload, hash, manifest, source identity, and creation timestamp unchanged. There is no member post-processing writer yet. The supplied SQL is design reference material. The original table design's index is on `media_record_id`. Verify the deployed index and check for duplicate current rows by `vv_media_id` before the first run. The application uses the existing server table. Serialize writes by logical article and recheck source and result state inside the transaction, including the case where no destination row exists yet.
+
+The ALTER changes the column definition; it does not repair rows expired by an older writer after the expression was removed. Inspect existing rows for disagreement between `is_current` and `to_date IS NULL` before resuming a previously affected database, and reconcile them separately. The code fix applies to subsequent writes.
 
 Example: article 410 moves from core row 9001 to 9008. If the analysis is unchanged, keep the active result linked to 9001. Read today's analysis by stable article ID; do not require the saved source row to equal today's core row. If analysis changes, close the old result and insert the new one linked to 9008. A processor version change alone does not create a result row when the payload is identical.
 
-ADD and UPDATE run both processors for the current source version and compare the payload hash before writing. DELETE expires the active result by stable article ID, setting its to_date so the generated is_current becomes false. A repeated DELETE with no active result leaves history unchanged. A DELETE for an older version cannot expire a newer active source or result.
+ADD and UPDATE run both processors for the current source version and compare the payload hash before writing. DELETE expires the active result by stable article ID, setting both `to_date = NOW()` and `is_current = FALSE`. A repeated DELETE with no active result leaves history unchanged. A DELETE for an older version cannot expire a newer active source or result.
 
 ## Before the first run
 

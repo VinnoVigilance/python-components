@@ -1,0 +1,25 @@
+fetch_strategy: saved_html
+
+record_mode: listing_only
+
+discovery:
+  selector_type: xpath
+  # Select the table belonging to the designated section, excluding delistings.
+  row_selector: >-
+    //h2[normalize-space(.)='Designated Foreign Terrorist Organizations']
+    /following-sibling::*[1][self::figure]//table/tbody/tr[td]
+
+list_fields:
+  name:
+    selector_type: xpath
+    selector: "normalize-space(string(./td[2]))"
+    value: text
+
+  date_implemented:
+    selector_type: xpath
+    selector: "normalize-space(string(./td[1]))"
+    value: text
+
+storage:
+  save_listing_page: false
+  save_detail_pages: false

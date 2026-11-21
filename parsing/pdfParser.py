@@ -11,6 +11,7 @@ class PdfParser:
     Explicit ``parser: {mode: ocr}`` delegates to the shared OCR parser.
     Explicit ``parser: {mode: image_cards}`` discovers bordered image/text cards.
     Explicit ``parser: {mode: labeled_blocks}`` reads repeated labelled columns.
+    Explicit ``parser: {mode: dbm_directory}`` delegates to the DBM listing parser.
 
     Output:
         A list of dictionaries.
@@ -46,6 +47,10 @@ class PdfParser:
         config = config or {}
 
         settings = config.get("parser") or {}
+        if str(settings.get("mode", "")).strip().lower() == "dbm_directory":
+            from parsing.dbm.parser import DbmDirectoryParser
+
+            return DbmDirectoryParser().parse(file_path=pdf_path, config=config)
         if str(settings.get("mode", "")).strip().lower() == "labeled_blocks":
             return self._parse_labeled_blocks(pdf_path, settings)
         if str(settings.get("mode", "")).strip().lower() == "image_cards":

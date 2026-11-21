@@ -395,6 +395,13 @@ def _download_source_file(
             f"{source_file_path}"
         )
 
+    if config.get("require_pdf_header"):
+        with source_file_path.open("rb") as source_file:
+            is_pdf = source_file.read(5) == b"%PDF-"
+        if not is_pdf:
+            source_file_path.unlink()
+            raise ValueError(f"Downloaded response is not a PDF: {download_url}")
+
     return source_file_path
 
 def store_source_file(
