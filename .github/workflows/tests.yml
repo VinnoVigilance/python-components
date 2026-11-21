@@ -118,4 +118,14 @@ jobs:
       - name: Run database integration tests
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vinno_vigilance_test
-        run: pytest -m db
+        run: pytest -m db --ignore=test/integration/test_media_member_post_processing_db.py
+
+      - name: Create empty media post-processing test database
+        env:
+          PGPASSWORD: postgres
+        run: createdb -h localhost -U postgres vinno_vigilance_media_empty_test
+
+      - name: Run media post-processing database tests
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vinno_vigilance_media_empty_test
+        run: pytest -m db test/integration/test_media_member_post_processing_db.py
