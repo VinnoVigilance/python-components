@@ -292,6 +292,7 @@ _COUNTRY_ALIASES = {
     "GUINÉE CONAKRY": "GN",
     "IRAN": "IR",
     "SYRIA": "SY",
+    "REPUBLIC OF LEBANON": "LB",
     "PALESTINE": "PS",
     "PALESTINIAN": "PS",
     "PALESTINIAN TERRITORY": "PS",
