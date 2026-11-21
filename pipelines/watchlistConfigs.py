@@ -3092,6 +3092,54 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
-
+    "METI_FOREIGN_END_USER_LIST": {
+        "source_name": "METI",
+        "list_name": "METI_FOREIGN_END_USER_LIST",
+        "date_order": "YMD",
+        "download_method": "HTTPS",
+        "url": "https://www.meti.go.jp/policy/anpo/law00.html#userlist",
+        "file_type": "xlsx",
+        "sheet_name": "ユーザーリスト",
+        "external_id_path": "source_record_id",
+        "schedule": "every_7_days",
+        "versioning_strategy": "continuous",
+        "download_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/130.0.0.0 Safari/537.36"
+            ),
+        },
+        "url_resolver": {
+            "type": "link_text",
+            "source_page_url": "https://www.meti.go.jp/policy/anpo/law00.html#userlist",
+            "value": "外国ユーザーリスト",
+            "link_selector": "#userlist a[href$='.xlsx']",
+            "encoding": "utf-8",
+            "timeout": 30,
+        },
+        "preprocessing": [
+            {
+                "handler": "set_constant_field",
+                "level": "record",
+                "config": {
+                    "output_field": "entity_type",
+                    "value": "Entity",
+                },
+            },
+            {
+                "handler": "generate_composite_id",
+                "level": "record",
+                "config": {
+                    "fields": [
+                        "企業名､組織名\nCompany or Organization",
+                        "国名、地域名\nCountry or Region",
+                    ],
+                    "output_field": "source_record_id",
+                    "prefix": "METI_FOREIGN_END_USER_LIST",
+                },
+            },
+        ],
+    },
 }
 
