@@ -120,6 +120,48 @@ class TestResolveByLinkText:
                 )
 
 
+class TestScopedLinkText:
+    @pytest.mark.parametrize("filename", ["20250929_4.xlsx", "20300101_list.xlsx"])
+    def test_dispatch_discovers_changing_file_and_inherits_headers(self, monkeypatch, filename):
+        response = requests.Response()
+        response.status_code = 200
+        response.url = "https://source.test/downloads/page.html"
+        response._content = (
+            '<a href="/archive.xlsx">Foreign User List</a>'
+            f'<div id="userlist"><a href="{filename}">外国ユーザーリスト</a></div>'
+        ).encode("utf-8")
+        response._content_consumed = True
+        get = MagicMock(return_value=response)
+        monkeypatch.setattr(linkResolver.requests, "get", get)
+        cfg = {
+            "download_headers": {"User-Agent": "Configured client"},
+            "url_resolver": {
+                "type": "link_text",
+                "value": "外国ユーザーリスト",
+                "source_page_url": "https://source.test/page",
+                "link_selector": "#userlist a[href$='.xlsx']",
+                "encoding": "utf-8",
+            },
+        }
+        assert interface.resolve_url(cfg) == f"https://source.test/{filename}"
+        get.assert_called_once_with(
+            "https://source.test/page", headers=cfg["download_headers"], timeout=30,
+        )
+        assert response.encoding == "utf-8"
+
+    @pytest.mark.parametrize("html", [
+        "", '<div><a href="a.xlsx">List</a><a href="b.xlsx">List</a></div>',
+        '<div><a>List</a></div>',
+    ])
+    def test_missing_or_ambiguous_scoped_link_is_rejected(self, monkeypatch, html):
+        response = MagicMock(text=html)
+        monkeypatch.setattr(linkResolver.requests, "get", MagicMock(return_value=response))
+        with pytest.raises(ValueError):
+            linkResolver.resolve_by_link_text(
+                "https://source.test/page", "List", link_selector="div a",
+            )
+
+
 class TestResolveLatestYearPage:
     @pytest.fixture
     def config(self, monkeypatch):

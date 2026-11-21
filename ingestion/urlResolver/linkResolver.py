@@ -9,14 +9,20 @@ def resolve_by_link_text(
     source_page_url: str,
     link_text: str,
     timeout: int = 30,
+    *,
+    link_selector: str = "a",
+    headers=None,
+    encoding=None,
 ) -> str:
 
-    response = requests.get(
-        source_page_url,
-        timeout=timeout,
-    )
+    request_options = {"timeout": timeout}
+    if headers is not None:
+        request_options["headers"] = headers
+    response = requests.get(source_page_url, **request_options)
 
     response.raise_for_status()
+    if encoding:
+        response.encoding = encoding
 
     selector = Selector(
         text=response.text
@@ -28,7 +34,11 @@ def resolve_by_link_text(
         .lower()
     )
 
-    for link in selector.css("a"):
+    links = selector.css(link_selector)
+    if link_selector != "a" and (len(links) != 1 or not links[0].attrib.get("href")):
+        raise ValueError("File selector must match exactly one download link.")
+
+    for link in links:
 
         current_text = " ".join(
             link.css("::text").getall()

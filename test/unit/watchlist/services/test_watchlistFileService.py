@@ -32,6 +32,31 @@ from services.watchlistPipeline import watchlistFileService as fs  # noqa: E402
 pytestmark = pytest.mark.unit
 
 
+def test_meti_uses_existing_resolver_and_downloader(monkeypatch, tmp_path):
+    config = {
+        "source_name": "METI", "list_name": "METI_FOREIGN_END_USER_LIST",
+        "download_method": "HTTPS", "file_type": "xlsx",
+        "download_headers": {"User-Agent": "configured client"},
+        "url_resolver": {"type": "link_text", "source_page_url": "https://www.meti.go.jp/policy/anpo/law00.html", "value": "外国ユーザーリスト"},
+    }
+    source = tmp_path / "current.xlsx"
+    source.write_bytes(b"downloaded workbook")
+    url = "https://www.meti.go.jp/policy/anpo/future.xlsx"
+    resolver = MagicMock(return_value=url)
+    monkeypatch.setattr(fs, "resolve_url", resolver)
+    browser = MagicMock()
+    monkeypatch.setattr(fs, "_collect_bypass_source", browser)
+    downloader = MagicMock()
+    downloader.download.return_value = str(source)
+    assert fs.acquire_source_file(config, downloader) == source.resolve()
+    resolver.assert_called_once_with(config)
+    task = downloader.download.call_args.args[0]
+    assert task.url == url
+    assert task.file_type == "xlsx"
+    assert task.headers == config["download_headers"]
+    browser.assert_not_called()
+
+
 @pytest.mark.parametrize("headers", [None, {"User-Agent": "source-client/1.0"}])
 def test_https_acquisition_passes_optional_headers_to_downloader(tmp_path, headers):
     source_file = tmp_path / "listing.html"

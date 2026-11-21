@@ -17,6 +17,13 @@ def resolve_url(config):
     resolver_type = resolver_config["type"]
 
     if resolver_type == "link_text":
+        options = {
+            key: resolver_config[key]
+            for key in ("link_selector", "encoding", "timeout", "headers")
+            if key in resolver_config
+        }
+        if "headers" not in options and config.get("download_headers"):
+            options["headers"] = config["download_headers"]
         return resolve_by_link_text(
             source_page_url=resolver_config[
                 "source_page_url"
@@ -24,6 +31,7 @@ def resolve_url(config):
             link_text=resolver_config[
                 "value"
             ],
+            **options,
         )
 
     if resolver_type == "json_list_filter":
