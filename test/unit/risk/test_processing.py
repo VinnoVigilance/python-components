@@ -131,6 +131,29 @@ class ProcessingTests(unittest.TestCase):
                 )
                 self.classify.assert_called_once_with(payload, run_model=enabled)
 
+    def test_shared_list_does_not_apply_person_label_to_organization_subject(self):
+        sources = [{"ListName": "DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"}]
+        person = {"EntityType": "Individual", "Sources": sources,
+                  "RiskCategory": {"RiskModelEnabled": False, "Labels": [{"Type": "List", "Value": "PEP"}]}}
+        office = {"EntityType": "Entity", "Sources": sources,
+                  "RiskCategory": {"RiskModelEnabled": False, "Labels": []}}
+        self.source["payload"] = person
+        self.assertEqual(_process(self.connection, self.repository, self.item,
+                                  "incremental", self.classify, subject="watchlist"), "versioned")
+        self.classify.assert_called_once_with(person, run_model=False)
+        self.classify.reset_mock()
+        self.repository.reset_mock()
+        self.item = {**self.item, "subject_id": "office-1", "source_record_id": 206}
+        self.repository.find_source_version.return_value = {
+            **self.source, "id": 206, "subject_id": "office-1", "payload": office,
+        }
+        self.repository.find_current_source.return_value = self.repository.find_source_version.return_value
+        self.assertEqual(_process(self.connection, self.repository, self.item,
+                                  "incremental", self.classify, subject="watchlist"), "skipped")
+        self.classify.assert_not_called()
+        self.repository.insert_risk.assert_not_called()
+        self.repository.expire_current.assert_called_once_with(self.cursor, "office-1")
+
 
 if __name__ == "__main__":
     unittest.main()

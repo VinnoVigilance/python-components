@@ -37,6 +37,20 @@ def test_empty_labels_return_no_assertions():
     assert record_rule_labels({"RiskCategory": {"Labels": []}}, TAXONOMY) == {}
 
 
+def test_list_origin_label_is_local_to_payload_even_when_list_name_is_shared():
+    from intelligence.risk.watchlistRiskClassifier import WatchlistRiskClassifier
+
+    classifier = WatchlistRiskClassifier(model_enabled=False)
+    source = [{"ListName": "DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"}]
+    person = {"EntityId": "person", "EntityType": "Individual", "Sources": source,
+              "RiskCategory": {"RiskModelEnabled": False, "Labels": [{"Type": "List", "Value": "PEP"}]}}
+    organization = {"EntityId": "office", "EntityType": "Entity", "Sources": source,
+                    "RiskCategory": {"RiskModelEnabled": False, "Labels": []}}
+    for record, expected in ((person, ["PEP"]), (organization, []), (person, ["PEP"]), (organization, [])):
+        result = classifier.classify(record)
+        assert [r["riskCategoryName"] for r in result["riskCategories"]] == expected
+
+
 @pytest.mark.parametrize("record, field", [
     ({}, "RiskCategory"),
     ({"RiskCategory": {"Labels": "Regulatory"}}, "RiskCategory.Labels"),
