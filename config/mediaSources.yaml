@@ -81,6 +81,10 @@ sources:
         acquisition:
           fetch_strategy: direct
           download_method: CRAWLER
+          crawler_settings:
+            concurrent_requests_per_domain: 3
+            download_delay: 0.05
+            retry_times: 3
 
         feed_urls:
           - https://data.gmanetwork.com/gno/rss/news/nation/feed.xml
