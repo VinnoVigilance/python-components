@@ -104,6 +104,23 @@ class MediaSourceAcquisitionResult:
     stop_reason: str = "UNEXPECTED_STOP"
     completed_safely: bool = False
 
+def collect_rendered_article_links(read_listing, scroll_to_more, wait_for_batch):
+    """Collect unique links until the listing ends or progress times out."""
+    urls = {}
+    batch_links, reached_end = read_listing()
+
+    while True:
+        urls.update(dict.fromkeys(batch_links))
+        if reached_end:
+            return list(urls), True
+
+        scroll_to_more()
+        next_batch = wait_for_batch(set(urls))
+        if next_batch is None:
+            return list(urls), False
+
+        batch_links, reached_end = next_batch
+
 
 class MediaAcquisitionService:
     """
@@ -140,6 +157,26 @@ class MediaAcquisitionService:
                 "INITIAL, INCREMENTAL or RETRY."
             )
 
+        mode_config = source_config.get("discovery_by_mode", {}).get(mode)
+        if mode_config:
+            discovery_settings = {
+                key: value
+                for key, value in mode_config.items()
+                if key not in {"acquisition", "bypass_config"}
+            }
+            source_config = {
+                **source_config,
+                "discovery": {
+                    **source_config.get("discovery", {}),
+                    **discovery_settings,
+                },
+                "acquisition": {
+                    **source_config.get("acquisition", {}),
+                    **mode_config.get("acquisition", {}),
+                },
+            }
+            if "bypass_config" in mode_config:
+                source_config["bypass_config"] = mode_config["bypass_config"]
         # =================================================
         # 1. Validate source configuration
         # =================================================
@@ -724,24 +761,42 @@ class MediaAcquisitionService:
         ).strip().lower()
 
         source_file_path = None
+        saved_listing_files = {}
+        failed_listing_urls = []
 
         if fetch_strategy == "saved_html":
+            listing_urls = source_config.get("discovery", {}).get("archive_urls")
 
-            source_file_path = (
-                MediaAcquisitionService
-                ._collect_bypass_listing(
+            if listing_urls:
+                for listing_url in dict.fromkeys(listing_urls):
+                    try:
+                        saved_listing_files[listing_url] = (
+                            MediaAcquisitionService._collect_bypass_listing(
+                                source_config={**source_config, "url": listing_url},
+                                dataset_name=dataset_name,
+                            )
+                        )
+                    except (RuntimeError, OSError):
+                        logger.warning(
+                            "Could not save Media listing: %s",
+                            listing_url,
+                            exc_info=True,
+                        )
+                        failed_listing_urls.append(listing_url)
+
+                if not saved_listing_files:
+                    raise RuntimeError(
+                        f"No Media archive listings were saved for {dataset_name}."
+                    )
+            else:
+                source_file_path = MediaAcquisitionService._collect_bypass_listing(
                     source_config=source_config,
                     dataset_name=dataset_name,
                 )
-            )
 
         elif fetch_strategy != "direct":
+            raise ValueError(f"Unsupported Media fetch_strategy: {fetch_strategy}")
 
-            raise ValueError(
-                "Unsupported Media "
-                "fetch_strategy: "
-                f"{fetch_strategy}"
-            )
 
         # Bypass collection does not need a DB connection.
         # Obtain the connection only after the listing
@@ -770,6 +825,12 @@ class MediaAcquisitionService:
                     )
                 )
 
+                for listing_url in failed_listing_urls:
+                    discovery_service.mark_discovery_failure(
+                        f"LISTING_COLLECTION_FAILED: {listing_url}"
+                    )
+
+
                 task = CrawlerTask(
                     url=source_url,
                     source_name=source_name,
@@ -786,6 +847,7 @@ class MediaAcquisitionService:
                     source_file_path=(
                         source_file_path
                     ),
+                    saved_listing_files=saved_listing_files,
 
                     download_dir=str(
                         ROOT_DIR

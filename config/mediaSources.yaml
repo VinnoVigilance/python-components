@@ -10,6 +10,146 @@ global:
 
 
 sources:
+
+  GMA_NEWS:
+    enabled: true
+    active: true
+
+    source_name: GMA_NEWS
+    dataset_name: GMA_NEWS
+    dataset_category: Media
+    schedule: daily
+    date_order: YMD
+
+    source_page_url: https://www.gmanetwork.com/news/
+    url: https://www.gmanetwork.com/news/archives/news-nation/
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 1
+        retry_times: 3
+
+    discovery:
+      policy: full_scan
+
+    discovery_by_mode:
+      INITIAL:
+        strategy: archive_listings
+
+        acquisition:
+          fetch_strategy: saved_html
+          download_method: BYPASS
+
+        archive_urls:
+          - https://www.gmanetwork.com/news/archives/news-nation/
+          - https://www.gmanetwork.com/news/archives/news-metro/
+          - https://www.gmanetwork.com/news/archives/news-regions/
+          - https://www.gmanetwork.com/news/archives/news-specialreports/
+          - https://www.gmanetwork.com/news/archives/money/
+          - https://www.gmanetwork.com/news/archives/money-personalfinance/
+          - https://www.gmanetwork.com/news/tracking/
+
+        article:
+          link_selector: '#grid_thumbnail_stories a[href*="/story/"]'
+
+        bypass_config:
+          engine: stealth_browser
+          headless: false
+          timeout_seconds: 120
+
+          actions:
+            - action: wait
+              type: selector
+              selector: '#grid_thumbnail_stories a[href*="/story/"]'
+              timeout: 60
+
+            - action: scroll_until_idle
+              link_selector: '#grid_thumbnail_stories a[href*="/story/"]'
+              idle_timeout_seconds: 30
+              poll_interval_seconds: 2
+
+            - action: save_html
+              filename_pattern: '{source}_{list}_{timestamp}.html'
+
+      INCREMENTAL:
+        strategy: rss
+
+        acquisition:
+          fetch_strategy: direct
+          download_method: CRAWLER
+
+        feed_urls:
+          - https://data.gmanetwork.com/gno/rss/news/nation/feed.xml
+          - https://data.gmanetwork.com/gno/rss/news/metro/feed.xml
+          - https://data.gmanetwork.com/gno/rss/news/regions/feed.xml
+          - https://data.gmanetwork.com/gno/rss/news/specialreports/feed.xml
+          - https://data.gmanetwork.com/gno/rss/money/feed.xml
+          - https://data.gmanetwork.com/gno/rss/money/personalfinance/feed.xml
+
+    extraction:
+      SourceURL:
+        source: response_url
+
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          pattern: '/news/(?:[^/?#]+/)+([0-9]+)/[^/?#]+/story(?:/|[?#]|$)'
+
+      Title:
+        selector: 'meta[property="og:title"]'
+        output: attribute
+        attribute: content
+
+      date.originalValue:
+        selector: 'meta[property="og:pubdate"], meta[name="og:pubdate"]'
+        output: attribute
+        attribute: content
+
+      BodyText:
+        selector: '.story_main'
+        output: text
+
+      AuthorName:
+        selector: 'meta[name="author"]'
+        output: attribute
+        attribute: content
+
+      Summary:
+        selector: 'meta[property="og:description"]'
+        output: attribute
+        attribute: content
+
+      FeaturedImageUrl:
+        selector: 'meta[property="og:image"]'
+        output: attribute
+        attribute: content
+
+      TagNames:
+        selector: '.automatic_tags a.automatic-tag-link'
+        output: text
+        multiple: true
+
+    required_article_fields:
+      - Title
+      - BodyText
+
+    parser:
+      type: html
+
+    identity:
+      external_id:
+        field: SourceRecordId
+      record_key:
+        fields:
+          - source_name
+          - dataset_name
+          - SourceRecordId
+
   SUPREME_COURT_PH_DECISIONS_AND_SIGNED_RESOLUTIONS:
     enabled: true
     active: true

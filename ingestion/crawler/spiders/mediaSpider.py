@@ -3,6 +3,7 @@ import re
 from datetime import date, datetime
 from typing import Any
 from urllib.parse import urlparse
+from xml.etree import ElementTree
 
 import scrapy
 
@@ -114,6 +115,41 @@ class MediaSpider(scrapy.Spider):
                 dont_filter=True,
             )
             return
+        if self.discovery_config.get("strategy") == "archive_listings":
+            urls = self.discovery_config.get("rendered_article_urls")
+            if urls is None:
+                self.discovery_service.mark_discovery_failure(
+                    "ARCHIVE_LINKS_NOT_COLLECTED"
+                )
+                return
+
+            for url in urls:
+                request, _ = self._discover_detail(url)
+                if request is not None:
+                    yield request
+
+            if self.discovery_config.get("archive_collection_complete") is True:
+                self.discovery_service.mark_source_end()
+            else:
+                self.discovery_service.mark_discovery_failure(
+                    "ARCHIVE_COLLECTION_INCOMPLETE"
+                )
+            return
+        
+        if self.discovery_config.get("strategy") == "rss":
+            feeds = list(dict.fromkeys(self.discovery_config.get("feed_urls", [])))
+            if not feeds:
+                self.discovery_service.mark_discovery_failure("MISSING_RSS_FEEDS")
+                return
+
+            self.pending_rss_feeds = len(feeds)
+            for url in feeds:
+                yield scrapy.Request(
+                    url,
+                    callback=self.parse_rss,
+                    errback=self.rss_failed,
+                )
+            return
 
         if self.discovery_config.get("strategy") == "dated_month_archive":
             yield scrapy.Request(start_url, callback=self.parse_month_archive,
@@ -135,6 +171,50 @@ class MediaSpider(scrapy.Spider):
             },
             dont_filter=True,
         )
+
+    def parse_rss(self, response):
+        try:
+            channel = ElementTree.fromstring(response.body).find("channel")
+            if channel is None:
+                raise ValueError("RSS channel not found")
+
+            items = channel.findall("item")
+            if not items:
+                raise ValueError("RSS feed contains no items")
+
+            article_host = urlparse(self.task.url).hostname
+            for item in items:
+                url = item.findtext("link", "").strip()
+                parsed = urlparse(url)
+                if (
+                    parsed.scheme not in {"https", "http"}
+                    or parsed.hostname != article_host
+                    or not self._extract_source_record_id(url)
+                ):
+                    self.discovery_service.mark_discovery_failure(
+                        "INVALID_RSS_ARTICLE_URL"
+                    )
+                    continue
+
+                request, _ = self._discover_detail(url)
+                if request is not None:
+                    yield request
+
+        except (ElementTree.ParseError, ValueError) as exc:
+            self.logger.warning("Invalid RSS feed %s: %s", response.url, exc)
+            self.discovery_service.mark_discovery_failure("INVALID_RSS_FEED")
+        finally:
+            self.finish_rss_feed()
+
+    def rss_failed(self, failure):
+        self.logger.warning("RSS download failed: %s", failure)
+        self.discovery_service.mark_discovery_failure("RSS_FETCH_FAILED")
+        self.finish_rss_feed()
+
+    def finish_rss_feed(self):
+        self.pending_rss_feeds -= 1
+        if self.pending_rss_feeds == 0:
+            self.discovery_service.mark_source_end()
 
     def parse_month_archive(self, response):
         """Visit month indexes serially so URL checks follow decision dates."""

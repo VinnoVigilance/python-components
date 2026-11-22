@@ -70,46 +70,45 @@ class SavedHtmlMediaSpider(MediaSpider):
                 yield result
             return
 
-        source_file_path = (
-            self.task.source_file_path
-        )
+        listing_files = self.task.saved_listing_files
+        if not listing_files:
+            if not self.task.source_file_path:
+                raise ValueError(
+                    "SavedHtmlMediaSpider requires source_file_path "
+                    "or saved_listing_files."
+                )
+            listing_files = {self.task.url: self.task.source_file_path}
 
-        if not source_file_path:
-            raise ValueError(
-                "source_file_path is required for "
-                "SavedHtmlMediaSpider."
+        list_only = self.discovery_config.get("strategy") == "list_only"
+        pending_details = []
+
+        for listing_url, file_path in listing_files.items():
+            source_file = Path(file_path).resolve()
+            if not source_file.is_file():
+                raise FileNotFoundError(
+                    f"Saved Media listing HTML was not found: {source_file}"
+                )
+
+            listing_response = HtmlResponse(
+                url=listing_url,
+                body=source_file.read_bytes(),
+                encoding="utf-8",
             )
 
-        source_file = Path(
-            source_file_path
-        ).resolve()
+            if list_only:
+                for result in self.parse_list_rows(listing_response):
+                    yield result
+                continue
 
-        if not source_file.is_file():
-            raise FileNotFoundError(
-                "Saved Media listing HTML was not "
-                f"found: {source_file}"
+            pending_details.extend(
+                self._discover_from_saved_listing(listing_response)
             )
+            if self.discovery_service.stop_reason == "KNOWN_THRESHOLD_REACHED":
+                break
 
-        listing_response = HtmlResponse(
-            url=self.task.url,
-            body=source_file.read_bytes(),
-            encoding="utf-8",
-        )
-
-        if self.discovery_config.get(
-            "strategy"
-        ) == "list_only":
-            for result in self.parse_list_rows(
-                listing_response
-            ):
-                yield result
+        if list_only:
             return
 
-        pending_details = (
-            self._discover_from_saved_listing(
-                listing_response
-            )
-        )
 
         if not pending_details:
             self.logger.info(

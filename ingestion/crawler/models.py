@@ -39,6 +39,7 @@ class CrawlerTask:
     source_file_path: Optional[str] = None
     detail_items: Optional[list[dict[str, Any]]] = None
     discovery_items: Optional[list[dict[str, Any]]] = None
+    saved_listing_files: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
