@@ -8,6 +8,12 @@ from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from concurrent.futures import FIRST_COMPLETED, CancelledError, wait
+from datetime import timezone
+from email.utils import parsedate_to_datetime
+from threading import Event, Lock
 
 import requests
 
@@ -29,6 +35,138 @@ logger = logging.getLogger(__name__)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DOWNLOAD_ROOT = ROOT_DIR / "data" / "downloads"
+
+def collect_profiles(
+    task: ApiCollectorTask,
+    records: list[dict],
+    source_file_path,
+) -> str:
+    """Add API profiles to extracted listing records."""
+
+    id_path = task.record_shape["id_path"]
+    ids = [read_path(record, id_path) for record in records]
+
+    if not ids or any(
+        value is None or not str(value).strip()
+        for value in ids
+    ):
+        raise ValueError(
+            "Profile collection requires non-empty record IDs"
+        )
+
+    if len({str(value) for value in ids}) != len(ids):
+        raise ValueError("Duplicate profile record IDs")
+
+    if any(
+        not _detail_url_for(record, task.detail)
+        for record in records
+    ):
+        raise ValueError(
+            "A profile request URL could not be resolved"
+        )
+
+    records = sorted(
+        records,
+        key=lambda record: str(read_path(record, id_path)),
+    )
+
+    source = Path(source_file_path)
+    overview = source.with_name(
+        f"{source.stem}_overview.jsonl"
+    )
+    members = (
+        source.parent
+        / "attachments"
+        / "members"
+        / source.stem
+    )
+    output = source.with_name(
+        f"{source.stem}_profiles.jsonl"
+    )
+    pending = output.with_suffix(".jsonl.partial")
+
+    _write_single_jsonl([records], overview)
+
+    with _build_transport(task) as transport:
+        _fetch_profiles(
+            task, overview, members, transport
+        )
+
+    written = _write_single_jsonl(
+        _iter_profile_records(task, records, members),
+        pending,
+        sort_keys=True,
+    )
+
+    if written != len(records):
+        raise RuntimeError("Incomplete profile snapshot")
+
+    pending.replace(output)
+    return str(output)
+
+
+def _iter_profile_records(task, records, members):
+    """Decode profiles and preserve records without a profile."""
+
+    for record in records:
+        record_id = read_path(
+            record, task.record_shape["id_path"]
+        )
+        path = members / (
+            f"{_safe_member_filename(record_id)}.json"
+        )
+
+        response = json.loads(
+            path.read_text(encoding="utf-8")
+        )
+        items = read_path(
+            response, task.detail["items_path"]
+        )
+
+        if not isinstance(items, list) or len(items) > 1:
+            raise ValueError(
+                f"Unexpected profile response for {record_id}"
+            )
+
+        profile = {}
+
+        if items:
+            profile = read_path(
+                items[0], task.detail["content_path"]
+            )
+
+            if (
+                task.detail.get("content_is_json")
+                and isinstance(profile, str)
+            ):
+                profile = json.loads(profile)
+
+            expected_id = read_path(
+                record, task.detail["id_path"]
+            )
+            actual_id = read_path(
+                profile, task.detail["response_id_path"]
+            )
+
+            if (
+                not isinstance(profile, dict)
+                or actual_id is None
+                or str(actual_id) != str(expected_id)
+            ):
+                raise ValueError(
+                    f"Profile ID mismatch for {record_id}"
+                )
+
+        yield [{
+            **record,
+            "detail": profile,
+            "profile_api_url": _detail_url_for(
+                record, task.detail
+            ),
+            "profile_status": (
+                "FOUND" if profile else "NOT_FOUND"
+            ),
+        }]
 
 
 def collect_source(task: ApiCollectorTask) -> str:
@@ -240,42 +378,64 @@ def _fetch_profiles(
     transport: Any,
     log_every: int = 200,
 ) -> int:
-    """Save each record's profile JSON; skip one already on disk (resumable)."""
+    """Save profiles, reusing cached files; concurrency is opt-in per source."""
+
+    rounds = task.detail.get("retry_rounds", 1)
+
+    if type(rounds) is not int or rounds < 1:
+        raise ValueError("detail.retry_rounds must be a positive integer")
+
+    if rounds > 1:
+        return _fetch_profiles_resilient(
+            task, overview_path, members_dir, transport, log_every
+        )
+
+    workers = task.detail.get("max_workers", 1)
+    if type(workers) is not int or workers < 1:
+        raise ValueError("detail.max_workers must be a positive integer")
+    if workers > 1 and (task.transport != "requests" or task.page_token):
+        raise ValueError("Parallel profiles require requests without page_token")
 
     members_dir.mkdir(parents=True, exist_ok=True)
-
     id_path = task.record_shape.get("id_path")
 
     saved = 0
     skipped = 0
     start = time.time()
 
-    with overview_path.open(encoding="utf-8") as handle:
-        for line in handle:
-            stub = json.loads(line)
+    def fetch_one(stub):
+        record_id = read_path(stub, id_path) if id_path else None
+        url = _detail_url_for(stub, task.detail)
+        if record_id is None or not url:
+            return None
 
-            record_id = read_path(stub, id_path) if id_path else None
-            url = _detail_url_for(stub, task.detail)
+        file_path = members_dir / f"{_safe_member_filename(record_id)}.json"
+        if file_path.exists():
+            return False
 
-            if record_id is None or not url:
-                continue
+        profile = _get_json_with_retry(task, url, None, transport)
 
-            file_path = members_dir / f"{_safe_member_filename(record_id)}.json"
-
-            if file_path.exists():
-                skipped += 1
-                continue
-
-            profile = _get_json_with_retry(task, url, None, transport)
-
-            if task.endpoints and read_path(profile, id_path) != record_id:
-                raise ValueError(f"Profile ID does not match overview record: {record_id}")
-
-            file_path.write_text(
-                json.dumps(profile, ensure_ascii=False),
-                encoding="utf-8",
+        if task.endpoints and read_path(profile, id_path) != record_id:
+            raise ValueError(
+                f"Profile ID does not match overview record: {record_id}"
             )
 
+        file_path.write_text(
+            json.dumps(profile, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        if task.throttle_delay:
+            time.sleep(task.throttle_delay)
+
+        return True
+
+    def track(result):
+        nonlocal saved, skipped
+
+        if result is False:
+            skipped += 1
+        elif result is True:
             saved += 1
 
             if saved % log_every == 0:
@@ -284,8 +444,29 @@ def _fetch_profiles(
                     f"{task.list_name}: {saved} profiles fetched ({rate:.1f}/s)"
                 )
 
-            if task.throttle_delay:
-                time.sleep(task.throttle_delay)
+    logger.info("%s: profile workers=%s", task.list_name, workers)
+
+    with overview_path.open(encoding="utf-8") as handle:
+        stubs = (json.loads(line) for line in handle if line.strip())
+
+        if workers == 1:
+            for stub in stubs:
+                track(fetch_one(stub))
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = []
+
+                try:
+                    for stub in stubs:
+                        futures.append(pool.submit(fetch_one, stub))
+
+                    for future in as_completed(futures):
+                        track(future.result())
+
+                except BaseException:
+                    for future in futures:
+                        future.cancel()
+                    raise
 
     if skipped:
         logger.info(
@@ -293,7 +474,6 @@ def _fetch_profiles(
         )
 
     return saved
-
 
 def _list_detail_base_dir(
     task: ApiCollectorTask,
@@ -717,20 +897,25 @@ def _build_output_path(
 def _write_single_jsonl(
     pages: Iterable[List[Any]],
     output_path: Path,
+    *,
+    sort_keys: bool = False,
 ) -> int:
-    """Write every record as one raw JSON line; return the number written."""
+    """Write every record as one raw JSON line."""
 
     written = 0
 
     with output_path.open("w", encoding="utf-8") as handle:
         for items in pages:
             for item in items:
-                handle.write(json.dumps(item, ensure_ascii=False))
+                handle.write(json.dumps(
+                    item,
+                    ensure_ascii=False,
+                    sort_keys=sort_keys,
+                ))
                 handle.write("\n")
                 written += 1
 
     return written
-
 
 def _write_record_files(
     pages: Iterable[List[Any]],
@@ -772,3 +957,368 @@ def _write_record_files(
             file_paths.append(str(file_path))
 
     return file_paths
+
+def _profile_retry_after(value):
+    value = str(value or "").strip()
+
+    if value.isdigit():
+        return float(value)
+
+    try:
+        when = parsedate_to_datetime(value)
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        return max(0.0, when.timestamp() - time.time())
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+class _ProfileRequestGate:
+    """Coordinate request spacing and cooldown across profile workers."""
+
+    def __init__(self, transport, interval, fallback):
+        self.transport = transport
+        self.interval = max(0.0, float(interval))
+        self.fallback = max(0.0, float(fallback))
+        self.lock = Lock()
+        self.stop = Event()
+        self.next_at = 0.0
+
+    def get_json(self, url, params=None):
+        while True:
+            if self.stop.is_set():
+                raise CancelledError()
+
+            with self.lock:
+                now = time.monotonic()
+                delay = self.next_at - now
+
+                if delay <= 0:
+                    self.next_at = now + self.interval
+                    break
+
+            if self.stop.wait(delay):
+                raise CancelledError()
+
+        try:
+            return self.transport.get_json(url, params)
+
+        except requests.HTTPError as error:
+            response = error.response
+
+            if response is not None and response.status_code in (429, 503):
+                delay = _profile_retry_after(
+                    response.headers.get("Retry-After")
+                )
+                if delay is None:
+                    delay = self.fallback
+
+                with self.lock:
+                    self.next_at = max(
+                        self.next_at,
+                        time.monotonic() + delay,
+                    )
+
+                logger.warning(
+                    "Profile API HTTP %s: shared cooldown %.1fs",
+                    response.status_code,
+                    delay,
+                )
+
+            raise
+
+
+def _fetch_profiles_resilient(
+    task,
+    overview_path,
+    members_dir,
+    transport,
+    log_every=200,
+):
+    workers = task.detail.get("max_workers", 1)
+    rounds = task.detail["retry_rounds"]
+
+    if type(workers) is not int or workers < 1:
+        raise ValueError("detail.max_workers must be a positive integer")
+
+    if task.transport != "requests" or task.page_token:
+        raise ValueError(
+            "Resilient profiles require requests without page_token"
+        )
+
+    required = {
+        "items_path",
+        "content_path",
+        "id_path",
+        "response_id_path",
+    }
+    if not required.issubset(task.detail):
+        raise ValueError(
+            "Resilient profiles require the enriched-profile "
+            "response configuration"
+        )
+
+    members_dir.mkdir(parents=True, exist_ok=True)
+    temporary_dir = members_dir / "_pending"
+    temporary_dir.mkdir(exist_ok=True)
+
+    rows = [
+        json.loads(line)
+        for line in overview_path.read_text(
+            encoding="utf-8"
+        ).splitlines()
+        if line.strip()
+    ]
+
+    id_path = task.record_shape["id_path"]
+    failed_path = overview_path.with_name(
+        f"{overview_path.stem}_failed_profiles.jsonl"
+    )
+    errors = {}
+
+    def record_id(row):
+        return str(read_path(row, id_path))
+
+    def cached(row):
+        path = members_dir / (
+            f"{_safe_member_filename(record_id(row))}.json"
+        )
+        if not path.is_file():
+            return False
+
+        try:
+            next(_iter_profile_records(task, [row], members_dir))
+            return True
+        except (ValueError, TypeError, KeyError):
+            return False
+
+    pending = [row for row in rows if not cached(row)]
+    initially_cached = len(rows) - len(pending)
+
+    gate = _ProfileRequestGate(
+        transport,
+        task.throttle_delay,
+        task.retry_max_delay_seconds,
+    )
+
+    started = time.monotonic()
+    saved = 0
+
+    def fetch_one(row):
+        url = _detail_url_for(row, task.detail)
+        profile = _get_json_with_retry(task, url, None, gate)
+
+        filename = (
+            f"{_safe_member_filename(record_id(row))}.json"
+        )
+        temporary = temporary_dir / filename
+
+        try:
+            temporary.write_text(
+                json.dumps(profile, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            # Validate using the existing profile decoder.
+            next(_iter_profile_records(task, [row], temporary_dir))
+
+            # Publish the individual checkpoint only after validation.
+            temporary.replace(members_dir / filename)
+
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    logger.info(
+        "%s: workers=%s total=%s cached=%s remaining=%s",
+        task.list_name,
+        workers,
+        len(rows),
+        initially_cached,
+        len(pending),
+    )
+
+    try:
+        for round_no in range(1, rounds + 1):
+            if not pending:
+                break
+
+            gate.stop.clear()
+            consecutive_failures = 0
+
+            logger.info(
+                "%s: profile round=%s/%s pending=%s",
+                task.list_name,
+                round_no,
+                rounds,
+                len(pending),
+            )
+
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {}
+                queue = iter(pending)
+
+                def submit_one():
+                    row = next(queue, None)
+                    if row is not None:
+                        futures[pool.submit(fetch_one, row)] = row
+
+                try:
+                    for _ in range(workers):
+                        submit_one()
+
+                    pause_round = False
+
+                    while futures and not pause_round:
+                        done, _ = wait(
+                            futures,
+                            return_when=FIRST_COMPLETED,
+                        )
+
+                        for future in done:
+                            row = futures.pop(future)
+
+                            try:
+                                future.result()
+
+                            except (
+                                requests.RequestException,
+                                ValueError,
+                                TypeError,
+                                KeyError,
+                            ) as error:
+                                response = getattr(
+                                    error, "response", None
+                                )
+                                status = (
+                                    response.status_code
+                                    if response is not None
+                                    else None
+                                )
+
+                                errors[record_id(row)] = {
+                                    "source_record_id": record_id(row),
+                                    "profile_api_url": _detail_url_for(
+                                        row, task.detail
+                                    ),
+                                    "http_status": status,
+                                    "error_type": type(error).__name__,
+                                    "error": str(error),
+                                }
+
+                                logger.warning(
+                                    "%s: profile %s deferred (%s, HTTP %s)",
+                                    task.list_name,
+                                    record_id(row),
+                                    type(error).__name__,
+                                    status,
+                                )
+
+                                if isinstance(
+                                    error, requests.RequestException
+                                ):
+                                    consecutive_failures += 1
+                                else:
+                                    consecutive_failures = 0
+
+                                pause_round = (
+                                    status in (429, 503)
+                                    or consecutive_failures
+                                    >= max(3, workers)
+                                )
+
+                            else:
+                                consecutive_failures = 0
+                                saved += 1
+
+                                if saved % log_every == 0:
+                                    rate = saved / max(
+                                        time.monotonic() - started,
+                                        1e-6,
+                                    )
+                                    logger.info(
+                                        "%s: %s new profiles fetched "
+                                        "(%.1f/s)",
+                                        task.list_name,
+                                        saved,
+                                        rate,
+                                    )
+
+                            if pause_round:
+                                logger.warning(
+                                    "%s: pausing this round after "
+                                    "repeated source errors",
+                                    task.list_name,
+                                )
+                                gate.stop.set()
+                                for item in futures:
+                                    item.cancel()
+                                break
+
+                            submit_one()
+
+                except BaseException:
+                    gate.stop.set()
+                    for item in futures:
+                        item.cancel()
+                    raise
+
+            pending = [row for row in rows if not cached(row)]
+
+            reports = [
+                errors.get(
+                    record_id(row),
+                    {
+                        "source_record_id": record_id(row),
+                        "profile_api_url": _detail_url_for(
+                            row, task.detail
+                        ),
+                        "error_type": "Pending",
+                        "error": "Not downloaded in this round",
+                    },
+                )
+                for row in pending
+            ]
+
+            if reports:
+                temporary = failed_path.with_suffix(
+                    ".jsonl.partial"
+                )
+                _write_single_jsonl(
+                    [reports],
+                    temporary,
+                    sort_keys=True,
+                )
+                temporary.replace(failed_path)
+
+                if round_no < rounds:
+                    logger.warning(
+                        "%s: %s profiles remain; next round in "
+                        "%.1fs. Failures: %s",
+                        task.list_name,
+                        len(pending),
+                        task.retry_max_delay_seconds,
+                        failed_path,
+                    )
+                    time.sleep(task.retry_max_delay_seconds)
+
+        if pending:
+            raise RuntimeError(
+                f"{len(pending)} profiles remain unresolved; "
+                "successful files are cached. "
+                f"Retry the same HTML. Failures: {failed_path}"
+            )
+
+        failed_path.unlink(missing_ok=True)
+
+        logger.info(
+            "%s: all %s profiles resolved; reused=%s new=%s",
+            task.list_name,
+            len(rows),
+            initially_cached,
+            len(rows) - initially_cached,
+        )
+
+        return len(rows) - initially_cached
+
+    finally:
+        gate.stop.set()

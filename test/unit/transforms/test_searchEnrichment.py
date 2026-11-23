@@ -184,6 +184,10 @@ class TestCountryToIso2:
     def test_comma_separated_countries_return_empty(self):
         assert country_to_iso2("Lebanon, Jordan", {"LB", "JO"}) == ""
 
+    def test_meti_lebanon_name_resolves_only_when_allowed(self):
+        assert country_to_iso2("Republic of Lebanon", {"LB"}) == "LB"
+        assert country_to_iso2("Republic of Lebanon", {"IR"}) == ""
+
     def test_pycountry_resolves_plain_name(self):
         assert country_to_iso2("United States", self.VALID) == "US"
 

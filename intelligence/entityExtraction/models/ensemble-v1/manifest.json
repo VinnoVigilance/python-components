@@ -1,0 +1,206 @@
+{
+  "schemaVersion": "1.0",
+  "modelSet": "ensemble-v1",
+  "models": {
+    "gliner25_policy": {
+      "repo": "fastino/gliner2.5-multi-v1",
+      "revision": "7b005274e82da37dcf1f5fd9d6a2ef413c6a004c",
+      "directory": "gliner25_policy",
+      "license": "apache-2.0"
+    },
+    "gliner21": {
+      "repo": "urchade/gliner_multi-v2.1",
+      "revision": "443d26d654e0324125a96bebd8e796c14ff2efe6",
+      "directory": "gliner21",
+      "license": "apache-2.0"
+    },
+    "xlmr": {
+      "repo": "Davlan/xlm-roberta-base-ner-hrl",
+      "revision": "253f557bd8249b8515114cfd7f71974fe5fa4d2f",
+      "directory": "xlmr",
+      "license": "afl-3.0"
+    }
+  },
+  "backbone": {
+    "repo": "microsoft/mdeberta-v3-base",
+    "revision": "a0484667b22365f84929a935b5e50a51f71f159d",
+    "directory": "mdeberta",
+    "license": "mit"
+  },
+  "policy": {
+    "minimum_votes": 2,
+    "voting_score_cutoff": 0.8,
+    "candidate_decode_threshold": 0.2,
+    "chunk_tokens": 320,
+    "chunk_overlap": 64,
+    "grouping": "conservative",
+    "gliner25_policy_descriptions": true
+  },
+  "runtime": {
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0",
+    "numpy": "2.4.6",
+    "gliner": "0.2.30",
+    "gliner2": "2.1.0",
+    "tokenizers": "0.23.3",
+    "huggingface-hub": "1.31.0",
+    "peft": "0.21.3",
+    "sentencepiece": "0.2.3",
+    "protobuf": "7.36.2",
+    "safetensors": "0.8.0"
+  },
+  "assets": [
+    {
+      "path": "gliner21/README.md",
+      "size": 4770,
+      "sha256": "820125f2ea897716cc38645d94f73f390ec9dfd392980c436be1d25c2e106b55",
+      "repo": "urchade/gliner_multi-v2.1",
+      "revision": "443d26d654e0324125a96bebd8e796c14ff2efe6",
+      "file": "README.md"
+    },
+    {
+      "path": "gliner21/gliner_config.json",
+      "size": 477,
+      "sha256": "e25f61d91620df84aae8076811ee592e926e94d341b82e7bc1be359718f83017",
+      "repo": "urchade/gliner_multi-v2.1",
+      "revision": "443d26d654e0324125a96bebd8e796c14ff2efe6",
+      "file": "gliner_config.json"
+    },
+    {
+      "path": "gliner21/model.safetensors",
+      "size": 1155830112,
+      "sha256": "2100142f31627531497850659dcb3821c99d5e71c08a8e01a98e4b11ef32a199",
+      "repo": "urchade/gliner_multi-v2.1",
+      "revision": "443d26d654e0324125a96bebd8e796c14ff2efe6",
+      "file": "model.safetensors"
+    },
+    {
+      "path": "gliner25_policy/README.md",
+      "size": 21958,
+      "sha256": "714ab8a3be7bf7e8114e43ac34c917da32d8ef13ab91f80a8d8de67985656445",
+      "repo": "fastino/gliner2.5-multi-v1",
+      "revision": "7b005274e82da37dcf1f5fd9d6a2ef413c6a004c",
+      "file": "README.md"
+    },
+    {
+      "path": "gliner25_policy/config.json",
+      "size": 4104,
+      "sha256": "3e4a96bf01da1094180f2d8998411c1a9fd6e2ae4b5b3e4bc6950318cee95bb7",
+      "repo": "fastino/gliner2.5-multi-v1",
+      "revision": "7b005274e82da37dcf1f5fd9d6a2ef413c6a004c",
+      "file": "config.json"
+    },
+    {
+      "path": "gliner25_policy/encoder_config/config.json",
+      "size": 857,
+      "sha256": "fa4f9ef2903b5369ab172333aae4574e6a476511d7465845cf59f8360ee18716",
+      "repo": "fastino/gliner2.5-multi-v1",
+      "revision": "7b005274e82da37dcf1f5fd9d6a2ef413c6a004c",
+      "file": "encoder_config/config.json"
+    },
+    {
+      "path": "gliner25_policy/model.safetensors",
+      "size": 1149461028,
+      "sha256": "c1ff4ec0bc00031c15530b8f3c33d3677f27949e6a0cb52e1247a6224b6c5395",
+      "repo": "fastino/gliner2.5-multi-v1",
+      "revision": "7b005274e82da37dcf1f5fd9d6a2ef413c6a004c",
+      "file": "model.safetensors"
+    },
+    {
+      "path": "gliner25_policy/tokenizer.json",
+      "size": 16035853,
+      "sha256": "c62446df87ae18ec98b133f8f84fc449a07cc89bbf8ef192a4cb5f9c53777a7a",
+      "repo": "fastino/gliner2.5-multi-v1",
+      "revision": "7b005274e82da37dcf1f5fd9d6a2ef413c6a004c",
+      "file": "tokenizer.json"
+    },
+    {
+      "path": "gliner25_policy/tokenizer_config.json",
+      "size": 645,
+      "sha256": "0bf3ea0873234bd9bfdd3853c440395009ac6365a925b91654daed5396d655e1",
+      "repo": "fastino/gliner2.5-multi-v1",
+      "revision": "7b005274e82da37dcf1f5fd9d6a2ef413c6a004c",
+      "file": "tokenizer_config.json"
+    },
+    {
+      "path": "mdeberta/README.md",
+      "size": 3667,
+      "sha256": "90d5e535e04fc9ac4f39336ed33c1adc7d0136b8ce3bbe211c18a0d47b72342f",
+      "repo": "microsoft/mdeberta-v3-base",
+      "revision": "a0484667b22365f84929a935b5e50a51f71f159d",
+      "file": "README.md"
+    },
+    {
+      "path": "mdeberta/config.json",
+      "size": 579,
+      "sha256": "bcffcd343dc5efa5ef2d5a58d2b405eed108f01cc45b48d0a907b333ec41801f",
+      "repo": "microsoft/mdeberta-v3-base",
+      "revision": "a0484667b22365f84929a935b5e50a51f71f159d",
+      "file": "config.json"
+    },
+    {
+      "path": "mdeberta/spm.model",
+      "size": 4305025,
+      "sha256": "13c8d666d62a7bc4ac8f040aab68e942c861f93303156cc28f5c7e885d86d6e3",
+      "repo": "microsoft/mdeberta-v3-base",
+      "revision": "a0484667b22365f84929a935b5e50a51f71f159d",
+      "file": "spm.model"
+    },
+    {
+      "path": "mdeberta/tokenizer_config.json",
+      "size": 52,
+      "sha256": "3f3978e0c036f2c2588cac34a6047cbb0af0b0dc1814254e291028529805496d",
+      "repo": "microsoft/mdeberta-v3-base",
+      "revision": "a0484667b22365f84929a935b5e50a51f71f159d",
+      "file": "tokenizer_config.json"
+    },
+    {
+      "path": "xlmr/README.md",
+      "size": 3048,
+      "sha256": "ded5d21f50ad65d500946602b18a0007b431971056f5542bdb7be6e6d3d03bf4",
+      "repo": "Davlan/xlm-roberta-base-ner-hrl",
+      "revision": "253f557bd8249b8515114cfd7f71974fe5fa4d2f",
+      "file": "README.md"
+    },
+    {
+      "path": "xlmr/config.json",
+      "size": 980,
+      "sha256": "b39f5cdaa31793288077859feb3d4e742b2d5a1226fe3374e97fc0220c02222f",
+      "repo": "Davlan/xlm-roberta-base-ner-hrl",
+      "revision": "253f557bd8249b8515114cfd7f71974fe5fa4d2f",
+      "file": "config.json"
+    },
+    {
+      "path": "xlmr/model.safetensors",
+      "size": 1109868164,
+      "sha256": "49530ba99295b5992caafa1f361a658206094d26c74bbe5248cd64a0c4270061",
+      "repo": "Davlan/xlm-roberta-base-ner-hrl",
+      "revision": "253f557bd8249b8515114cfd7f71974fe5fa4d2f",
+      "file": "model.safetensors"
+    },
+    {
+      "path": "xlmr/sentencepiece.bpe.model",
+      "size": 5069051,
+      "sha256": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865",
+      "repo": "Davlan/xlm-roberta-base-ner-hrl",
+      "revision": "253f557bd8249b8515114cfd7f71974fe5fa4d2f",
+      "file": "sentencepiece.bpe.model"
+    },
+    {
+      "path": "xlmr/special_tokens_map.json",
+      "size": 150,
+      "sha256": "7638f5bbbe86ef6d604ef28ad3647dc690d6d117c81c0d63e885416be8da1150",
+      "repo": "Davlan/xlm-roberta-base-ner-hrl",
+      "revision": "253f557bd8249b8515114cfd7f71974fe5fa4d2f",
+      "file": "special_tokens_map.json"
+    },
+    {
+      "path": "xlmr/tokenizer_config.json",
+      "size": 211,
+      "sha256": "25784ba43a0c3aa2afaa08cd4e89795117a2c82e56f4fff50fb0b8dcff27b29f",
+      "repo": "Davlan/xlm-roberta-base-ner-hrl",
+      "revision": "253f557bd8249b8515114cfd7f71974fe5fa4d2f",
+      "file": "tokenizer_config.json"
+    }
+  ]
+}

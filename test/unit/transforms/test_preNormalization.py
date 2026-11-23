@@ -150,6 +150,23 @@ class TestHandlers:
         assert handler.normalize("Other", rule) == "Other"  # unmapped -> unchanged
         assert handler.normalize(None, rule) is None
 
+    def test_enum_lookup_returns_a_description_only_for_known_codes(self):
+        handler = EnumHandler(mode="lookup")
+
+        assert handler.normalize(" A ", "A=Apple") == "Apple"
+        assert handler.normalize("B", "A=Apple") is None
+
+    def test_enum_add_field_enriches_each_matching_item(self):
+        handler = EnumHandler(mode="add_field")
+        items = [{"code": "A"}, {"code": "B"}, {"code": "A", "name": "Existing"}]
+
+        assert handler.normalize(items, "code -> name | A=Apple") == [
+            {"code": "A", "name": "Apple"},
+            {"code": "B"},
+            {"code": "A", "name": "Existing"},
+        ]
+        assert items[0] == {"code": "A"}
+
     def test_remove_list_markers(self):
         handler = RemoveListMarkersHandler()
         assert handler.normalize("(a) Some Name", "") == "Some Name"

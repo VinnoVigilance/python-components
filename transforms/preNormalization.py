@@ -1,6 +1,7 @@
 import html
 import json
 import re
+from datetime import datetime
 import pandas as pd
 import pycountry
 from pathlib import Path
@@ -18,6 +19,77 @@ class BaseHandler:
         raise NotImplementedError
 
 
+class DesignationNamesHandler(BaseHandler):
+    """Parse name cells with AKA/former names and dated alias amendments.
+
+    Opt-in through a workbook rule. The raw cell must be preserved by using
+    target_field. Em dashes delimit amendments; en dashes can belong to names.
+    Unrecognised amendment syntax raises instead of silently losing history.
+    """
+
+    def normalize(self, value, rule):
+        if not isinstance(value, str) or not value.strip():
+            return value
+
+        sections = re.split(r"\s*—\s*", value.strip())
+        base = sections[0].strip()
+        aliases = []
+
+        def add_alias(name, kind="AKA", note=""):
+            name = name.strip()
+            if not name:
+                raise ValueError("Designation contains an empty alias")
+            for item in aliases:
+                if item["value"].casefold() == name.casefold() and item["type"] == kind:
+                    if note and note not in item["note"]:
+                        item["note"] = "; ".join(filter(None, [item["note"], note]))
+                    return
+            aliases.append({"type": kind, "value": name, "note": note})
+
+        # Only explicit AKA markers separate a base name at a comma.
+        parts = re.split(r",\s*(?:aka|a\.k\.a\.)\s+", base, flags=re.IGNORECASE)
+        base = parts[0]
+        inline_aliases = parts[1:]
+        parenthetical = re.fullmatch(r"(.+?)\s*\(([^()]*)\)\s*", base)
+        if parenthetical:
+            base, text = parenthetical.groups()
+            base = base.strip()
+            former = re.match(r"formerly\s+(.+)", text, re.IGNORECASE)
+            if former:
+                add_alias(former.group(1), "Former Name")
+            else:
+                # Do not mistake dates or explanatory history for alias names.
+                if re.search(r"\b(?:Amendment|\d{4})\b", text, re.IGNORECASE):
+                    raise ValueError("Unsupported designation parenthetical: " + text)
+                for name in re.split(r",\s*", text):
+                    add_alias(name)
+        elif "(" in base or ")" in base:
+            raise ValueError("Unsupported designation parentheses: " + base)
+
+        for name in inline_aliases:
+            add_alias(name)
+
+        primary_notes = []
+        for section in sections[1:]:
+            match = re.fullmatch(
+                r"(.+?)\s+Amendments?\s*\(([A-Za-z]+\s+\d{1,2},\s+\d{4})\)",
+                section.strip(),
+            )
+            if not match:
+                raise ValueError("Unsupported designation amendment: " + section)
+            names, published = match.groups()
+            # Validate the date, but preserve the source's written form in notes.
+            datetime.strptime(published, "%B %d, %Y")
+            note = "Added to the designation by amendment published " + published + "."
+            for name in re.split(r",\s*(?:and\s+)?|\s+and\s+", names):
+                if name.strip().casefold() == base.casefold():
+                    primary_notes.append("Designation amendment published " + published + ".")
+                else:
+                    add_alias(name, note=note)
+
+        return {"primary_name": base, "primary_note": " ".join(primary_notes), "aliases": aliases}
+
+
 class HtmlUnescapeHandler(BaseHandler):
     """Decode one HTML entity layer; use target_field to keep the original."""
 
@@ -32,17 +104,14 @@ class HtmlUnescapeHandler(BaseHandler):
 class EnumHandler(BaseHandler):
 
     """
-    Rule format:
+    Replace or look up scalar values using CODE=value entries.
 
-    Entity=Organization|Individual=Individual
+    For add_field, prefix the entries with source_key -> destination_key |.
+    Enrichment preserves unmatched items and existing destination keys.
     """
 
-    def normalize(self, value, rule):
-
-        if value is None:
-
-            return value
-
+    @staticmethod
+    def parse_mapping(rule):
         mapping = {}
 
         for item in str(rule).split("|"):
@@ -54,8 +123,47 @@ class EnumHandler(BaseHandler):
 
             mapping[k.strip()] = v.strip()
 
-        return mapping.get(str(value).strip(), value)
-    
+        return mapping
+
+    def __init__(self, mode="replace"):
+        self.mode = mode
+
+    def normalize(self, value, rule):
+        if self.mode == "add_field":
+            return self._add_field(value, rule)
+
+        if value is None:
+            return None
+        if self.mode == "lookup" and isinstance(value, (dict, list)):
+            return None
+
+        fallback = value if self.mode == "replace" else None
+        return self.parse_mapping(rule).get(str(value).strip(), fallback)
+
+    def _add_field(self, value, rule):
+        """Add a mapped sibling field to each matching object."""
+        fields, _, entries = rule.partition("|")
+        source_key, _, destination_key = map(str.strip, fields.partition("->"))
+        mapping = self.parse_mapping(entries)
+        if not source_key or not destination_key or source_key == destination_key or not mapping:
+            raise ValueError(
+                "enum_add_field requires distinct source and destination keys and CODE=value entries"
+            )
+
+        def enrich(item):
+            if not isinstance(item, dict) or destination_key in item:
+                return item
+            code = item.get(source_key)
+            match = mapping.get(str(code).strip()) if code is not None else None
+            if not match:
+                return item
+            return {**item, destination_key: match}
+
+        if isinstance(value, list):
+            return [enrich(item) for item in value]
+        return enrich(value)
+
+
 class RemoveListMarkersHandler(BaseHandler):
     
     def normalize(self, value, rule):
@@ -441,8 +549,11 @@ class LanguageNameHandler(BaseHandler):
 # =========================================================
 
 HANDLERS = {
+    "designation_names": DesignationNamesHandler(),
     "html_unescape": HtmlUnescapeHandler(),
     "enum": EnumHandler(),
+    "enum_lookup": EnumHandler(mode="lookup"),
+    "enum_add_field": EnumHandler(mode="add_field"),
     "before_parenthesis": BeforeParenthesisHandler(),
     "remove_list_markers": RemoveListMarkersHandler(),
     "date_format": DateFormatHandler(),
@@ -729,15 +840,16 @@ class PreNormalizationEngine:
                 rule["normalization_rule"]
             ).strip()
 
-            # target_field is optional and absent from every existing rule
-            # (watchlist and media alike): when blank, a rule normalizes its
-            # field in place exactly as before. Set it only when the result
-            # must NOT overwrite the field it was read from -- e.g. pulling a
-            # list of image URLs out of an HTML body while the body itself
-            # (BodyOriginalValue) still needs to reach mapping untouched.
+            # A blank target_field writes back to the matched path.
+            # A separate top-level target preserves the source value.
             target_field = str(
                 rule.get("target_field", "") or ""
             ).strip()
+
+            if normalization_type == "enum_lookup" and (
+                not target_field or target_field == field
+            ):
+                raise ValueError("enum_lookup requires a separate top-level target_field")
 
             # -----------------------------------------
             # Handler Exists?

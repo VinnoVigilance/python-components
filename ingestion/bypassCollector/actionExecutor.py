@@ -18,6 +18,9 @@ from ingestion.bypassCollector.actions.saveImageAction import SaveImageAction
 from ingestion.bypassCollector.actions.collectPopupProfilesAction import (
     CollectPopupProfilesAction,
 )
+from ingestion.bypassCollector.actions.scrollUntilIdleAction import (
+    ScrollUntilIdleAction,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -37,6 +40,7 @@ class ActionExecutor:
             "save_paginated_html": SavePaginatedHtmlAction(),
             "execute_js": ExecuteJsAction(),
             "collect_popup_profiles": CollectPopupProfilesAction(),
+            "scroll_until_idle": ScrollUntilIdleAction(),
 
         }
 

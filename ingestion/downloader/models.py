@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
 @dataclass
 class DownloadTask:
@@ -12,3 +12,6 @@ class DownloadTask:
     headers: Dict[str, str] = field(default_factory=dict)
     timeout: int = 30
     retry: int = 3
+    params: Dict[str, Any] = field(default_factory=dict, repr=False)
+
+    

@@ -95,3 +95,28 @@ def test_raw_insert_success_is_logged(monkeypatch):
     assert logged["status"] == "SUCCESS"
     # The file is also marked PARSED after its raw rows land.
     raw.watchlistFileRepository.mark_file_as_parsed.assert_called_once()
+
+
+@pytest.mark.parametrize("count,accepted", [(4999, False), (5000, True)])
+def test_dbm_rejects_major_extraction_loss_before_raw_insertion(monkeypatch, count, accepted):
+    from pathlib import Path
+    from types import SimpleNamespace
+    from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+
+    acquisition = SimpleNamespace(
+        source_file_path=Path("directory.pdf"),
+        records=[{}] * count,
+        broken_details=[],
+    )
+    process = MagicMock(return_value={"processed_record_count": count})
+    monkeypatch.setattr(raw, "process_records", process)
+    config = WATCHLIST_CONFIGS["DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"]
+
+    if accepted:
+        result = raw.process_watchlist_source(acquisition, config, 100)
+        assert result["processed_record_count"] == count
+        process.assert_called_once()
+    else:
+        with pytest.raises(ValueError, match="minimum expected count is 5000"):
+            raw.process_watchlist_source(acquisition, config, 100)
+        process.assert_not_called()

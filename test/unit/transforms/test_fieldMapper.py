@@ -32,6 +32,28 @@ from transforms.fieldMapper import (
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("entity_type", ["Individual", "Entity"])
+def test_mapped_comment_fields_match_strict_search_schema(entity_type):
+    from pathlib import Path
+    import yaml
+
+    schema_file = Path(__file__).resolve().parents[3] / "config" / "searchSchemas" / "watchlist.yaml"
+    schema = yaml.safe_load(schema_file.read_text())
+    comment_schema = schema["mapping"]["properties"]["payload"]["properties"]["Comments"]
+    mapper = MappingEngine([
+        Rule(entity_type, "Comments[].Type", "string", "comments", "constant", '"Additional Info"'),
+        Rule(entity_type, "Comments[].Text", "string", "comments", "path", "source_note"),
+    ])
+    result = mapper.map_record({"entity_type": entity_type, "source_note": "Directory context"})
+    assert result["Comments"] == [{"Type": "Additional Info", "Text": "Directory context"}]
+    assert schema["mapping"]["properties"]["payload"]["dynamic"] == "strict"
+    assert comment_schema["type"] == "nested"
+    for comment in result["Comments"]:
+        assert set(comment) <= set(comment_schema["properties"])
+    assert comment_schema["properties"]["Type"]["type"] == "keyword"
+    assert comment_schema["properties"]["Text"]["type"] == "text"
+
+
 class TestConcatPathLabels:
     def _join(self, expression, item):
         rule = Rule("Individual", "Identifiers[].Note", "string",
@@ -63,6 +85,17 @@ class TestConcatPathLabels:
 
     def test_literal_only_expression_is_unchanged(self):
         assert self._join('"Known"|"reference"', {}) == "Known reference"
+
+    def test_optional_groups_only_include_labels_with_values(self):
+        expression = '("Programme description:"|description)|("Authority:"|authority)'
+        assert self._join(expression, {"authority": "Act 2020"}) == "Authority: Act 2020"
+        assert self._join(expression, {"description": "Sanctions", "authority": "Act 2020"}) == (
+            "Programme description: Sanctions Authority: Act 2020"
+        )
+
+    def test_item_fallback_accepts_scalar_but_not_object(self):
+        assert self._join("$item", "Act 2020") == "Act 2020"
+        assert self._join("$item", {"description": "Sanctions"}) == ""
 
 
 @pytest.mark.parametrize("value", ["Official", '"Official"', "PEP", '"PEP"'])
@@ -189,11 +222,48 @@ class TestDetectEntityType:
     def test_vessel_inferred_from_imo(self):
         assert detect_entity_type({"IMO number": "1234567"}) == "Vessel"
 
+    @pytest.mark.parametrize("record", [
+        {"entity_type": "Aircraft"},
+        {"generalInfo": {"entityType": {"text": "Aircraft"}}},
+    ])
+    def test_aircraft_from_normalized_and_ofac_source_types(self, record):
+        assert detect_entity_type(record) == "Aircraft"
+
     def test_defaults_to_individual(self):
         assert detect_entity_type({}) == "Individual"
 
 
 class TestMappingEngineEndToEnd:
+    @pytest.mark.parametrize("value, expected", [("true", True), ("false", False)])
+    def test_grouped_risk_model_setting_remains_a_boolean(self, value, expected):
+        rules = [Rule("Individual", "RiskCategory.RiskModelEnabled", "boolean",
+                      "risk", "constant", value)]
+        assert MappingEngine(rules).map_record({})["RiskCategory"]["RiskModelEnabled"] is expected
+
+    def test_constant_list_risk_label_is_not_discarded(self):
+        rules = [
+            Rule("Individual", "RiskCategory.Labels[].Type", "string", "risk", "constant", "List"),
+            Rule("Individual", "RiskCategory.Labels[].Value", "string", "risk", "constant", "Regulatory"),
+        ]
+        assert MappingEngine(rules).map_record({})["RiskCategory"]["Labels"] == [
+            {"Type": "List", "Value": "Regulatory"}
+        ]
+
+    def test_aircraft_uses_aircraft_rules_instead_of_individual_rules(self):
+        rules = [
+            Rule("Aircraft", "model", "string", None, "path", "model"),
+            Rule("Individual", "individualName", "string", None, "path", "name"),
+        ]
+        engine = MappingEngine(rules)
+
+        result = engine.map_record({
+            "generalInfo": {"entityType": {"text": "Aircraft"}},
+            "model": "IL-76TD",
+            "name": "EP-GOL",
+        })
+
+        assert result == {"model": "IL-76TD"}
+
     def test_scalar_path_and_constant(self):
         rules = [
             Rule("Individual", "fullName", "string", None, "path", "name"),

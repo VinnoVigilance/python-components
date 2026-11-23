@@ -32,6 +32,31 @@ from services.watchlistPipeline import watchlistFileService as fs  # noqa: E402
 pytestmark = pytest.mark.unit
 
 
+def test_meti_uses_existing_resolver_and_downloader(monkeypatch, tmp_path):
+    config = {
+        "source_name": "METI", "list_name": "METI_FOREIGN_END_USER_LIST",
+        "download_method": "HTTPS", "file_type": "xlsx",
+        "download_headers": {"User-Agent": "configured client"},
+        "url_resolver": {"type": "link_text", "source_page_url": "https://www.meti.go.jp/policy/anpo/law00.html", "value": "外国ユーザーリスト"},
+    }
+    source = tmp_path / "current.xlsx"
+    source.write_bytes(b"downloaded workbook")
+    url = "https://www.meti.go.jp/policy/anpo/future.xlsx"
+    resolver = MagicMock(return_value=url)
+    monkeypatch.setattr(fs, "resolve_url", resolver)
+    browser = MagicMock()
+    monkeypatch.setattr(fs, "_collect_bypass_source", browser)
+    downloader = MagicMock()
+    downloader.download.return_value = str(source)
+    assert fs.acquire_source_file(config, downloader) == source.resolve()
+    resolver.assert_called_once_with(config)
+    task = downloader.download.call_args.args[0]
+    assert task.url == url
+    assert task.file_type == "xlsx"
+    assert task.headers == config["download_headers"]
+    browser.assert_not_called()
+
+
 @pytest.mark.parametrize("headers", [None, {"User-Agent": "source-client/1.0"}])
 def test_https_acquisition_passes_optional_headers_to_downloader(tmp_path, headers):
     source_file = tmp_path / "listing.html"
@@ -56,6 +81,67 @@ def test_https_acquisition_passes_optional_headers_to_downloader(tmp_path, heade
     assert task.url == config["url"]
     assert task.source_name == "BSP"
     assert task.list_name == "BSP_SENIOR_OFFICIALS"
+
+
+@pytest.mark.parametrize("content,require_pdf,accepted", [
+    (b"%PDF-1.7\nexample", True, True),
+    (b"<html>Homepage</html>", True, False),
+    (b"", True, False),
+    (b"<html>Other source</html>", False, True),
+])
+def test_optional_pdf_validation_rejects_and_removes_non_pdf_downloads(tmp_path, content, require_pdf, accepted):
+    downloaded = tmp_path / "download.pdf"
+    downloaded.write_bytes(content)
+    downloader = MagicMock()
+    downloader.download.return_value = str(downloaded)
+    config = {
+        "source_name": "EXAMPLE", "list_name": "ANNUAL_REGISTER",
+        "download_method": "HTTPS", "url": "https://annual.test/file.pdf",
+        "file_type": "pdf", "require_pdf_header": require_pdf,
+        "download_timeout": 120,
+    }
+    if accepted:
+        assert fs.acquire_source_file(config, downloader) == downloaded.resolve()
+        assert downloaded.read_bytes() == content
+    else:
+        with pytest.raises(ValueError, match="Downloaded response is not a PDF"):
+            fs.acquire_source_file(config, downloader)
+        assert not downloaded.exists()
+    task = downloader.download.call_args.args[0]
+    assert task.timeout == 120
+    assert task.url == config["url"]
+
+
+def test_annual_resolver_download_and_pdf_validation_work_together(tmp_path, monkeypatch):
+    from datetime import date
+    import requests
+    from ingestion.urlResolver import linkResolver
+
+    clock = MagicMock()
+    clock.today.return_value = date(2026, 6, 1)
+    monkeypatch.setattr(linkResolver, "date", clock)
+    response = requests.Response()
+    response.status_code = 200
+    response.url = "https://annual.test/2026"
+    response._content = b'<h1>Register 2026</h1><a href="/register.pdf">Download</a>'
+    get = MagicMock(return_value=response)
+    monkeypatch.setattr(linkResolver.requests, "get", get)
+    downloaded = tmp_path / "register.pdf"
+    downloaded.write_bytes(b"%PDF-1.7\nexample")
+    downloader = MagicMock()
+    downloader.download.return_value = str(downloaded)
+    config = {
+        "source_name": "EXAMPLE", "list_name": "ANNUAL_REGISTER", "file_type": "pdf",
+        "url_resolver": {
+            "type": "latest_year_page", "page_url_template": "https://annual.test/{year}",
+            "page_heading_template": "Register {year}", "first_year": 2026,
+            "years_ahead": 0, "download_path_suffix": ".pdf", "timeout": 60,
+        },
+        "download_timeout": 120, "require_pdf_header": True,
+    }
+    assert fs.acquire_source_file(config, downloader) == downloaded.resolve()
+    assert downloader.download.call_args.args[0].url == "https://annual.test/register.pdf"
+    get.assert_called_once_with("https://annual.test/2026", timeout=60)
 
 
 def _patch_latest_file(monkeypatch, return_value):

@@ -297,10 +297,14 @@ def crawl_source(
 
         elif media_fetch_strategy == "saved_html":
 
-            if not task.source_file_path and not task.detail_items:
+            if not (
+                task.source_file_path
+                or task.saved_listing_files
+                or task.detail_items
+            ):
                 raise ValueError(
-                    "Media saved_html strategy "
-                    "requires task.source_file_path."
+                    "Media saved_html requires a saved listing "
+                    "or detail_items."
                 )
 
             spider_class = (

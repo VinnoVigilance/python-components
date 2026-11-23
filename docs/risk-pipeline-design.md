@@ -343,6 +343,7 @@ therefore receives a new assessment even if its calculated labels are unchanged.
 | Table version_no | Source-content version being assessed |
 | label.metadata.modelVersion | Named model/weights; media includes its training run ID |
 | label.metadata.calculationVersion | SHA-256 fingerprint of relevant model assets, settings, and classifier/rule code |
+| Watchlist assessment calculationVersion | Fingerprint of the lookup-only or model-enabled calculation, present even when no labels are emitted |
 | taxonomyVersion | Fingerprint of label IDs, names and descriptions |
 
 Example: source row 101/version 1 has Fraud pending review under v6. An address
@@ -357,6 +358,18 @@ CLASSIFIED with no labels is stored. SKIPPED_EMPTY_BODY is also explicit and
 stored; it never means risk-free. FAILED calculation does not replace previous
 labels with an empty result. Media evaluates 11 labels, watchlist 15 text labels
 plus lookup-only scope; the workbook has 23 labels. Unsupported is unassessed.
+
+For watchlists, canonical `RiskCategory` contains `RiskModelEnabled` and
+`Labels[]` (each with `Type` and `Value`). `RiskCategory.RiskModelEnabled`
+controls only text-model inference. `true` runs the model even with empty
+`RiskCategory.Labels[]`; `false`, blank, or
+missing runs no model. Mapped List and Record labels are still validated and
+saved. A record with neither mapped labels nor model inference is skipped.
+Skipping a current source version expires its current assessment; a historical
+skip does not change the current assessment. Stored payloads using the previous
+structure need to be normalized again.
+If a stored record lacks the RiskCategory object, the risk job fails that item
+and preserves any current assessment until the record is normalized again.
 
 ## Persistent label review
 

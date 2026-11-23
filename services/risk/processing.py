@@ -7,7 +7,9 @@ from infrastructure.database.connection import connection_pool
 from infrastructure.database.jobLock import advisory_job_lock
 from intelligence.risk.interface import create_classifier
 from intelligence.risk.result import build_assessment_payload
+from intelligence.risk.watchlistRiskCategory.lookupRules import RiskMappingError
 from repositories import jobStateRepository
+from services.common.incrementalDeltaScan import destination_delta_window, iter_effective_dates
 from utils.hashing import calculate_record_hash
 
 
@@ -18,7 +20,7 @@ class ClassifierLoadError(RuntimeError):
     """The selected classifier cannot initialize for this run."""
 
 
-def _process(connection, repository, item, mode, classify):
+def _process(connection, repository, item, mode, classify, *, subject=None):
     """Persist one complete assessment or expiry in one transaction."""
     action = str(item.get("action", "UPDATE")).upper()
     if action not in {"ADD", "UPDATE", "DELETE"}:
@@ -27,16 +29,63 @@ def _process(connection, repository, item, mode, classify):
               if mode == "incremental" else repository.find_current_source(connection, item["subject_id"]))
     if source is None or source["subject_id"] != item["subject_id"]:
         raise LookupError(f"Missing matching source version for {item['subject_id']}.")
+    if subject == "media" and action != "DELETE" and source["change_type"] == "DELETED":
+        logger.warning("Skipping deleted media source %s", source["id"])
+        return "skipped"
     latest = repository.find_current_source(connection, item["subject_id"]) if mode == "incremental" else source
     historical = latest is None or latest["id"] != source["id"]
     with connection.cursor() as cursor:
+        if subject == "media" and action == "DELETE":
+            if latest and latest["version_no"] > source["version_no"]:
+                return "skipped"
+            current_risk = repository.find_current_risk(cursor, item["subject_id"])
+            if not current_risk or current_risk["version_no"] > source["version_no"]:
+                return "skipped"
+            repository.expire_current(cursor, item["subject_id"])
+            return "deleted"
         if action == "DELETE" or source["change_type"] == "DELETED":
             current_risk = repository.find_current_risk(cursor, item["subject_id"])
             if (not historical and current_risk
                     and current_risk["version_no"] <= source["version_no"]):
                 repository.expire_current(cursor, item["subject_id"])
             return "deleted"
-        details = build_assessment_payload(classify(source["payload"] or {}))
+        if subject == "watchlist":
+            payload = source["payload"] or {}
+            try:
+                risk_category = payload.get("RiskCategory")
+                if not isinstance(risk_category, dict):
+                    raise RiskMappingError(
+                        "RiskCategory", "RiskCategory must be an object. Normalize legacy records before assessment."
+                    )
+                categories = risk_category.get("Labels")
+                if categories is None:
+                    categories = []
+                if not isinstance(categories, list):
+                    raise RiskMappingError("RiskCategory.Labels", "RiskCategory.Labels must be an array.")
+                enabled = risk_category.get("RiskModelEnabled")
+                if isinstance(enabled, str) and not enabled.strip():
+                    enabled = None
+                if enabled is not None and type(enabled) is not bool:
+                    raise RiskMappingError("RiskCategory.RiskModelEnabled", "RiskModelEnabled must be a boolean.")
+                if enabled is not True and not categories:
+                    if not historical:
+                        repository.expire_current(cursor, item["subject_id"])
+                    return "skipped"
+                assessment = classify(payload, run_model=enabled is True)
+            except RiskMappingError as error:
+                sources = payload.get("Sources")
+                list_names = ", ".join(dict.fromkeys(
+                    entry["ListName"].strip() for entry in sources
+                    if isinstance(entry, dict) and isinstance(entry.get("ListName"), str)
+                    and entry["ListName"].strip()
+                )) if isinstance(sources, list) else ""
+                error.add_note(
+                    f"Watchlist risk mapping failed: list={list_names or '<unknown>'!r} field={error.field}"
+                )
+                raise
+        else:
+            assessment = classify(source["payload"] or {})
+        details = build_assessment_payload(assessment)
         if details.get("assessmentStatus") not in {"CLASSIFIED", "SKIPPED_EMPTY_BODY"}:
             raise ValueError("Classifier did not return a completed or explicitly skipped assessment.")
         result_hash = calculate_record_hash(details)
@@ -61,7 +110,7 @@ def _attempt(connection, repository, subject, item, mode, effective_date, classi
     for attempt in range(1, 4):
         try:
             with connection:
-                outcome = _process(connection, repository, item, mode, classify)
+                outcome = _process(connection, repository, item, mode, classify, subject=subject)
             return outcome, None
         except ClassifierLoadError:
             raise
@@ -143,14 +192,22 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
               "last_scanned_date": None, "target_date": None, "pending_count": 0,
               "retried_count": 0, "dates": []}
 
-    def classify(payload):
-        nonlocal classifier
-        if classifier is None:
+    lookup_classifier = None
+
+    def classify(payload, run_model=True):
+        nonlocal classifier, lookup_classifier
+        selected = classifier if run_model else lookup_classifier
+        if selected is None:
             try:
-                classifier = create_classifier(subject, model_path, threads)
+                selected = create_classifier(subject, model_path, threads,
+                                             model_enabled=run_model)
             except Exception as error:
                 raise ClassifierLoadError(f"Cannot initialize {subject} classifier: {error}") from error
-        return classifier.classify(payload)
+            if run_model:
+                classifier = selected
+            else:
+                lookup_classifier = selected
+        return selected.classify(payload)
 
     with advisory_job_lock(lock_id) as acquired:
         if not acquired:
@@ -160,6 +217,12 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
             state = jobStateRepository.load_state("risk", subject) or {}
             pending_items = state.setdefault("items", {})
             target_date = effective_date if effective_date is not None else date.today()
+            if mode == "incremental" and subject == "media":
+                with connection:
+                    with connection.cursor() as cursor:
+                        media_baseline, target_date = destination_delta_window(
+                            cursor, repository.latest_risk_date, through=effective_date,
+                        )
 
             def record_result(item, item_mode, item_date, error):
                 key = f"{item_mode}:{item['id']}"
@@ -202,11 +265,14 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
                     result[outcome + "_count"] += 1
 
             if mode == "incremental":
-                with connection:
-                    with connection.cursor() as cursor:
-                        baseline = repository.latest_risk_date(cursor)
+                if subject == "media":
+                    frontier = media_baseline
+                else:
+                    with connection:
+                        with connection.cursor() as cursor:
+                            baseline = repository.latest_risk_date(cursor)
+                    frontier = date.fromisoformat(state["next_date"]) if state.get("next_date") else baseline
                 result["target_date"] = target_date
-                frontier = date.fromisoformat(state["next_date"]) if state.get("next_date") else baseline
                 starts = [frontier] if frontier else []
                 for key in ("inflight_date", "replay_from"):
                     if state.get(key):
@@ -220,9 +286,9 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
                 next_date = None
                 last_available = None
 
-            while not result["limit_reached"] and (mode == "initial" or (
-                    next_date is not None and last_available is not None
-                    and next_date <= last_available)):
+            effective_dates = iter_effective_dates(next_date, last_available)
+            next_date = next(effective_dates, None)
+            while not result["limit_reached"] and (mode == "initial" or next_date is not None):
                 if max_rows and result["processed_count"] >= max_rows:
                     result["limit_reached"] = True
                     break
@@ -253,7 +319,7 @@ def run(subject, repository, lock_id, mode="incremental", effective_date=None,
                                          (next_date + timedelta(days=1)).isoformat())
                 state.pop("inflight_date", None)
                 jobStateRepository.save_state("risk", subject, state)
-                next_date += timedelta(days=1)
+                next_date = next(effective_dates, None)
 
             result["pending_count"] = len(pending_items)
             if result["limit_reached"]:

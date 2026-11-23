@@ -15,7 +15,7 @@ def values(items, keys):
     return out
 
 
-def render(record, list_name):
+def render(record):
     """Build the labelling text for one canonical record."""
     first_source = (record.get("Sources") or [{}])[0]
 
@@ -23,16 +23,19 @@ def render(record, list_name):
         items = record.get(field) or []
         return list(items[0].keys()) if items else []
 
-    lines = [f"Source list: {list_name}", f"Entity type: {record.get('EntityType', '')}"]
+    lines = [f"Entity type: {record.get('EntityType', '')}"]
     sections = [
         ("Programs", values(record.get("Programs"), ["ProgramType", "Program", "Authority", "Note"])),
         ("Measures", values(record.get("Measures"), all_keys("Measures"))),
         ("Titles", values(record.get("Titles"), ["Title", "Note"])),
         ("Occupations", values(record.get("Occupations"), all_keys("Occupations"))),
         ("Relationships", values(record.get("Relationships"), all_keys("Relationships"))),
+        ("Business activities", values(record.get("BusinessActivities"), ["Description", "Note"])),
+        ("Vessel details", values(record.get("VesselDetails"), ["Note"])),
+        ("Aircraft details", values(record.get("AircraftDetails"), ["Note"])),
         ("Additional info", values([a for a in record.get("additionalInfo") or [] if a.get("Type") not in NOISE], ["Type", "Value"])),
         ("Source note", [first_source.get("Note", "").strip()] if first_source.get("Note", "").strip() else []),
-        ("Remarks", values(record.get("Comments"), ["type", "text"])),
+        ("Remarks", values(record.get("Comments"), ["Type", "Text"])),
     ]
     for name, items in sections:
         unique = list(dict.fromkeys(items))

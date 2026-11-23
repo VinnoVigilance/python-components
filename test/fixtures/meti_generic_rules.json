@@ -1,0 +1,582 @@
+{
+  "prenormalization": [
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "企業名､組織名\nCompany or Organization",
+      "normalization_type": "regex_extract",
+      "normalization_rule": "(?s)^\\s*(.+?)\\s*[（(](?=[\\s\\S]*[\\u3040-\\u30ff\\u3400-\\u9fff])(?:[^()（）]|[（(](?:[^()（）]|[（(][^()（）]*[)）])*[)）])+[)）]\\s*$",
+      "target_field": "meti_name_without_native"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "$",
+      "normalization_type": "first_non_empty",
+      "normalization_rule": "meti_name_without_native | 企業名､組織名\nCompany or Organization",
+      "target_field": "meti_name_base"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_name_base",
+      "normalization_type": "regex_extract",
+      "normalization_rule": "(?s)^\\s*(.*?)(?:\\s*[（(](?!HK[)）])(?=[A-Z0-9. -]*[A-Z])[A-Z0-9][A-Z0-9. -]{1,19}[)）]|\\s*$)",
+      "target_field": "meti_name_head"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_name_base",
+      "normalization_type": "regex_extract",
+      "normalization_rule": "(?s)^.*?[（(](?!HK[)）])(?=[A-Z0-9. -]*[A-Z])[A-Z0-9][A-Z0-9. -]{1,19}[)）]\\s*(.*?)(?:\\s*[（(](?!HK[)）])(?=[A-Z0-9. -]*[A-Z])[A-Z0-9][A-Z0-9. -]{1,19}[)）]|\\s*$)",
+      "target_field": "meti_name_middle"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_name_base",
+      "normalization_type": "regex_extract",
+      "normalization_rule": "(?s)^.*?[（(](?!HK[)）])(?=[A-Z0-9. -]*[A-Z])[A-Z0-9][A-Z0-9. -]{1,19}[)）].*?[（(](?!HK[)）])(?=[A-Z0-9. -]*[A-Z])[A-Z0-9][A-Z0-9. -]{1,19}[)）]\\s*(.*?)\\s*$",
+      "target_field": "meti_name_tail"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_name_base",
+      "normalization_type": "regex_extract",
+      "normalization_rule": "(?s)^(?!.*[A-Za-z])(.+)$",
+      "target_field": "meti_native_only_name"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "企業名､組織名\nCompany or Organization",
+      "normalization_type": "regex_extract_all",
+      "normalization_rule": "(?s)^.+?\\s*[（(](?=[\\s\\S]*[\\u3040-\\u30ff\\u3400-\\u9fff])((?:[^()（）]|[（(](?:[^()（）]|[（(][^()（）]*[)）])*[)）])+)[)）]\\s*$",
+      "target_field": "meti_native_aliases"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_name_base",
+      "normalization_type": "regex_extract_all",
+      "normalization_rule": "[（(]((?!HK[)）])(?=[A-Z0-9. -]*[A-Z])[A-Z0-9][A-Z0-9. -]{1,19})[)）]",
+      "target_field": "meti_abbreviations"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "別名\nAlso Known As",
+      "normalization_type": "regex_extract_all",
+      "normalization_rule": "(?s)(?:^|・)(?!\\s*(?:・|$))\\s*([^・]+?)\\s*(?=・|$)",
+      "target_field": "meti_aliases"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "国名、地域名\nCountry or Region",
+      "normalization_type": "regex_extract",
+      "normalization_rule": "(?m)^\\s*([A-Za-z][^\\r\\n]*?)\\s*$",
+      "target_field": "meti_country_en"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "懸念区分\nType of WMD",
+      "normalization_type": "regex_extract",
+      "normalization_rule": "([BCMNＢＣＭＮ](?:[\\s,、，]*[BCMNＢＣＭＮ])*)",
+      "target_field": "meti_wmd_text"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_wmd_text",
+      "normalization_type": "split_pattern",
+      "normalization_rule": "(?P<code>[BCMNＢＣＭＮ])",
+      "target_field": "meti_wmd"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_wmd[].code",
+      "normalization_type": "enum",
+      "normalization_rule": "Ｂ=B | Ｃ=C | Ｍ=M | Ｎ=N",
+      "target_field": ""
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_wmd",
+      "normalization_type": "enum_add_field",
+      "normalization_rule": "code -> description | B=Biological weapons | C=Chemical weapons | M=Missiles | N=Nuclear weapons | CW=Conventional weapons",
+      "target_field": ""
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "通常兵器\nConventional Weapons",
+      "normalization_type": "regex_extract",
+      "normalization_rule": "(CW)",
+      "target_field": "meti_cw_text"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_cw_text",
+      "normalization_type": "split_pattern",
+      "normalization_rule": "(?P<code>CW)",
+      "target_field": "meti_cw"
+    },
+    {
+      "source": "METI_FOREIGN_END_USER_LIST",
+      "entity_type": "Entity",
+      "field": "meti_cw",
+      "normalization_type": "enum_add_field",
+      "normalization_rule": "code -> description | B=Biological weapons | C=Chemical weapons | M=Missiles | N=Nuclear weapons | CW=Conventional weapons",
+      "target_field": ""
+    }
+  ],
+  "mapping": [
+    {
+      "entity_type": "Individual",
+      "target_path": "Names[].Name",
+      "target_type": "string",
+      "group": "names",
+      "source_type": "concat_path",
+      "source_value": "meti_name_head | meti_name_middle | meti_name_tail"
+    },
+    {
+      "entity_type": "Individual",
+      "target_path": "Names[].Note",
+      "target_type": "string",
+      "group": "names",
+      "source_type": "concat_path",
+      "source_value": "\"No English/Latin-script primary name is supplied in the source:\" | meti_native_only_name"
+    },
+    {
+      "entity_type": "Individual",
+      "target_path": "Countries[].CountryName",
+      "target_type": "string",
+      "group": "countries",
+      "source_type": "path",
+      "source_value": "meti_country_en"
+    },
+    {
+      "entity_type": "Individual",
+      "target_path": "Aliases[]",
+      "target_type": "array",
+      "group": "aliases",
+      "source_type": "list_expand*list_expand*list_expand",
+      "source_value": "meti_native_aliases[] * meti_abbreviations[] * meti_aliases[]"
+    },
+    {
+      "entity_type": "Individual",
+      "target_path": "Aliases[].AliasType",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "constant",
+      "source_value": "\"AKA\""
+    },
+    {
+      "entity_type": "Individual",
+      "target_path": "Aliases[].Alias",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "list_expand*list_expand*list_expand",
+      "source_value": "meti_native_aliases[] * meti_abbreviations[] * meti_aliases[]"
+    },
+    {
+      "entity_type": "Individual",
+      "target_path": "Aliases[].Note",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "constant*constant*constant",
+      "source_value": "\"Additional-script name supplied in the primary-name cell.\" * \"Abbreviation supplied in the primary-name cell.\" * \"\""
+    },
+    {
+      "entity_type": "Individual",
+      "target_path": "Programs[]",
+      "target_type": "array",
+      "group": "programs",
+      "source_type": "path_expand*path_expand",
+      "source_value": "meti_wmd[] * meti_cw[]"
+    },
+    {
+      "entity_type": "Individual",
+      "target_path": "Programs[].Program",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "concat_path",
+      "source_value": "\"Foreign End User List:\" | code"
+    },
+    {
+      "entity_type": "Individual",
+      "target_path": "Programs[].Note",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "concat_path",
+      "source_value": "\"Program description:\" | description"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "EntityId",
+      "target_type": "string",
+      "group": null,
+      "source_type": "path",
+      "source_value": "source_record_id"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "EntityType",
+      "target_type": "string",
+      "group": null,
+      "source_type": "path",
+      "source_value": "entity_type"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Sources[].SourceType",
+      "target_type": "string",
+      "group": "sources",
+      "source_type": "constant",
+      "source_value": "\"Official\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Sources[].DatasetCategory",
+      "target_type": "string",
+      "group": "sources",
+      "source_type": "constant",
+      "source_value": "\"Regulatory\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Sources[].ListName",
+      "target_type": "string",
+      "group": "sources",
+      "source_type": "constant",
+      "source_value": "\"METI_FOREIGN_END_USER_LIST\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Sources[].SourceName",
+      "target_type": "string",
+      "group": "sources",
+      "source_type": "constant",
+      "source_value": "\"METI\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Sources[].SourceURL",
+      "target_type": "string",
+      "group": "sources",
+      "source_type": "constant",
+      "source_value": "\"https://www.meti.go.jp/policy/anpo/law00.html#userlist\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Sources[].SourceRecordId",
+      "target_type": "string",
+      "group": "sources",
+      "source_type": "path",
+      "source_value": "source_record_id"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Sources[].Note",
+      "target_type": "string",
+      "group": "sources",
+      "source_type": "concat_path",
+      "source_value": "\"Source edition row number:\" | No."
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "RiskCategory.RiskModelEnabled",
+      "target_type": "boolean",
+      "group": "riskcategory",
+      "source_type": "constant",
+      "source_value": "\"true\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "RiskCategory.Labels[].Type",
+      "target_type": "string",
+      "group": "riskcategory",
+      "source_type": "constant",
+      "source_value": "\"List\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "RiskCategory.Labels[].Value",
+      "target_type": "string",
+      "group": "riskcategory",
+      "source_type": "constant",
+      "source_value": "\"Regulatory\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Names[].NameType",
+      "target_type": "string",
+      "group": "names",
+      "source_type": "constant",
+      "source_value": "\"Primary Name\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Names[].Name",
+      "target_type": "string",
+      "group": "names",
+      "source_type": "concat_path",
+      "source_value": "meti_name_head | meti_name_middle | meti_name_tail"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Names[].Note",
+      "target_type": "string",
+      "group": "names",
+      "source_type": "concat_path",
+      "source_value": "\"No English/Latin-script primary name is supplied in the source:\" | meti_native_only_name"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Countries[].CountryName",
+      "target_type": "string",
+      "group": "countries",
+      "source_type": "path",
+      "source_value": "meti_country_en"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Aliases[]",
+      "target_type": "array",
+      "group": "aliases",
+      "source_type": "list_expand*list_expand*list_expand",
+      "source_value": "meti_native_aliases[] * meti_abbreviations[] * meti_aliases[]"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Aliases[].AliasType",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "constant",
+      "source_value": "\"AKA\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Aliases[].Alias",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "list_expand*list_expand*list_expand",
+      "source_value": "meti_native_aliases[] * meti_abbreviations[] * meti_aliases[]"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Aliases[].Note",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "constant*constant*constant",
+      "source_value": "\"Additional-script name supplied in the primary-name cell.\" * \"Abbreviation supplied in the primary-name cell.\" * \"\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Programs[]",
+      "target_type": "array",
+      "group": "programs",
+      "source_type": "path_expand*path_expand",
+      "source_value": "meti_wmd[] * meti_cw[]"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Programs[].ProgramType",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "constant",
+      "source_value": "\"Export Control\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Programs[].Program",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "concat_path",
+      "source_value": "\"Foreign End User List:\" | code"
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Programs[].Authority",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "constant",
+      "source_value": "\"Ministry of Economy, Trade and Industry (METI), Japan\""
+    },
+    {
+      "entity_type": "Entity",
+      "target_path": "Programs[].Note",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "concat_path",
+      "source_value": "\"Program description:\" | description"
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Names[].Name",
+      "target_type": "string",
+      "group": "names",
+      "source_type": "concat_path",
+      "source_value": "meti_name_head | meti_name_middle | meti_name_tail"
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Names[].Note",
+      "target_type": "string",
+      "group": "names",
+      "source_type": "concat_path",
+      "source_value": "\"No English/Latin-script primary name is supplied in the source:\" | meti_native_only_name"
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Aliases[]",
+      "target_type": "array",
+      "group": "aliases",
+      "source_type": "list_expand*list_expand*list_expand",
+      "source_value": "meti_native_aliases[] * meti_abbreviations[] * meti_aliases[]"
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Aliases[].AliasType",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "constant",
+      "source_value": "\"AKA\""
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Aliases[].Alias",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "list_expand*list_expand*list_expand",
+      "source_value": "meti_native_aliases[] * meti_abbreviations[] * meti_aliases[]"
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Aliases[].Note",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "constant*constant*constant",
+      "source_value": "\"Additional-script name supplied in the primary-name cell.\" * \"Abbreviation supplied in the primary-name cell.\" * \"\""
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Countries[].CountryName",
+      "target_type": "string",
+      "group": "countries",
+      "source_type": "path",
+      "source_value": "meti_country_en"
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Programs[]",
+      "target_type": "array",
+      "group": "programs",
+      "source_type": "path_expand*path_expand",
+      "source_value": "meti_wmd[] * meti_cw[]"
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Programs[].Program",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "concat_path",
+      "source_value": "\"Foreign End User List:\" | code"
+    },
+    {
+      "entity_type": "Vessel",
+      "target_path": "Programs[].Note",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "concat_path",
+      "source_value": "\"Program description:\" | description"
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Names[].Name",
+      "target_type": "string",
+      "group": "names",
+      "source_type": "concat_path",
+      "source_value": "meti_name_head | meti_name_middle | meti_name_tail"
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Names[].Note",
+      "target_type": "string",
+      "group": "names",
+      "source_type": "concat_path",
+      "source_value": "\"No English/Latin-script primary name is supplied in the source:\" | meti_native_only_name"
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Countries[].CountryName",
+      "target_type": "string",
+      "group": "countries",
+      "source_type": "path",
+      "source_value": "meti_country_en"
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Aliases[]",
+      "target_type": "array",
+      "group": "aliases",
+      "source_type": "list_expand*list_expand*list_expand",
+      "source_value": "meti_native_aliases[] * meti_abbreviations[] * meti_aliases[]"
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Aliases[].AliasType",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "constant",
+      "source_value": "\"AKA\""
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Aliases[].Alias",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "list_expand*list_expand*list_expand",
+      "source_value": "meti_native_aliases[] * meti_abbreviations[] * meti_aliases[]"
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Aliases[].Note",
+      "target_type": "string",
+      "group": "aliases",
+      "source_type": "constant*constant*constant",
+      "source_value": "\"Additional-script name supplied in the primary-name cell.\" * \"Abbreviation supplied in the primary-name cell.\" * \"\""
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Programs[]",
+      "target_type": "array",
+      "group": "programs",
+      "source_type": "path_expand*path_expand",
+      "source_value": "meti_wmd[] * meti_cw[]"
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Programs[].Program",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "concat_path",
+      "source_value": "\"Foreign End User List:\" | code"
+    },
+    {
+      "entity_type": "Aircraft",
+      "target_path": "Programs[].Note",
+      "target_type": "string",
+      "group": "programs",
+      "source_type": "concat_path",
+      "source_value": "\"Program description:\" | description"
+    }
+  ]
+}

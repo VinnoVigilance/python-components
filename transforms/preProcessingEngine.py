@@ -2,6 +2,8 @@ import hashlib
 import json
 import os
 import re
+import unicodedata
+from copy import deepcopy
 from string import Formatter
 from urllib.parse import unquote, urlparse
 
@@ -13,7 +15,590 @@ from nameparser import HumanName
 EMPTY_VALUES = {"", "N/A", "NONE", "NULL", "UNKNOWN", "-"}
 
 
+DBM_SECTION_NAMES = {
+    "national_government": "National Government",
+    "executive_branch": "Executive Branch",
+    "legislative_branch": "Legislative Branch",
+    "judicial_branch": "Judicial Branch",
+    "local_government_units": "Local Government Units",
+    "provincial_governments": "Provincial Governments",
+    "city_governments": "City Governments",
+    "municipal_governments": "Municipal Governments",
+    "diplomatic_and_consular_missions": "Diplomatic and Consular Missions",
+    "international_organizations": "International Organizations",
+    "house_of_representatives": "House of Representatives",
+    "senate": "Senate",
+}
+DBM_EMAIL = re.compile(r"[\w.+%-]+@[\w-]+(?:\.[\w-]+)+")
+DBM_WEBSITE = re.compile(
+    r"(?:https?://|www\.)[^\s;,]+|"
+    r"(?:[\w-]+\.)+[A-Za-z]{2,24}(?:/[^\s;,]*)?",
+    re.IGNORECASE,
+)
+DBM_EXTENSION = re.compile(
+    r"\b(?:(?:loc\s*\.?|local|ext\s*\.?)\s*:?\s*)+"
+    r"([\d,. /–—-]+(?:to\s*\d+)?)$", re.IGNORECASE,
+)
+DBM_PHONE = re.compile(r"[\d\s()+./,–—-]+(?:\s+to\s*\d+)?", re.IGNORECASE)
+DBM_VANITY_PHONE = re.compile(
+    r"(?:\(\+?\d[\d -]*\)\s*)?\d+-[A-Z0-9]*[A-Z][A-Z0-9]*"
+    r"(?:\s*\([\d-]+\))?"
+)
+DBM_ADDRESS = re.compile(
+    r"\b(?:St\.?|Street|Ave\.?|Avenue|Road|Blvd\.?|Bldg\.?|Building|"
+    r"Levels?|Drive|Parkway|Campus|Sitio|Subdivision)\b", re.IGNORECASE,
+)
+DBM_POSTAL_ADDRESS = re.compile(r"^\d{4}\s+[^\W\d_]", re.UNICODE)
+
+
 class PreProcessingEngine:
+
+    def _dbm_text(self, value):
+        if isinstance(value, dict):
+            return value.get("text") or ""
+        return value if isinstance(value, str) else ""
+
+
+    def _dbm_join(self, lines):
+        value = {"lines": lines}
+        self.join_object_field_values(value, {
+            "source_path": "lines", "value_path": "text",
+            "target_field": "text", "separator": " ",
+        })
+        return value.get("text") or ""
+
+
+    def _dbm_hierarchy(self, record):
+        hierarchy = []
+
+        def add(kind, name):
+            if name and not any(item == {"kind": kind, "name": name} for item in hierarchy):
+                hierarchy.append({"kind": kind, "name": name})
+
+        path = record["source_path"]
+        for part in path:
+            if part in DBM_SECTION_NAMES:
+                add("branch" if str(part).endswith("_branch") else "section", DBM_SECTION_NAMES[part])
+
+        for entry in record.get("context", []):
+            fields = entry["fields"]
+            parent = self._dbm_text(fields.get("parent_heading"))
+            add("department" if parent.startswith("DEPARTMENT OF ") else "parent", parent)
+            heading = self._dbm_text(fields.get("heading"))
+            lines = ([{"text": heading}] if heading else fields.get("heading_lines", []))
+            heading = self._dbm_join([*lines, *fields.get("heading_continuation_lines", [])])
+            context_path = entry["source_path"]
+            if heading.startswith("DEPARTMENT OF "):
+                kind = "department"
+            elif "courts" in context_path and "groups" not in context_path:
+                kind = "court"
+            elif "colleges" in context_path and "groups" in context_path:
+                kind = "region"
+            else:
+                kind = "group" if "groups" in context_path else "section"
+            add(kind, heading)
+            for field, kind in (
+                ("country", "country"), ("printed_mission", "mission"),
+                ("printed_organization", "organization"), ("printed_office", "office"),
+                ("printed_place", "jurisdiction"), ("printed_label", "party"),
+                ("locality", "locality"),
+            ):
+                add(kind, self._dbm_text(fields.get(field)))
+
+        for field in ("region", "province", "city", "municipality"):
+            add(field, self._dbm_text(record.get(field)))
+        add("group", self._dbm_text(record.get("group_source")) or self._dbm_text(record.get("group")))
+        add("committee", self._dbm_join(record.get("committee_lines", [])))
+        office = self._dbm_text(record.get("office")) or self._dbm_join(record.get("office_lines", []))
+        organization_layout = "corporations_and_colleges" in path or "other_executive_offices" in path
+        add("organization" if organization_layout else "office", office)
+        add("posting", self._dbm_join(record.get("location_lines", [])))
+        return hierarchy
+
+
+    def _dbm_classify_contact(self, text, prepared):
+        for original in text.split(";"):
+            part = original.strip()
+            if "@" in part:
+                email = re.sub(r"(?<=\w)\s*@\s*(?=[\w-])", "@", part)
+                email = re.sub(r"^e-?mails?\s*:\s*", "", email, flags=re.IGNORECASE)
+                emails = [value.strip() for value in email.split(",")]
+                if all(DBM_EMAIL.fullmatch(value) for value in emails):
+                    for value in emails:
+                        if value not in prepared["emails"]:
+                            prepared["emails"].append(value)
+                else:
+                    prepared["contact_unparsed"].append(part)
+                continue
+            part = re.sub(r"\bwww\s*[.,]\s*(?=[A-Za-z0-9])", "www.", part, flags=re.IGNORECASE)
+            for match in DBM_WEBSITE.finditer(part):
+                website = match.group().rstrip(".,")
+                if website not in prepared["websites"]:
+                    prepared["websites"].append(website)
+            part = DBM_WEBSITE.sub("", part)
+            part = part.strip(" ,")
+            if not part:
+                continue
+            part = re.sub(r"^(?:e-?mail|website)\s*:?\s*$", "", part, flags=re.IGNORECASE)
+            if not part:
+                continue
+            fax = bool(re.search(r"^(?:fax|F)\b|\sF$", part, re.IGNORECASE))
+            phone_fax = bool(re.search(r"^(?:telefax|TF)\b|\sTF$", part, re.IGNORECASE))
+            part = re.sub(r"^(?:tel(?:ephone)?|telefax|phone|fax|trunk\s*lines?|hotlines?|TL|DL|TF|F)\b\s*(?:No\.?\s*)?[.:]?\s*", "", part, flags=re.IGNORECASE)
+            part = re.sub(r"\s+(?:F|TL|DL|TF)$", "", part, flags=re.IGNORECASE)
+            extension = DBM_EXTENSION.search(part)
+            number = part[:extension.start()].strip() if extension else part
+            valid_number = number and (
+                DBM_PHONE.fullmatch(number) or DBM_VANITY_PHONE.fullmatch(number)
+            ) and any(char.isdigit() for char in number)
+            if valid_number or (extension and not number):
+                prepared["phones"].append({
+                    "number": number or None,
+                    "extension": extension[1].strip() if extension else None,
+                    "kind": "fax" if fax else "phone_fax" if phone_fax else "phone",
+                })
+            else:
+                prepared["contact_unparsed"].append(part)
+
+
+    def _dbm_contacts(self, record, prepared):
+        fields = record.get("fields") or {}
+        phones = record.get("phone_lines", fields.get("phone", []))
+        extensions = record.get("extension_lines", fields.get("extension", []))
+        used = set()
+        for line in phones:
+            matches = [
+                (index, extension) for index, extension in enumerate(extensions)
+                if extension.get("source_page") == line.get("source_page")
+                and extension.get("top") == line.get("top")
+            ]
+            if len(matches) == 1:
+                index, extension = matches[0]
+                used.add(index)
+                prepared["phones"].append({
+                    "number": self._dbm_text(line), "extension": self._dbm_text(extension), "kind": "phone",
+                })
+            else:
+                self._dbm_classify_contact(self._dbm_text(line), prepared)
+        for index, line in enumerate(extensions):
+            if index not in used:
+                prepared["phones"].append({"number": None, "extension": self._dbm_text(line), "kind": "phone"})
+        lines = []
+        addresses = list(record.get("address_lines", []))
+        for line in [*record.get("contact_lines", []), *fields.get("email", [])]:
+            printed = self._dbm_text(line)
+            address = DBM_ADDRESS.search(printed) or (
+                record.get("address_lines") and DBM_POSTAL_ADDRESS.match(printed)
+            )
+            if address and "@" not in printed and not DBM_WEBSITE.search(printed):
+                addresses.append(line)
+                continue
+            compact = "".join(self._dbm_text(line).split())
+            text = compact if DBM_EMAIL.fullmatch(compact) else self._dbm_text(line)
+            if lines:
+                previous, previous_text = lines[-1]
+                adjacent = (
+                    line.get("source_page") == previous.get("source_page")
+                    and 0 < line.get("top", 0) - previous.get("top", 0) <= 15
+                )
+                fragment = previous_text.rstrip().endswith(("@", ".")) or previous_text.lower() == "www"
+                combined = "".join((previous_text + text).split())
+                if adjacent and fragment and (
+                    DBM_EMAIL.fullmatch(combined)
+                    or (combined.lower().startswith(("www.", "http")) and DBM_WEBSITE.fullmatch(combined))
+                ):
+                    lines[-1] = (line, combined)
+                    continue
+            lines.append((line, text))
+        for _, text in lines:
+            self._dbm_classify_contact(text, prepared)
+        if addresses:
+            addresses.sort(key=lambda line: (line.get("source_page", 0), line.get("top", 0)))
+            prepared["address_text"] = self._dbm_join(addresses)
+
+
+    def _dbm_office_contacts(self, lines, prepared):
+        """Institution header lines contain addresses, contacts, and edition captions."""
+        office = {"address_lines": [], "contact_lines": []}
+        for line in lines:
+            text = self._dbm_text(line)
+            probe = {"phones": [], "emails": [], "websites": [], "contact_unparsed": []}
+            self._dbm_classify_contact(text, probe)
+            qualified = re.match(r"^([^:@]+):\s*((?:\(\+?[\d -]+\)|\d).*)$", text)
+            if qualified and not probe["phones"]:
+                parsed = {"phones": [], "emails": [], "websites": [], "contact_unparsed": []}
+                self._dbm_classify_contact(qualified[2], parsed)
+                if parsed["phones"] and not parsed["contact_unparsed"]:
+                    prepared["phones"].extend({**phone, "label": qualified[1].strip()} for phone in parsed["phones"])
+                    continue
+            contact = (
+                probe["phones"] or probe["emails"] or probe["websites"] or "@" in text
+                or re.search(r"^(?:tel|phone|fax|trunk\s*line|hotline|TL\b|DL\b|TF\b|Hours\b)", text, re.IGNORECASE)
+                or re.search(r"\bCONGRESS\b", text, re.IGNORECASE)
+            )
+            office["contact_lines" if contact else "address_lines"].append(line)
+        self._dbm_contacts(office, prepared)
+        addresses, chunk, label = [], [], ""
+        for line in office["address_lines"]:
+            text = self._dbm_text(line)
+            start = re.match(r"^((?:Main Office|Extension(?: Office)?|[\w ’'-]+ (?:Office|Branch))):\s*(.*)", text, re.IGNORECASE)
+            branch = re.match(r"^(?:Consulate|Embassy)\b", text, re.IGNORECASE)
+            if start or branch:
+                if chunk:
+                    addresses.append({"text": self._dbm_join(chunk), "label": label})
+                chunk = []
+                label = start[1] if start else text
+                text = start[2] if start else ""
+            if text:
+                chunk.append({**line, "text": text})
+        if chunk:
+            addresses.append({"text": self._dbm_join(chunk), "label": label})
+        prepared["addresses"] = addresses
+
+    def _dbm_organization_details(self, record, prepared):
+        contexts = []
+        for entry in record.get("context", []):
+            fields = entry["fields"]
+            heading = self._dbm_text(fields.get("heading") or fields.get("printed_mission") or fields.get("printed_organization"))
+            lines = [{"text": heading}] if heading else fields.get("heading_lines", [])
+            heading = self._dbm_join([*lines, *fields.get("heading_continuation_lines", [])])
+            contexts.append((entry, heading))
+
+        if not prepared["organization_name"]:
+            for entry, heading in reversed(contexts):
+                institutional = (
+                    heading.startswith("OFFICE OF ") or heading.endswith(" OFFICE")
+                    or "constitutional_offices" in entry["source_path"]
+                    or "departments" in entry["source_path"] or "related_rosters" in entry["source_path"]
+                    or "bangsamoro" in entry["source_path"]
+                    or heading == "SENATE OF THE PHILIPPINES"
+                )
+                if heading and institutional:
+                    prepared["organization_name"] = heading
+                    break
+        if not prepared["organization_name"]:
+            for chamber in ("senate", "house_of_representatives"):
+                if chamber in record["source_path"]:
+                    prepared["organization_name"] = DBM_SECTION_NAMES[chamber]
+                    break
+
+        group = self._dbm_text(record.get("group_source"))
+        if not prepared["office_text"] and group.startswith("OFFICE OF "):
+            prepared["office_text"] = group
+
+        details = None
+        for entry, heading in reversed(contexts):
+            fields = entry["fields"]
+            header = (fields.get("header_lines") or fields.get("details") or fields.get("regional_details")
+                      or fields.get("mission_lines") or fields.get("office_lines") or [])
+            organization = str(prepared["organization_name"] or "").casefold()
+            header_names_organization = organization and any(self._dbm_text(line).casefold() == organization for line in header)
+            if not organization or (heading.casefold() != organization and not header_names_organization):
+                continue
+            if not header:
+                continue
+            details = {
+                "name": prepared["organization_name"],
+                "address_text": None,
+                "phones": [], "emails": [], "websites": [], "contact_unparsed": [],
+                "source_path": deepcopy(entry["source_path"]),
+                "source_pages": sorted({line["source_page"] for line in header if isinstance(line.get("source_page"), int)}),
+            }
+            self._dbm_office_contacts([line for line in header if self._dbm_text(line).casefold() != organization], details)
+            break
+        prepared["organization_details"] = details
+        self._dbm_apply_office_context(prepared)
+
+    def _dbm_apply_office_context(self, prepared):
+        details = prepared.get("organization_details")
+        if prepared["address_text"]:
+            prepared["addresses"] = [{"text": prepared["address_text"], "note": "Office address printed for this listing"}]
+        else:
+            prepared["addresses"] = [
+                {"text": address["text"], "note": "Shared office address — " + details["name"]
+                 + ("; " + address["label"] if address["label"] else "")}
+                for address in (details or {}).get("addresses", [])
+            ]
+
+        contacts = []
+        bases = [phone for phone in (details or {}).get("phones", []) if phone["number"] and phone["kind"] != "fax"]
+        for phone in prepared["phones"]:
+            number, extension = phone["number"], phone["extension"]
+            kind = phone["kind"]
+            note = "Office " + {"fax": "fax", "phone_fax": "telephone/fax", "phone": "telephone"}[kind] + " printed for this listing"
+            if extension and not number:
+                if len(bases) == 1:
+                    number = bases[0]["number"]
+                    note = "Office number from the shared header; extension printed for this listing"
+                else:
+                    note = "Office extension; base number not uniquely identified in the directory"
+            elif extension:
+                note = "Office " + ("telephone/fax" if kind == "phone_fax" else "fax" if kind == "fax" else "telephone") + " and extension printed for this listing"
+            value = number or ""
+            if extension:
+                value = (value + " ext. " + extension).strip()
+            contacts.append({"type": "Fax" if kind == "fax" else "Phone", "value": value, "note": note})
+        for field, kind in (("emails", "Email"), ("websites", "Website")):
+            contacts.extend({"type": kind, "value": value, "note": kind + " printed for this listing"}
+                            for value in prepared[field])
+        prepared["contacts"] = contacts
+
+        pages = set((details or {}).get("source_pages", []))
+        def collect_pages(value):
+            if isinstance(value, dict):
+                if isinstance(value.get("source_page"), int):
+                    pages.add(value["source_page"])
+                for key, child in value.items():
+                    if key != "context":
+                        collect_pages(child)
+            elif isinstance(value, list):
+                for child in value:
+                    collect_pages(child)
+        collect_pages(prepared["source_evidence"])
+        prepared["source_pages"] = sorted(pages)
+        prepared["source_note"] = (("PDF page: " if len(pages) == 1 else "PDF pages: ")
+                                   + ", ".join(map(str, sorted(pages)))) if pages else None
+
+        notes = []
+        if prepared["hierarchy"]:
+            notes.append("Hierarchy: " + " > ".join(item["name"] for item in prepared["hierarchy"]))
+        if prepared["qualifier"]:
+            notes.append("Qualifier: " + prepared["qualifier"])
+        if details:
+            # A listing address takes precedence; keep the different parent context
+            # in the occupation note. An inherited address appears only in Addresses.
+            if prepared["address_text"] and details["address_text"]:
+                notes.append("Organization office address: " + details["address_text"])
+            for phone in details["phones"]:
+                value = phone["number"] or ""
+                if phone["extension"]:
+                    value = (value + " ext. " + phone["extension"]).strip()
+                label = " (" + phone["label"] + ")" if phone.get("label") else ""
+                kind = "telephone/fax" if phone["kind"] == "phone_fax" else phone["kind"]
+                notes.append("Organization " + kind + label + ": " + value)
+            if details["emails"]:
+                notes.append("Organization email: " + "; ".join(details["emails"]))
+            if details["websites"]:
+                notes.append("Organization website: " + "; ".join(details["websites"]))
+        prepared["occupation_note"] = " | ".join(notes)
+
+    def prepare_dbm_listing(self, record, config):
+        """Keep every source row and mark which rows contain a named person."""
+        name = record.get("printed_name") or self._dbm_text(record.get("chair_source"))
+        if not name:
+            name = self._dbm_join(record.get("name_lines", []))
+        vacant = (
+            bool(record.get("vacant")) or record.get("status") == "vacant"
+            or str(name).upper() in {"VACANT", "(VACANT)"}
+        )
+        hierarchy = self._dbm_hierarchy(record)
+        role = (
+            record.get("role") or record.get("inherited_role")
+            or self._dbm_text(record.get("role_source")) or self._dbm_join(record.get("role_lines", []))
+        )
+        if not role and record["record_kind"] == "committee" and name and not vacant:
+            role = "Chairperson"
+        if not role:
+            role = next(
+                (entry["fields"]["shared_role"] for entry in reversed(record.get("context", []))
+                 if entry["fields"].get("shared_role")), None,
+            )
+        if not role and "senate" in record["source_path"] and "roster" in record["source_path"]:
+            role = "Senator"
+        prepared = {
+            "record_kind": record["record_kind"],
+            "is_person_record": bool(name) and not vacant,
+            "vacant": vacant,
+            "name_text": name or None,
+            "role_text": role or None,
+            "department_name": next((item["name"] for item in reversed(hierarchy) if item["kind"] == "department"), None),
+            "organization_name": next(
+                (item["name"] for item in reversed(hierarchy) if item["kind"] in {"organization", "department", "court", "mission"}), None,
+            ),
+            "office_text": self._dbm_text(record.get("office")) or self._dbm_join(record.get("office_lines", [])) or None,
+            "address_text": self._dbm_join(record.get("address_lines", [])) or None,
+            "qualifier": record.get("qualifier"),
+            "hierarchy": hierarchy,
+            "phones": [], "emails": [], "websites": [], "contact_unparsed": [],
+            "source_path": deepcopy(record["source_path"]),
+            "source_evidence": deepcopy(record),
+        }
+        self._dbm_contacts(record, prepared)
+        self._dbm_organization_details(record, prepared)
+        self._dbm_assignment_identity(prepared)
+        return prepared
+
+    def _dbm_identity_text(self, value):
+        """Normalize typography only; never fuzzy-match people or institutions."""
+        text = unicodedata.normalize("NFKC", self._dbm_text(value)).upper()
+        text = text.translate(str.maketrans({"–": "-", "—": "-", "’": "'", "‘": "'", "“": '"', "”": '"'}))
+        text = " ".join(text.split())
+        text = re.sub(r"\s*([.,'-])\s*", r"\1", text)
+        # PDF text can split the initial letter of this printed word.
+        text = re.sub(r"\bO\s+FFICE\b", "OFFICE", text)
+        text = re.sub(r"\bOFFI\s+(CE(?:RS?|S)?)\b", r"OFFI\1", text)
+        return re.sub(r"\bOFFICEOF\b", "OFFICE OF", text)
+
+    def _dbm_identity_person(self, value):
+        name = unicodedata.normalize("NFKC", str(value or "")).strip()
+        name = re.sub(r"^(?:(?:H\.\s*E\.|Hon\.|Dr\.|Mr\.|Mrs\.|Ms\.|Atty\.|Engr\.)\s*)+",
+                      "", name, flags=re.IGNORECASE)
+        parts = [part.strip() for part in name.split(",")]
+        suffixes = []
+        while len(parts) > 1 and re.fullmatch(r"(?:JR\.?|SR\.?|[IVX]+)", parts[-1], re.IGNORECASE):
+            suffixes.insert(0, parts.pop())
+        if len(parts) == 2:
+            suffix = re.search(r"\s+(JR\.?|SR\.?|[IVX]+)$", parts[1], re.IGNORECASE)
+            if suffix:
+                suffixes.insert(0, suffix[1])
+                parts[1] = parts[1][:suffix.start()].rstrip()
+        if len(parts) == 2 and all(parts):
+            name = parts[1] + " " + parts[0]
+        else:
+            name = " ".join(parts)
+        name = " ".join([name, *suffixes])
+        return self._dbm_identity_text(name.replace(".", ""))
+
+    def _dbm_assignment_identity(self, prepared):
+        """Build edition-independent assignment fields for the generic ID handler."""
+        raw = prepared["source_evidence"]
+        path = prepared["source_path"]
+        clean = self._dbm_identity_text
+        institution = clean(prepared["organization_name"])
+        if "local_government_units" in path and "bangsamoro" not in path:
+            institution = "PHILIPPINE LOCAL GOVERNMENT"
+        elif "house_of_representatives" in path:
+            institution = "PHILIPPINE HOUSE OF REPRESENTATIVES"
+        elif "senate" in path:
+            institution = "PHILIPPINE SENATE"
+
+        territory = {}
+        for field in ("province", "city", "municipality"):
+            if clean(raw.get(field)):
+                territory[field] = clean(raw[field])
+        for entry in raw.get("context", []):
+            for field in ("printed_place", "country", "locality"):
+                value = clean(entry["fields"].get(field))
+                if value:
+                    territory[field] = value
+        district = clean(raw.get("printed_district"))
+        if district:
+            district = re.sub(r"\s+DISTRICT$", "", district)
+            district = re.sub(r"^(\d+)(?:ST|ND|RD|TH)$", r"\1", district)
+            territory["district"] = district
+        # Keep the district in mapped occupation context as well as in the key.
+        if raw.get("printed_district"):
+            prepared["district_text"] = self._dbm_text(raw["printed_district"])
+            note = "District: " + prepared["district_text"]
+            prepared["occupation_note"] = " | ".join(filter(None, [prepared["occupation_note"], note]))
+
+        hierarchy = prepared["hierarchy"]
+        explicit_units = any(item["kind"] in {"office", "committee"} for item in hierarchy)
+        assemblies = {
+            clean(assembly.get("heading"))
+            for entry in raw.get("context", [])
+            for assembly in entry["fields"].get("assemblies", [])
+        }
+        units, parties = set(), set()
+        role_slug = re.sub(r"\W", "", clean(prepared["role_text"]))
+        for item in hierarchy:
+            kind, name = item["kind"], clean(item["name"])
+            if kind == "posting":
+                territory["posting"] = name
+            elif kind == "party":
+                parties.add(name)
+            elif kind in {"office", "committee"}:
+                # "Secretary General" and "Office of the Secretary General"
+                # describe the same assignment on two different House pages.
+                slug = re.sub(r"\W", "", name)
+                if name != institution and slug not in {"OFFICEOF" + role_slug, "OFFICEOFTHE" + role_slug}:
+                    units.add(name)
+            elif kind == "group" and name != "OFFICE OF THE PRESIDENT":
+                if (name in assemblies or name.startswith("OFFICE OF ")
+                        or re.search(r"\bDIVISION\b", name)
+                        or (not explicit_units and re.search(r"\b(?:DIVISION|SERVICE|COUNCIL)\b", name))):
+                    units.add(name)
+
+        qualifier = clean(prepared["qualifier"]).strip("() ")
+        if "house_of_representatives" in path and qualifier == "LEGISLATIVE CARETAKER":
+            qualifier = "CARETAKER"
+        identity = {
+            "person": self._dbm_identity_person(prepared["name_text"]),
+            "institution": institution,
+            "position": clean(prepared["role_text"]),
+            "units": sorted(units),
+            "territory": territory,
+            "parties": sorted(parties),
+            "qualifier": qualifier,
+        }
+        prepared["assignment_identity"] = identity
+        prepared["assignment_key"] = json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+    def _dbm_merge_assignment(self, target, occurrence):
+        """Coalesce repeated listings without dropping source or contact evidence."""
+        target.setdefault("source_evidence_rows", [deepcopy(target["source_evidence"])])
+        target["source_evidence_rows"].append(deepcopy(occurrence["source_evidence"]))
+        for field in ("phones", "emails", "websites", "contact_unparsed", "contacts", "hierarchy"):
+            for value in occurrence[field]:
+                if value not in target[field]:
+                    target[field].append(deepcopy(value))
+        addresses = target["addresses"] + occurrence["addresses"]
+        explicit = [value for value in addresses if value["note"] == "Office address printed for this listing"]
+        target["addresses"] = []
+        for value in explicit or addresses:
+            if value not in target["addresses"]:
+                target["addresses"].append(deepcopy(value))
+        for field in ("office_text", "address_text", "organization_details"):
+            if not target.get(field) and occurrence.get(field):
+                target[field] = deepcopy(occurrence[field])
+        target["source_pages"] = sorted(set(target["source_pages"]) | set(occurrence["source_pages"]))
+        pages = target["source_pages"]
+        target["source_note"] = (("PDF page: " if len(pages) == 1 else "PDF pages: ")
+                                 + ", ".join(map(str, pages))) if pages else None
+        notes = list(dict.fromkeys(filter(None, [*target["occupation_note"].split(" | "),
+                                                  *occurrence["occupation_note"].split(" | ")])))
+        if explicit:
+            for address in addresses:
+                if address not in explicit:
+                    note = "Organization office address: " + address["text"]
+                    if note not in notes:
+                        notes.append(note)
+        target["occupation_note"] = " | ".join(notes)
+
+    def prepare_dbm_directory(self, records, config):
+        """Emit one Individual per assignment, retaining repeated source evidence."""
+        people = []
+        for raw in records:
+            person = self.prepare_dbm_listing(raw, {})
+            if not person["is_person_record"]:
+                continue
+            person["entity_type"] = "Individual"
+            self.generate_composite_id(person, config["person_id"])
+            people.append(person)
+        # Chamber-wide headers are printed on the roster/leadership page, while
+        # committee and representative subsections omit the same shared details.
+        for chamber in ("senate", "house_of_representatives"):
+            headers = [person["organization_details"] for person in people
+                       if chamber in person["source_path"] and person.get("organization_details")]
+            if not headers:
+                continue
+            first = headers[0]
+            if any(header != first for header in headers):
+                continue
+            for person in people:
+                if chamber in person["source_path"] and not person.get("organization_details"):
+                    person["organization_details"] = deepcopy(first)
+                    self._dbm_apply_office_context(person)
+                    self._dbm_assignment_identity(person)
+        assignments = {}
+        for person in people:
+            key = person["source_record_id"]
+            if key in assignments:
+                self._dbm_merge_assignment(assignments[key], person)
+            else:
+                assignments[key] = person
+        return list(assignments.values())
+
 
     def preprocess(self, records, rules):
         records = list(records)
@@ -502,6 +1087,7 @@ class PreProcessingEngine:
 
     def merge_dfat_split_records(self, records, config):
         grouped = {}
+        designations_field = config.get("designations_field")
 
         single_value_fields = {
             "Reference",
@@ -530,6 +1116,20 @@ class PreProcessingEngine:
                 }
 
             merged = grouped[base_reference]
+
+            if designations_field:
+                committee = str(record.get("Committees", "")).strip()
+                instrument = str(
+                    record.get("Instrument of Designation", "")
+                ).strip()
+                designation = {
+                    "Committees": "" if committee.upper() in EMPTY_VALUES else committee,
+                    "instrument": "" if instrument.upper() in EMPTY_VALUES else instrument,
+                }
+                if any(designation.values()):
+                    designations = merged.setdefault(designations_field, [])
+                    if designation not in designations:
+                        designations.append(designation)
 
             name_value = str(
                 record.get(
@@ -1312,6 +1912,39 @@ class PreProcessingEngine:
         if assigned != {line["line_number"] for line in values}:
             raise ValueError(f"Unassigned OCR text in column: {input_field}")
         record.update(outputs)
+        return record
+
+    def join_object_field_values(self, record, config):
+        """Join nonblank text from an object or list into a separate top-level field.
+
+        source_path is relative to the record and value_path to each object.
+        Values retain source order. Missing or non-string values are skipped.
+        """
+        source_path = config["source_path"]
+        value_path = config["value_path"]
+        target_field = config["target_field"]
+        separator = config.get("separator", "; ")
+
+        if not target_field or "." in target_field or target_field == source_path.split(".", 1)[0]:
+            raise ValueError("target_field must be a separate top-level field")
+
+        items = self._resolve_field(record, source_path)
+        if isinstance(items, dict):
+            items = [items]
+        if not isinstance(items, list):
+            return record
+
+        texts = []
+        for item in items:
+            value = self._resolve_field(item, value_path)
+            if isinstance(value, str):
+                value = value.strip()
+                if value:
+                    texts.append(value)
+
+        if texts:
+            record[target_field] = separator.join(texts)
+
         return record
 
     def normalize_empty_fields(self, record, config):
