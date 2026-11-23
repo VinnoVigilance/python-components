@@ -418,83 +418,34 @@ class TestSanitizeHtmlHandler:
 
 
 class TestNormalizeBodyTextHandler:
-    @pytest.mark.parametrize(
-        "config",
-        [None, {}, {"post_normalization": {"body_input_format": "html"}}],
-    )
-    def test_default_and_explicit_html_keep_existing_cleanup(self, config):
-        original = "<p>Judgment &amp; reasons.</p><p>Second paragraph.</p>"
-        entity = {"Content": {"BodyOriginalValue": original}}
-
-        normalize_body_text_handler(entity, {}, config)
-
-        assert entity["Content"]["BodyText"] == "Judgment & reasons.\n\nSecond paragraph."
+    def test_plain_text_cleanup_preserves_original_and_literal_content(self):
+        original = "  Cafe\u0301  <CASE_ID> &amp;\r\n\r\n\r\nNext\u200b  "
+        entity = {"Content": {"BodyOriginalValue": original, "BodyText": original}}
+        normalize_body_text_handler(entity, {})
+        assert entity["Content"]["BodyText"] == "Café <CASE_ID> &amp;\n\nNext"
         assert entity["Content"]["BodyOriginalValue"] == original
 
-    def test_plain_text_preserves_literal_tokens_and_entities(self):
-        original = "Case <CASE_ID> against <respondent>; literal &amp; and &copy;."
-        entity = {"Content": {"BodyOriginalValue": original}}
-
-        normalize_body_text_handler(
-            entity, {}, {"post_normalization": {"body_input_format": "plain_text"}}
-        )
-
-        assert entity["Content"]["BodyText"] == original
-        assert entity["Content"]["BodyOriginalValue"] == original
-
-    @pytest.mark.parametrize(
-        ("input_format", "expected"),
-        [
-            ("html", "Café ruling می\u200cرود ا\u200dب Next End"),
-            ("plain_text", "Café ruling\n\nمی\u200cرود ا\u200dب\nNext\nEnd"),
-        ],
-    )
-    def test_cleanup_preserves_language_joiners_and_format_specific_breaks(
-        self, input_format, expected
-    ):
-        original = "\ufeff Cafe\u0301\xa0 \t ruling\u200b \r\n\r\n\r\nمی\u200cرود ا\u200dب \u2028 Next\u2029 End "
-        entity = {"Content": {"BodyOriginalValue": original}}
-
-        normalize_body_text_handler(
-            entity, {}, {"post_normalization": {"body_input_format": input_format}}
-        )
-
-        assert entity["Content"]["BodyText"] == expected
-
-    @pytest.mark.parametrize("input_format", ["html", "plain_text"])
-    def test_null_body_remains_null(self, input_format):
-        entity = {"Content": {"BodyOriginalValue": None}}
-
-        normalize_body_text_handler(
-            entity, {}, {"post_normalization": {"body_input_format": input_format}}
-        )
-
+    def test_missing_and_null_body_are_preserved(self):
+        entity = {"Content": {"BodyOriginalValue": "original"}}
+        normalize_body_text_handler(entity, {})
+        assert "BodyText" not in entity["Content"]
+        entity["Content"]["BodyText"] = None
+        normalize_body_text_handler(entity, {})
         assert entity["Content"]["BodyText"] is None
 
-    @pytest.mark.parametrize("input_format", ["markdown", "", None])
-    def test_invalid_format_fails_instead_of_guessing(self, input_format):
-        with pytest.raises(ValueError, match="body_input_format"):
-            normalize_body_text_handler(
-                {"Content": {"BodyOriginalValue": "body"}},
-                {},
-                {"post_normalization": {"body_input_format": input_format}},
-            )
+    def test_invalid_body_type_is_rejected(self):
+        with pytest.raises(TypeError, match="BodyText"):
+            normalize_body_text_handler({"Content": {"BodyText": ["body"]}}, {})
 
 
 class TestEngineEndToEnd:
-    def test_body_format_config_reaches_handler_without_mutating_input(self):
+    def test_body_cleanup_does_not_mutate_input(self):
         rules = pd.DataFrame([{"rule_type": "NORMALIZE_BODY_TEXT"}])
-        engine = PostNormalizationEngine(
-            rules, config={"post_normalization": {"body_input_format": "plain_text"}}
-        )
-        original = "  Case <CASE_ID> &amp; reasons.  "
-        record = {"Content": {"BodyOriginalValue": original}}
-
+        engine = PostNormalizationEngine(rules, config={})
+        record = {"Content": {"BodyOriginalValue": "  raw  ", "BodyText": "  Case <CASE_ID> &amp;  "}}
         result = engine.post_normalize_record(record)
-
-        assert result["Content"]["BodyText"] == "Case <CASE_ID> &amp; reasons."
-        assert result["Content"]["BodyOriginalValue"] == original
-        assert record == {"Content": {"BodyOriginalValue": original}}
+        assert result["Content"]["BodyText"] == "Case <CASE_ID> &amp;"
+        assert record["Content"]["BodyText"] == "  Case <CASE_ID> &amp;  "
 
     def test_workbook_comment_rules_use_canonical_field_names(self):
         rules_path = Path(__file__).resolve().parents[3] / "data" / "rules" / "postNormalization.xlsx"

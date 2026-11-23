@@ -19,8 +19,6 @@ sources:
     dataset_category: Crime / Judicial Records
     schedule: daily
     date_order: MDY
-    post_normalization:
-      body_input_format: plain_text
     source_page_url: https://services.ca.judiciary.gov.ph/recentdecisions/
     url: https://services.ca.judiciary.gov.ph/recentdecisions/
     acquisition:

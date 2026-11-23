@@ -7,7 +7,6 @@ import re
 import unicodedata
 from transforms.post_normalization.dateResolver import MAX_YEAR
 
-from inscriptis import get_text
 import logging
 
 
@@ -191,45 +190,28 @@ def date_component_handler(entity, rule, config=None):
 
 
 def normalize_body_text_handler(entity, rule, config=None):
-    """Normalize a declared HTML/plain-text body; default to legacy HTML behavior."""
-
-    input_format = (config or {}).get("post_normalization", {}).get(
-        "body_input_format", "html"
-    )
-    if input_format not in ("html", "plain_text"):
-        raise ValueError(
-            "post_normalization.body_input_format must be 'html' or 'plain_text'."
-        )
+    """Clean mapped plain text consistently, preserving the original source body."""
 
     content = entity.get("Content")
 
     if not isinstance(content, dict):
         return
 
-    if "BodyOriginalValue" not in content:
+    if "BodyText" not in content:
         return
 
-    original_value = content.get("BodyOriginalValue")
+    body_text = content.get("BodyText")
 
-    if original_value is None:
-        content["BodyText"] = None
+    if body_text is None:
         return
 
-    if not isinstance(original_value, str):
+    if not isinstance(body_text, str):
         raise TypeError(
-            "Content.BodyOriginalValue must be a string or None."
+            "Content.BodyText must be a string or None."
         )
 
-    # Plain text can contain literal angle brackets and entity-like strings.
-    # Only HTML inputs should be decoded and passed through an HTML parser.
-    normalized_text = (
-        get_text(html.unescape(original_value))
-        if input_format == "html"
-        else original_value
-    )
-
     # Normalize Unicode characters.
-    normalized_text = unicodedata.normalize("NFC", normalized_text)
+    normalized_text = unicodedata.normalize("NFC", body_text)
 
     # Normalize special spaces and line endings.
     normalized_text = (

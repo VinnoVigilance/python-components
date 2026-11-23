@@ -26,7 +26,6 @@ def test_enabled_daily_source_uses_native_pdf_text_with_document_ocr_fallback(so
     assert source["parser"] == {
         "type": "pdf", "mode": "text", "require_text": True, "ocr_fallback": {}
     }
-    assert source["post_normalization"]["body_input_format"] == "plain_text"
 
 
 def test_initial_covers_three_bounded_stations_and_recent_incremental_only_recent(source):
