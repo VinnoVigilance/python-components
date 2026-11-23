@@ -191,7 +191,15 @@ def date_component_handler(entity, rule, config=None):
 
 
 def normalize_body_text_handler(entity, rule, config=None):
-    """Create normalized plain text from Content.BodyOriginalValue."""
+    """Normalize a declared HTML/plain-text body; default to legacy HTML behavior."""
+
+    input_format = (config or {}).get("post_normalization", {}).get(
+        "body_input_format", "html"
+    )
+    if input_format not in ("html", "plain_text"):
+        raise ValueError(
+            "post_normalization.body_input_format must be 'html' or 'plain_text'."
+        )
 
     content = entity.get("Content")
 
@@ -212,11 +220,13 @@ def normalize_body_text_handler(entity, rule, config=None):
             "Content.BodyOriginalValue must be a string or None."
         )
 
-    # Decode encoded HTML such as &lt;p&gt; before parsing.
-    decoded_value = html.unescape(original_value)
-
-    # Convert HTML to plain text while preserving paragraph/list boundaries.
-    normalized_text = get_text(decoded_value)
+    # Plain text can contain literal angle brackets and entity-like strings.
+    # Only HTML inputs should be decoded and passed through an HTML parser.
+    normalized_text = (
+        get_text(html.unescape(original_value))
+        if input_format == "html"
+        else original_value
+    )
 
     # Normalize Unicode characters.
     normalized_text = unicodedata.normalize("NFC", normalized_text)
