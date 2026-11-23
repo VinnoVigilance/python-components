@@ -43,6 +43,11 @@ sources:
         acquisition:
           fetch_strategy: saved_html
           download_method: BYPASS
+          detail_fetch_strategy: direct
+          crawler_settings:
+            concurrent_requests_per_domain: 3
+            download_delay: 0.05
+            retry_times: 3
 
         archive_urls:
           - https://www.gmanetwork.com/news/archives/news-nation/
@@ -58,7 +63,7 @@ sources:
 
         bypass_config:
           engine: stealth_browser
-          headless: false
+          headless: true
           timeout_seconds: 120
 
           actions:
@@ -69,7 +74,8 @@ sources:
 
             - action: scroll_until_idle
               link_selector: '#grid_thumbnail_stories a[href*="/story/"]'
-              idle_timeout_seconds: 30
+              overlay_close_selector: '#tbl-explore-more-header button[aria-label*="close" i], #tbl-explore-more-header [role="button"][aria-label*="close" i], #tbl-explore-more-header button[title*="close" i]'
+              idle_timeout_seconds: 90
               poll_interval_seconds: 2
 
             - action: save_html

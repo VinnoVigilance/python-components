@@ -122,7 +122,25 @@ class SavedHtmlMediaSpider(MediaSpider):
             "detail page(s).",
             len(pending_details),
         )
-
+        acquisition = self.source_config.get("acquisition", {})
+        if acquisition.get("detail_fetch_strategy") == "direct":
+            self.logger.info(
+                "Fetching %d article pages directly with Scrapy.",
+                len(pending_details),
+            )
+            for item in pending_details:
+                yield scrapy.Request(
+                    url=item["detail_url"],
+                    callback=self.parse_detail,
+                    errback=self.detail_failed,
+                    cb_kwargs={
+                        "record_key": item["record_key"],
+                        "is_known": item["is_known"],
+                        "source_record_id": item["source_record_id"],
+                        "identity_fields": item["identity_fields"],
+                    },
+                )
+            return
         # SeleniumBase manages its own event loop. Running it directly in
         # Scrapy's asyncio loop causes an event-loop conflict. Move the whole
         # blocking batch to one worker thread. Details are still fetched
