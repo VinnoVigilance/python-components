@@ -31,7 +31,6 @@ from repositories.adverseMedia import (
 
 from services.adverseMediaPipeline.mediaDiscoveryService import (
     MediaDiscoveryService,
-    resolve_discovery_mode,
 )
 
 from services.adverseMediaPipeline.mediaIdentityService import (
@@ -158,7 +157,26 @@ class MediaAcquisitionService:
                 "INITIAL, INCREMENTAL or RETRY."
             )
 
-        source_config = resolve_discovery_mode(source_config, mode)
+        mode_config = source_config.get("discovery_by_mode", {}).get(mode)
+        if mode_config:
+            discovery_settings = {
+                key: value
+                for key, value in mode_config.items()
+                if key not in {"acquisition", "bypass_config"}
+            }
+            source_config = {
+                **source_config,
+                "discovery": {
+                    **source_config.get("discovery", {}),
+                    **discovery_settings,
+                },
+                "acquisition": {
+                    **source_config.get("acquisition", {}),
+                    **mode_config.get("acquisition", {}),
+                },
+            }
+            if "bypass_config" in mode_config:
+                source_config["bypass_config"] = mode_config["bypass_config"]
         # =================================================
         # 1. Validate source configuration
         # =================================================

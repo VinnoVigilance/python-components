@@ -1,4 +1,3 @@
-from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -7,7 +6,6 @@ from scrapy.http import HtmlResponse, Response
 
 from ingestion.crawler.spiders.mediaSpider import MediaSpider
 from ingestion.crawler.storage import CrawlerStorage
-from services.adverseMediaPipeline.mediaDiscoveryService import resolve_discovery_mode
 
 
 pytestmark = pytest.mark.unit
@@ -32,12 +30,11 @@ def test_enabled_daily_source_uses_native_pdf_text_with_document_ocr_fallback(so
 
 
 def test_initial_covers_three_bounded_stations_and_recent_incremental_only_recent(source):
-    original = deepcopy(source)
-    initial = resolve_discovery_mode(source, "INITIAL")
-    incremental = resolve_discovery_mode(source, "INCREMENTAL")
-    historical = initial["discovery"]["form_search"][:3]
+    initial = source["discovery_by_mode"]["INITIAL"]
+    incremental = source["discovery_by_mode"]["INCREMENTAL"]
+    historical = initial["form_search"][:3]
 
-    assert len(initial["discovery"]["form_search"]) == 4
+    assert len(initial["form_search"]) == 4
     assert [recipe["parameters"]["station"]["values"] for recipe in historical] == [
         ["mnl"], ["ceb"], ["cdo"]
     ]
@@ -47,18 +44,17 @@ def test_initial_covers_three_bounded_stations_and_recent_incremental_only_recen
         {"start": 1, "end": 30000},
     ]
     assert all(recipe["parameters"]["case_number"]["format"] == "05d" for recipe in historical)
-    recent = incremental["discovery"]["form_search"]
-    assert initial["discovery"]["form_search"][-1] == recent
+    recent = incremental["form_search"]
+    assert initial["form_search"][-1] == recent
     assert "parameters" not in recent
     assert recent["start_url"] == source["source_page_url"]
-    assert source == original
 
 
 def test_actual_listing_rules_preserve_metadata_and_deduplicate_pdf_across_routes(source, tmp_path):
-    initial = resolve_discovery_mode(source, "INITIAL")
-    historical, *_, recent = initial["discovery"]["form_search"]
+    initial = source["discovery_by_mode"]["INITIAL"]
+    historical, *_, recent = initial["form_search"]
     storage = CrawlerStorage(source["source_name"], DATASET, str(tmp_path), None)
-    spider = MediaSpider(None, initial, storage, [], None)
+    spider = MediaSpider(None, source, storage, [], None)
     spider.persist_pending_work = False
 
     recent_page = HtmlResponse(

@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -293,9 +294,21 @@ def test_search_retry_completion_reflects_failures_and_crawl_status(monkeypatch,
 def test_acquire_uses_mode_configuration_without_mutating_source(monkeypatch, mode, expected):
     from services.adverseMediaPipeline import mediaAcquisitionService as module
 
-    source = {**_crawler_config(), "discovery": {"policy": "full_scan"},
-              "discovery_by_mode": {"INITIAL": {"form_search": "historical"},
-                                    "INCREMENTAL": {"form_search": "recent"}}}
+    source = {
+        **_crawler_config(),
+        "discovery": {"policy": "full_scan", "form_search": "recent"},
+        "acquisition": {"type": "crawler", "fetch_strategy": "direct"},
+        "bypass_config": {"enabled": False},
+        "discovery_by_mode": {
+            "INITIAL": {
+                "form_search": "historical",
+                "acquisition": {"fetch_strategy": "saved_html"},
+                "bypass_config": {"enabled": True},
+            },
+            "INCREMENTAL": {"form_search": "recent"},
+        },
+    }
+    original = deepcopy(source)
     monkeypatch.setattr(MediaAcquisitionService, "_validate_source_config", lambda *_: None)
     monkeypatch.setattr(MediaAcquisitionService, "_resolve_lookup_values", lambda *_, **__: {"source_id": 1, "dataset_id": 2})
     acquire = MagicMock(return_value=module.MediaSourceAcquisitionResult())
@@ -303,8 +316,30 @@ def test_acquire_uses_mode_configuration_without_mutating_source(monkeypatch, mo
 
     MediaAcquisitionService().acquire(source, mode)
 
-    assert acquire.call_args.kwargs["source_config"]["discovery"]["form_search"] == expected
-    assert "form_search" not in source["discovery"]
+    resolved = acquire.call_args.kwargs["source_config"]
+    assert resolved["discovery"] == {"policy": "full_scan", "form_search": expected}
+    assert resolved["acquisition"] == {
+        "type": "crawler",
+        "fetch_strategy": "saved_html" if mode == "INITIAL" else "direct",
+    }
+    assert resolved["bypass_config"] == {"enabled": mode == "INITIAL"}
+    assert source == original
+
+
+def test_acquire_preserves_configuration_without_mode_overrides(monkeypatch):
+    from services.adverseMediaPipeline import mediaAcquisitionService as module
+
+    source = {**_crawler_config(), "discovery": {"policy": "full_scan"}}
+    original = deepcopy(source)
+    monkeypatch.setattr(MediaAcquisitionService, "_validate_source_config", lambda *_: None)
+    monkeypatch.setattr(MediaAcquisitionService, "_resolve_lookup_values", lambda *_, **__: {"source_id": 1, "dataset_id": 2})
+    acquire = MagicMock(return_value=module.MediaSourceAcquisitionResult())
+    monkeypatch.setattr(MediaAcquisitionService, "_acquire_source", acquire)
+
+    MediaAcquisitionService().acquire(source, "INITIAL")
+
+    assert acquire.call_args.kwargs["source_config"] == original
+    assert source == original
 
 
 def test_persistence_failure_keeps_navigation_context_for_recovery(monkeypatch):

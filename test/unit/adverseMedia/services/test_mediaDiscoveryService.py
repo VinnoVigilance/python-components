@@ -1,5 +1,4 @@
 from unittest.mock import MagicMock
-from copy import deepcopy
 
 import pytest
 
@@ -157,40 +156,6 @@ def test_summary_distinguishes_source_end_from_threshold(
         "stop_reason": "SOURCE_EXHAUSTED",
         "completed_safely": True,
     }
-
-
-def test_resolve_mode_leaves_sources_without_overrides_unchanged():
-    config = {"discovery": {"strategy": "rss"}, "acquisition": {"type": "crawler"}}
-    assert module.resolve_discovery_mode(config, "INITIAL") == config
-
-
-@pytest.mark.parametrize("mode,expected_recipe", [("INITIAL", "historical"), ("INCREMENTAL", "recent")])
-def test_resolve_mode_applies_overrides_without_mutating_source(mode, expected_recipe):
-    config = {
-        "dataset_name": "EXAMPLE",
-        "discovery": {"policy": "full_scan", "form_search": "recent"},
-        "acquisition": {"type": "crawler", "fetch_strategy": "direct"},
-        "bypass_config": {"enabled": False},
-        "discovery_by_mode": {
-            "INITIAL": {
-                "form_search": "historical",
-                "acquisition": {"fetch_strategy": "saved_html"},
-                "bypass_config": {"enabled": True},
-            },
-            "INCREMENTAL": {"form_search": "recent"},
-        },
-    }
-    original = deepcopy(config)
-
-    resolved = module.resolve_discovery_mode(config, mode)
-
-    assert config == original
-    assert resolved["discovery"] == {"policy": "full_scan", "form_search": expected_recipe}
-    assert resolved["acquisition"] == {
-        "type": "crawler", "fetch_strategy": "saved_html" if mode == "INITIAL" else "direct",
-    }
-    assert resolved["bypass_config"] == {"enabled": mode == "INITIAL"}
-    assert resolved["dataset_name"] == "EXAMPLE"
 
 
 @pytest.mark.parametrize("failure", [None, "identity", "discovery"])
