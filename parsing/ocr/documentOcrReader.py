@@ -1,6 +1,6 @@
 """Read image frames, PDF pages or self-contained HTML images for OCR.
 
-This is an explicit OCR path, not automatic fallback for existing PDF parsers.
+Callers explicitly choose this OCR path, including opt-in PDF text fallback.
 All processing uses one immutable source snapshot. No records are written here.
 """
 
