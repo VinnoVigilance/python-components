@@ -167,7 +167,7 @@ class MediaDiscoveryService:
             and (
                 self.reached_source_end
                 or self.stop_reason
-                == "KNOWN_THRESHOLD_REACHED"
+                in {"KNOWN_THRESHOLD_REACHED", "CONFIGURED_RANGE_COMPLETE"}
             )
         )
 

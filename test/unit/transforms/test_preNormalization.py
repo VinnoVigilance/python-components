@@ -19,6 +19,7 @@ from transforms.preNormalization import (
     EnumHandler,
     FlattenDictHandler,
     HtmlUnescapeHandler,
+    HtmlToTextHandler,
     LanguageNameHandler,
     PreNormalizationEngine,
     RegexExtractAllHandler,
@@ -31,6 +32,14 @@ from transforms.preNormalization import (
 )
 
 pytestmark = pytest.mark.unit
+
+
+def test_html_to_text_converts_markup_and_preserves_paragraphs():
+    handler = HtmlToTextHandler()
+    assert handler.normalize("<p>First &amp; second</p><p>Another</p>", "").split() == ["First", "&", "second", "Another"]
+    assert handler.normalize(None, "") is None
+    with pytest.raises(TypeError):
+        handler.normalize(["text"], "")
 
 
 def test_html_unescape_decodes_one_layer_and_preserves_non_strings():

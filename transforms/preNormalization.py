@@ -6,6 +6,7 @@ import pandas as pd
 import pycountry
 from pathlib import Path
 from copy import deepcopy
+from inscriptis import get_text
 
 
 # =========================================================
@@ -95,6 +96,17 @@ class HtmlUnescapeHandler(BaseHandler):
 
     def normalize(self, value, rule):
         return html.unescape(value) if isinstance(value, str) else value
+
+
+class HtmlToTextHandler(BaseHandler):
+    """Convert declared HTML to text; use target_field to preserve the original."""
+
+    def normalize(self, value, rule):
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise TypeError("html_to_text requires a string or None")
+        return get_text(html.unescape(value))
 
 
 # =========================================================
@@ -551,6 +563,7 @@ class LanguageNameHandler(BaseHandler):
 HANDLERS = {
     "designation_names": DesignationNamesHandler(),
     "html_unescape": HtmlUnescapeHandler(),
+    "html_to_text": HtmlToTextHandler(),
     "enum": EnumHandler(),
     "enum_lookup": EnumHandler(mode="lookup"),
     "enum_add_field": EnumHandler(mode="add_field"),

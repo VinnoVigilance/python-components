@@ -87,3 +87,13 @@ class CrawlerStorage:
         )
 
         return str(file_path)
+
+    def save_detail_file(self, record_id: str, content: bytes, extension: str) -> str:
+        """Save a binary publication atomically in the existing detail directory."""
+        if not record_id.isalnum() or not extension.isalnum():
+            raise ValueError("Binary filename and extension must be alphanumeric")
+        path = self.detail_path / f"{record_id}.{extension}"
+        temporary = path.with_suffix(path.suffix + ".tmp")
+        temporary.write_bytes(content)
+        temporary.replace(path)
+        return str(path.resolve())

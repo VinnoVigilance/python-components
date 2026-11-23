@@ -11,6 +11,167 @@ global:
 
 sources:
 
+  COURT_OF_APPEALS_PH_DECISIONS_AND_RESOLUTIONS:
+    enabled: true
+    active: true
+    source_name: COURT_OF_APPEALS_PH
+    dataset_name: COURT_OF_APPEALS_PH_DECISIONS_AND_RESOLUTIONS
+    dataset_category: Crime / Judicial Records
+    schedule: daily
+    date_order: MDY
+    source_page_url: https://services.ca.judiciary.gov.ph/recentdecisions/
+    url: https://services.ca.judiciary.gov.ph/recentdecisions/
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 1
+        retry_times: 3
+    discovery:
+      policy: full_scan
+      strategy: form_search
+      form_search: &ca_recent
+        start_url: https://services.ca.judiciary.gov.ph/recentdecisions/
+        metadata:
+          DiscoveryMethod: recent
+        stages:
+        - selector_type: xpath
+          row_selector: //table[@id='tbl-table']/tbody/tr
+          row_key:
+          - Station
+          - CaseNumber
+          - date.originalValue
+          unsupported_pagination_selector: //*[contains(concat(' ', normalize-space(@class), ' '), ' ui-paginator ')]
+          fields:
+            CaseNumber:
+              selector: td:nth-child(1) span
+              required: true
+            Station:
+              selector: td:nth-child(2) .station-value
+              required: true
+              values:
+                MANILA: mnl
+                VISAYAS: ceb
+                CEBU: ceb
+                MINDANAO: cdo
+                CAGAYAN DE ORO: cdo
+            Title:
+              selector: td:nth-child(3) p
+              required: true
+            date.originalValue:
+              selector: td:nth-child(1)
+              required: true
+              extraction:
+                strategy: regex
+                pattern: \(([A-Za-z]+ \d{1,2}, \d{4})\)
+          action:
+            submit_selector: form a[onclick][id]
+        document:
+          type: pdf
+          identity_fields: &ca_document_identity
+          - Station
+          - CaseNumber
+          - date.originalValue
+          - FileHash
+    parser:
+      type: pdf
+      mode: text
+      require_text: true
+      ocr_fallback: {}
+    identity:
+      external_id:
+        field: SourceRecordId
+      record_key:
+        fields:
+        - source_name
+        - dataset_name
+        - SourceRecordId
+        hash: true
+    discovery_by_mode:
+      INITIAL:
+        form_search:
+        - &ca_historical
+          start_url: https://services.ca.judiciary.gov.ph/csisver3-war/
+          parameters:
+            station:
+              values:
+              - mnl
+            case_number:
+              range:
+                start: 1
+                end: 300000
+              format: 05d
+          parameter_fields:
+            Station: station
+          metadata:
+            DiscoveryMethod: historical
+          search_action:
+            form_xpath: //form[@id="searching"]
+            fields:
+              searching:radio-id: '{station}'
+              searching:dt-search-0: '{case_number}'
+              searching:search-button: ''
+          stages:
+          - selector_type: xpath
+            row_selector: //table[@id='tbl-table']/tbody/tr
+            row_key:
+            - CaseNumber
+            unsupported_pagination_selector: //*[contains(concat(' ', normalize-space(@class), ' '), ' ui-paginator ')]
+            fields:
+              CaseNumber:
+                selector: td:nth-child(1)
+                required: true
+              Title:
+                selector: td:nth-child(3) p
+                required: true
+              CaseStatus:
+                selector: td:nth-child(4)
+            action:
+              submit_selector: form a[onclick][id]
+            empty_source: html
+            empty_pattern: No record.*?Retrieved
+          - selector_type: xpath
+            row_selector: //table[@id='tbl-table']/tbody/tr
+            row_key:
+            - date.originalValue
+            unsupported_pagination_selector: //*[contains(concat(' ', normalize-space(@class), ' '), ' ui-paginator ')]
+            fields:
+              date.originalValue:
+                selector: td:nth-child(1)
+                required: true
+                extraction:
+                  strategy: regex
+                  pattern: ([A-Za-z]+ \d{1,2}, \d{4})
+            action:
+              submit_selector: form a[onclick][id]
+            empty_pattern: Decisions / Resolutions No data available\.
+            page_fields:
+              CaseDetailText:
+                selector_type: xpath
+                selector: //body
+          document:
+            type: pdf
+            identity_fields: *ca_document_identity
+        - <<: *ca_historical
+          parameters:
+            station:
+              values: [ceb]
+            case_number:
+              range: {start: 1, end: 40000}
+              format: 05d
+        - <<: *ca_historical
+          parameters:
+            station:
+              values: [cdo]
+            case_number:
+              range: {start: 1, end: 30000}
+              format: 05d
+        - *ca_recent
+      INCREMENTAL:
+        form_search: *ca_recent
+
   GMA_NEWS:
     enabled: true
     active: true
@@ -1444,6 +1605,8 @@ sources:
     parser:
       type: pdf
       mode: text
+      require_text: true
+      ocr_fallback: {}
 
     identity:
       external_id:

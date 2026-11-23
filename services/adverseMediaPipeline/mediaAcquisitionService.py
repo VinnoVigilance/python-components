@@ -297,11 +297,7 @@ class MediaAcquisitionService:
         # =================================================
 
         if mode == "RETRY":
-            source_result = (
-                self._acquire_todo_items(
-                    source_config=source_config,
-                )
-            )
+            source_result = self._acquire_todo_items(source_config=source_config)
 
         else:
             source_result = (
@@ -409,6 +405,7 @@ class MediaAcquisitionService:
                         "error_stage": "RAW_PERSISTENCE",
                         "error_type": type(error).__name__,
                         "discovery_retry_key": record.get("discovery_retry_key"),
+                        "discovery_context": record.get("discovery_context"),
                     }
                 )
 
@@ -667,9 +664,11 @@ class MediaAcquisitionService:
                 "is_known": False,
                 "extracted": item.get("extracted"),
                 "detail_file_path": item["detail_file_path"],
+                "discovery_context": item.get("discovery_context"),
             }
             for item in items
-            if item["kind"] == "process"
+            if item["kind"] == "process" and (
+                Path(item["detail_file_path"]).is_file() or not item.get("discovery_context"))
         ]
 
         fetch_items = [
@@ -678,8 +677,12 @@ class MediaAcquisitionService:
             if item["kind"] == "fetch"
         ]
 
-        discovery_items = [item for item in items if item["kind"] in {"json_manifest_entry", "month_index"}]
+        discovery_items = [item for item in items if item["kind"] in {"json_manifest_entry", "month_index", "form_search"}]
+        discovery_items.extend(item["discovery_context"] for item in items
+                               if item["kind"] == "process" and item.get("discovery_context")
+                               and not Path(item["detail_file_path"]).is_file())
 
+        crawl_completed = True
         if fetch_items or discovery_items:
             fetch_strategy = str(
                 source_config.get(
@@ -711,16 +714,22 @@ class MediaAcquisitionService:
             records.extend(
                 crawl_result.records
             )
+            crawl_completed = bool(getattr(crawl_result, "completed_safely", True))
+
+        if any(item.get("kind") == "form_search" for item in discovery_items):
+            records = list({record["record_key"]: record for record in records}.values())
 
         return MediaSourceAcquisitionResult(
             records=records,
             discovered_count=len(items),
             new_count=len(items),
             selected_detail_count=len(records),
-            missing_detail_count=max(len(items) - len(records), 0),
+            missing_detail_count=max(sum(item["kind"] != "form_search" for item in items) - len(records), 0),
             reached_source_end=True,
             stop_reason="TODO_RETRY",
-            completed_safely=len(records) >= len(items),
+            completed_safely=(len(records) >= sum(item["kind"] != "form_search" for item in items)
+                              and crawl_completed
+                              and not any(record.get("failed") for record in records)),
         )
 
     @staticmethod
@@ -1143,6 +1152,7 @@ class MediaAcquisitionService:
 
         source_url = (
             record.get("file_url")
+            or (extracted or {}).get("PDFURL")
             or (extracted or {}).get(
                 "SourceURL"
             )
@@ -1224,6 +1234,8 @@ class MediaAcquisitionService:
 
             "failed": False,
             "discovery_retry_key": record.get("discovery_retry_key"),
+            "discovery_context": record.get("discovery_context"),
+            "discovery_retry_item": record.get("discovery_retry_item"),
         }
 
     # =====================================================

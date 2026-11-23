@@ -148,6 +148,16 @@ def _canonical_records(dataset_name):
     return tuple(canonical)
 
 
+@pytest.mark.parametrize("dataset", ["AMLC_NEWS_AND_ANNOUNCEMENTS", "NBI_PRESS_RELEASES", "SEC_PH_ADVISORIES"])
+def test_sample_body_reaches_final_record(dataset):
+    for record in _canonical_records(dataset):
+        content = record.get("Content") or {}
+        if content.get("BodyOriginalValue"):
+            assert content.get("BodyText")
+            if dataset == "AMLC_NEWS_AND_ANNOUNCEMENTS":
+                assert "<p" not in content["BodyText"].lower()
+
+
 def test_samples_and_golden_cover_the_same_sources():
     """Guard: a source can never be added to one table but forgotten in the other."""
     assert set(SAMPLES) == set(GOLDEN), (
