@@ -8,6 +8,24 @@ from services.adverseMediaPipeline.mediaIdentityService import (
 )
 
 
+def resolve_discovery_mode(source_config: dict, mode: str) -> dict:
+    """Apply the same configured acquisition/discovery overrides for every runner."""
+    mode_config = source_config.get("discovery_by_mode", {}).get(mode)
+    if not mode_config:
+        return source_config
+    resolved = {
+        **source_config,
+        "discovery": {**source_config.get("discovery", {}),
+                      **{key: value for key, value in mode_config.items()
+                         if key not in {"acquisition", "bypass_config"}}},
+        "acquisition": {**source_config.get("acquisition", {}),
+                        **mode_config.get("acquisition", {})},
+    }
+    if "bypass_config" in mode_config:
+        resolved["bypass_config"] = mode_config["bypass_config"]
+    return resolved
+
+
 class MediaDiscoveryService:
     """
     Handles media discovery decisions.
@@ -167,7 +185,7 @@ class MediaDiscoveryService:
             and (
                 self.reached_source_end
                 or self.stop_reason
-                == "KNOWN_THRESHOLD_REACHED"
+                in {"KNOWN_THRESHOLD_REACHED", "CONFIGURED_RANGE_COMPLETE"}
             )
         )
 
