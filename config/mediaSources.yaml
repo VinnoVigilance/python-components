@@ -1599,6 +1599,8 @@ sources:
     parser:
       type: pdf
       mode: text
+      require_text: true
+      ocr_fallback: {}
 
     identity:
       external_id:

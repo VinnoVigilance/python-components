@@ -49,6 +49,12 @@ def _sec_config() -> dict:
         return yaml.safe_load(handle)["sources"]["SEC_PH_ADVISORIES"]
 
 
+def test_sec_pdf_uses_native_text_then_ocr_when_empty():
+    assert _sec_config()["parser"] == {
+        "type": "pdf", "mode": "text", "require_text": True, "ocr_fallback": {}
+    }
+
+
 def _detail_page(viewer: str = "", button: str = "", body: str = "") -> HtmlResponse:
     html = f"""
     <html><head>
