@@ -1,13 +1,18 @@
 import hashlib
+import itertools
+import json
 import re
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from xml.etree import ElementTree
 
 import scrapy
 
 from scrapy.http import HtmlResponse
+from ingestion.crawler.pagination import resolve_next_page_url
+from services.adverseMediaPipeline import mediaTodoService
 from services.adverseMediaPipeline.mediaIdentityService import MediaIdentityService
 
 
@@ -48,6 +53,7 @@ class MediaSpider(scrapy.Spider):
 
         self.task = task
         self.source_config = source_config
+        self.persist_pending_work = getattr(discovery_service, "persist_pending_work", True)
         self.storage = storage
         self.records = records
         self.discovery_service = discovery_service
@@ -72,6 +78,8 @@ class MediaSpider(scrapy.Spider):
         # Prevent duplicate listing links from affecting
         # discovery counters or creating duplicate requests.
         self.seen_record_keys: set[str] = set()
+        self.form_publications: dict[str, dict[str, Any]] = {}
+        self.form_document_references: dict[str, list[dict[str, Any]]] = {}
 
     async def start(self):
         """
@@ -80,6 +88,11 @@ class MediaSpider(scrapy.Spider):
 
         detail_items = getattr(self.task, "detail_items", None) or []
         discovery_items = getattr(self.task, "discovery_items", None) or []
+        if (not detail_items and not discovery_items and
+                self.discovery_config.get("strategy") == "form_search"):
+            await self.collect_form_searches()
+            self.records[:] = list({record["record_key"]: record for record in self.records}.values())
+            return
         if detail_items or discovery_items:
             for item in detail_items:
                 yield scrapy.Request(
@@ -90,6 +103,9 @@ class MediaSpider(scrapy.Spider):
                     dont_filter=True,
                 )
             for item in discovery_items:
+                if item.get("kind") == "form_search":
+                    await self.collect_form_searches([item])
+                    continue
                 index_url = item["index_file_url"]
                 start_url = self.discovery_config.get("start_url", self.task.url)
                 if (urlparse(index_url).scheme, urlparse(index_url).netloc) != (urlparse(start_url).scheme, urlparse(start_url).netloc):
@@ -171,6 +187,409 @@ class MediaSpider(scrapy.Spider):
             },
             dont_filter=True,
         )
+
+    async def collect_form_searches(self, retry_items=None, *, settings=None, replay_pending=True):
+        """Run bounded, sequential HTML form searches through Scrapy's downloader.
+
+        Each retry carries a declarative recipe, never cookies, row positions or
+        hidden form values. Parents are reopened before following another child.
+        Production retains pending work; no-DB discovery disables that persistence.
+        Search progress is not saved.
+        """
+        if settings is None:
+            settings = self.discovery_config.get("form_search", {})
+        if retry_items is None and isinstance(settings, list):
+            if not settings or any(not isinstance(recipe, dict) for recipe in settings):
+                raise ValueError("form_search must be a recipe or a non-empty list of recipes")
+            for index, recipe in enumerate(settings):
+                await self.collect_form_searches(settings=recipe, replay_pending=index == 0)
+                if getattr(self.discovery_service, "limit_reached", False):
+                    return
+            if self.discovery_service and any(recipe.get("parameters") for recipe in settings):
+                self.discovery_service.reached_source_end = False
+                if self.discovery_service.discovery_failure_count == 0:
+                    self.discovery_service.stop_reason = "CONFIGURED_RANGE_COMPLETE"
+            return
+        dataset = self.source_config["dataset_name"]
+        if retry_items is None:
+            stages = settings.get("stages", [])
+            if not stages:
+                raise ValueError("form_search.stages must describe at least one document listing")
+            names, variants = [], []
+            for name, spec in settings.get("parameters", {}).items():
+                names.append(name)
+                if "values" in spec:
+                    values = spec["values"]
+                    if not values:
+                        raise ValueError(f"Search parameter {name} has no values")
+                    variants.append(values)
+                else:
+                    bounds = spec.get("range", {})
+                    first, last = bounds.get("start"), bounds.get("end")
+                    if type(first) is not int or type(last) is not int or not 0 <= first <= last:
+                        raise ValueError(f"Search parameter {name} needs an explicit inclusive range")
+                    variants.append(range(first, last + 1))
+            recipes = (dict(zip(names, values)) for values in itertools.product(*variants))
+            work = ({"kind": "form_search", "recipe": settings,
+                             "parameters": {name: format(value, settings["parameters"][name].get("format", ""))
+                                            for name, value in parameters.items()}}
+                    for parameters in recipes)
+        else:
+            work = retry_items
+        if retry_items is None and replay_pending and self.persist_pending_work:
+            pending = mediaTodoService.load_items(dataset)
+            active_recipes = self.discovery_config.get("form_search", {})
+            if not isinstance(active_recipes, list):
+                active_recipes = [active_recipes]
+            # Older pending snapshots may contain the removed checkpoint setting.
+            active_recipes = [{key: value for key, value in recipe.items() if key != "checkpoint"}
+                              for recipe in active_recipes]
+            replay = [entry for entry in pending if entry.get("kind") == "form_search"
+                      and {key: value for key, value in entry.get("recipe", {}).items()
+                           if key != "checkpoint"} in active_recipes]
+            for entry in pending:
+                if entry.get("kind") == "process":
+                    if Path(entry["detail_file_path"]).is_file():
+                        self.records.append({key: value for key, value in entry.items() if key != "kind"})
+                    elif (entry.get("discovery_context")
+                          and {key: value for key, value in entry["discovery_context"].get("recipe", {}).items()
+                               if key != "checkpoint"} in active_recipes):
+                        replay.append(entry["discovery_context"])
+            if replay:
+                unique = {entry["record_key"]: entry for entry in replay}
+                await self.collect_form_searches(list(unique.values()))
+        for item in work:
+            if getattr(self.discovery_service, "limit_reached", False):
+                return
+            fingerprint = json.dumps([item["recipe"], item["parameters"]], sort_keys=True)
+            item = {**item, "record_key": item.get("record_key") or
+                    "form:" + hashlib.sha256(fingerprint.encode()).hexdigest()}
+            # Also covers an interrupted search before any publication is saved.
+            if self.persist_pending_work:
+                mediaTodoService.queue_items(dataset, [item])
+            try:
+                page = await self._open_form_path(item, [])
+                inherited = {field: item["parameters"][parameter]
+                             for field, parameter in item["recipe"].get("parameter_fields", {}).items()}
+                await self._walk_form_rows(page, item, [], inherited)
+                if getattr(self.discovery_service, "limit_reached", False):
+                    # Keep a partially visited query pending for replay.
+                    return
+                if self.persist_pending_work:
+                    mediaTodoService.remove_items(dataset, [item["record_key"]])
+            except Exception as error:
+                self.logger.exception("Form discovery failed%s",
+                                      "; query remains pending" if self.persist_pending_work else "")
+                if self.discovery_service:
+                    self.discovery_service.mark_discovery_failure("FORM_SEARCH_INCOMPLETE")
+                record = self.failed_detail_record(
+                    detail_url=item["recipe"]["start_url"], details={"record_key": item["record_key"]},
+                    error=str(error), error_type=type(error).__name__, error_stage="FORM_DISCOVERY")
+                record["discovery_retry_item"] = item
+                self.records.append(record)
+        if retry_items is None and settings.get("parameters"):
+            if self.discovery_service and self.discovery_service.discovery_failure_count == 0:
+                self.discovery_service.stop_reason = "CONFIGURED_RANGE_COMPLETE"
+        elif retry_items is None and self.discovery_service:
+            self.discovery_service.mark_source_end()
+
+    async def _download_form_request(self, request, item):
+        origin = urlparse(item["recipe"]["start_url"])
+        target = urlparse(request.url)
+        if (origin.scheme, origin.netloc) != (target.scheme, target.netloc):
+            raise ValueError("Form navigation left the configured origin")
+        # Searches are sequential; one jar avoids retaining one jar per number
+        # throughout a large historical range. Paths are replayed before use.
+        request.meta.update(cookiejar="form_search", download_timeout=self.task.timeout)
+        response = await self.crawler.engine.download_async(request)
+        final = urlparse(response.url)
+        if (final.scheme, final.netloc) != (origin.scheme, origin.netloc) or response.status >= 400:
+            raise ValueError(f"Unexpected form response: {response.status} {response.url}")
+        return response
+
+    def _form_action(self, response, row, action, parameters=None):
+        """Build a link or form action from fresh HTML, not JavaScript execution."""
+        if action.get("type", "form") not in {"link", "form"}:
+            raise ValueError("Navigation action must be link or form")
+        if action.get("type", "form") == "link":
+            links = (row.xpath(action["selector"]) if action.get("selector_type") == "xpath"
+                     else row.css(action["selector"]))
+            href = links[0].attrib.get("href") if links else None
+            if not href:
+                raise ValueError("Configured navigation link missing")
+            url = response.urljoin(href)
+            target, origin = urlparse(url), urlparse(response.url)
+            if (action.get("upgrade_https") and origin.scheme == "https"
+                    and target.scheme == "http" and target.netloc == origin.netloc):
+                url = target._replace(scheme="https").geturl()
+            return scrapy.Request(url, dont_filter=True)
+        fields = {key: str(value).format(**(parameters or {}))
+                  for key, value in action.get("fields", {}).items()}
+        control = None
+        if action.get("submit_selector"):
+            controls = row.css(action["submit_selector"])
+            if not controls:
+                raise ValueError("Configured form action missing")
+            control = controls[0]
+            name = control.attrib.get("name") or control.attrib.get("id")
+            if not name:
+                raise ValueError("Form action has no name or id")
+            fields[name] = action.get("submit_value", name)
+        forms = ((control if control is not None else row)
+                 .xpath(action.get("form_xpath", "ancestor-or-self::form[1]")))
+        if len(forms) != 1:
+            raise ValueError("Configured form must match exactly once")
+        form = forms[0]
+        form_path = form.root.getroottree().getpath(form.root)
+        return scrapy.FormRequest.from_response(response, formxpath=form_path, formdata=fields,
+                                                dont_click=True, dont_filter=True)
+
+    def _form_rows(self, response, stage):
+        if not isinstance(response, HtmlResponse):
+            raise ValueError("Expected HTML before the publication download")
+        select = response.xpath if stage.get("selector_type") == "xpath" else response.css
+        if stage.get("unsupported_pagination_selector") and select(stage["unsupported_pagination_selector"]):
+            raise ValueError("Untraversed server pagination detected")
+        rows = select(stage["row_selector"])
+        empty = stage.get("empty_pattern")
+        empty_content = (response.text if stage.get("empty_source") == "html" else
+                         self._clean_text(" ".join(response.xpath('//body//text()[not(ancestor::script) and not(ancestor::style)]').getall())))
+        if empty and re.search(empty, empty_content, re.I):
+            return []
+        if not rows:
+            self.storage.save_source_html(response.text)
+            raise ValueError("Expected result rows or an explicit no-results notice")
+        return rows
+
+    def _form_row_key(self, metadata, stage):
+        values = [metadata.get(name) for name in stage["row_key"]]
+        if any(value is None or value == "" for value in values):
+            raise ValueError("Missing stable row identity; refusing positional navigation")
+        return values
+
+    async def _open_form_path(self, item, path):
+        recipe = item["recipe"]
+        response = await self._download_form_request(
+            scrapy.Request(recipe["start_url"], dont_filter=True), item)
+        if recipe.get("search_action"):
+            response = await self._download_form_request(
+                self._form_action(response, response, recipe["search_action"], item["parameters"]), item)
+        for depth, entry in enumerate(path):
+            stage = recipe["stages"][depth]
+            # GET pagination is independent of form state. Reopen the parent
+            # first, then restore the page on which this row was discovered.
+            page_url = entry.get("page_url")
+            if page_url and page_url != response.url:
+                url = resolve_next_page_url(response.url, page_url)
+                response = await self._download_form_request(
+                    scrapy.Request(url, dont_filter=True), item)
+            key = entry["row_key"]
+            matches = [row for row in self._form_rows(response, stage)
+                       if self._form_row_key(self._extract_record(
+                           row, fields=stage.get("fields", {}), base_url=response.url), stage) == key]
+            if len(matches) != 1:
+                raise ValueError("Previously discovered row cannot be reopened uniquely")
+            response = await self._download_form_request(
+                self._form_action(response, matches[0], stage["action"]), item)
+        return response
+
+    async def _walk_form_rows(self, response, item, path, inherited):
+        """Walk each listing page; pagination uses existing same-origin checks."""
+        stage = item["recipe"]["stages"][len(path)]
+        pagination = stage.get("pagination")
+        if pagination and pagination.get("type", "next_link") != "next_link":
+            raise ValueError("Navigation stages support next-link pagination only")
+        visited = set()
+        failures = []
+        while True:
+            visited.add(response.url)
+            try:
+                await self._walk_form_page(response, item, path, inherited)
+            except Exception as error:
+                # Preserve successful siblings/pages, but leave the search pending.
+                failures.append(str(error))
+            if getattr(self.discovery_service, "limit_reached", False):
+                return
+            if not pagination:
+                break
+            select = (response.xpath if pagination.get("selector_type", "css") == "xpath"
+                      else response.css)
+            links = select(pagination["selector"])
+            if len(links) > 1:
+                raise ValueError("Next-page selector must match at most one link")
+            if not links:
+                break
+            url = resolve_next_page_url(response.url, links[0].attrib.get("href", ""),
+                                        visited_urls=visited)
+            response = await self._download_form_request(
+                scrapy.Request(url, dont_filter=True), item)
+            if response.url in visited:
+                raise ValueError("Next-page redirect returned to a visited page")
+        if failures:
+            raise ValueError("; ".join(failures))
+
+    async def _walk_form_page(self, response, item, path, inherited):
+        stage = item["recipe"]["stages"][len(path)]
+        metadata = {**inherited, **self._extract_record(
+            response, fields=stage.get("page_fields", {}), base_url=response.url)}
+        rows = self._form_rows(response, stage)
+        failures = []
+        children = []
+        for index, row in enumerate(rows, 1):
+            try:
+                fields = self._extract_record(
+                    row, fields=stage.get("fields", {}), base_url=response.url)
+                self._form_row_key(fields, stage)
+                children.append((fields, row))
+            except Exception as error:
+                # Bad source rows must not prevent valid siblings from being saved.
+                # Leave the recipe pending; the row number is diagnostic, not identity.
+                failures.append(f"Row {index} at {response.url}: {error}")
+                self.logger.warning("Publication row deferred: %s", failures[-1])
+        # Explicit formats keep ambiguous source dates independent of locale.
+        # Invalid/missing values fail discovery rather than changing run order.
+        for order in reversed(stage.get("order_by", [])):
+            def sort_key(child):
+                value = child[0][order["field"]]
+                kind = order.get("type", "text")
+                if kind == "integer":
+                    return int(value)
+                if kind == "date":
+                    return datetime.strptime(value, order["format"])
+                if kind != "text":
+                    raise ValueError(f"Unsupported row ordering type: {kind}")
+                return str(value)
+            children.sort(key=sort_key, reverse=order.get("descending", False))
+        if stage.get("allow_identical_rows") and item["recipe"].get("replay_parents", True):
+            raise ValueError("allow_identical_rows requires replay_parents: false")
+        unique_children = []
+        seen_rows = {}
+        for fields, row in children:
+            key = json.dumps(self._form_row_key(fields, stage))
+            if key in seen_rows:
+                previous_fields, previous_row = seen_rows[key]
+                if stage.get("allow_identical_rows") and fields == previous_fields:
+                    request = self._form_action(response, row, stage["action"])
+                    previous_request = self._form_action(response, previous_row, stage["action"])
+                    if (request.method, request.url, request.body) == (
+                            previous_request.method, previous_request.url, previous_request.body):
+                        self.logger.info("Identical publication row ignored: %s at %s", key, response.url)
+                        continue
+                raise ValueError("Ambiguous document/case row identity")
+            seen_rows[key] = (fields, row)
+            unique_children.append((fields, row))
+        children = unique_children
+        for fields, row in children:
+            if getattr(self.discovery_service, "limit_reached", False):
+                return
+            key = self._form_row_key(fields, stage)
+            child_path = [*path, {"row_key": key,
+                                  "page_url": response.url if stage.get("pagination") else None}]
+            # Replay parents for every sibling to restore server selection state.
+            try:
+                if item["recipe"].get("replay_parents", True):
+                    child = await self._open_form_path(item, child_path)
+                else:
+                    child = await self._download_form_request(
+                        self._form_action(response, row, stage["action"]), item)
+                extracted = {**metadata, **fields}
+                if len(child_path) < len(item["recipe"]["stages"]):
+                    await self._walk_form_rows(child, item, child_path, extracted)
+                else:
+                    self._save_form_publication(child, item, extracted)
+            except Exception as error:
+                failures.append(f"{key}: {error}")
+                self.logger.warning("Publication branch deferred: %s", failures[-1])
+        if failures:
+            raise ValueError("; ".join(failures))
+
+    def _save_form_publication(self, response, item, fields):
+        """Finish navigation through existing HTML or binary storage paths."""
+        output = item["recipe"]["document"]
+        document_type = output.get("type")
+        if document_type not in {"html", "pdf"}:
+            raise ValueError("Publication document.type must be html or pdf")
+        if document_type == "pdf" and not response.body.startswith(b"%PDF-"):
+            raise ValueError("Publication action did not return the configured PDF")
+        digest = hashlib.sha256(response.body).hexdigest()
+        if document_type == "html":
+            if not isinstance(response, HtmlResponse) or response.body.startswith(b"%PDF-"):
+                raise ValueError("Publication action did not return the configured HTML")
+            # Detail-page rules augment listing metadata; no parallel extractor.
+            try:
+                fields = {**fields, **self._extract_record(response)}
+            except Exception:
+                # Preserve the received original even if identity fields cannot
+                # yet be extracted; successful HTML uses parse_detail's storage.
+                self.storage.save_detail_html(digest, response.text)
+                raise
+        fields = {**fields, **item["recipe"].get("metadata", {}), "FileHash": digest}
+        if document_type == "pdf":
+            fields.setdefault("PDFURL", response.url)
+            fields.setdefault("SourceURL", item["recipe"]["start_url"])
+        else:
+            fields["SourceURL"] = response.url
+        if output.get("identity_fields"):
+            fields["SourceRecordId"] = "|".join(str(fields[name]) for name in output["identity_fields"])
+        row_evidence = dict(fields)
+        record_key = MediaIdentityService.generate_record_key(self.source_config, fields)
+        if record_key in self.seen_record_keys:
+            previous_record = self.form_publications.get(record_key)
+            if previous_record and output.get("conflict_fields"):
+                previous_fields = previous_record["extracted"]
+                if any(previous_fields.get(name) != fields.get(name)
+                       for name in output["conflict_fields"]):
+                    previous_fields["SourceMetadataConflict"] = True
+                    if row_evidence not in previous_fields["SourceRows"]:
+                        previous_fields["SourceRows"].append(row_evidence)
+                    if self.persist_pending_work:
+                        mediaTodoService.queue_items(self.source_config["dataset_name"], [{"kind": "process", **previous_record}])
+                    self.logger.warning("Conflicting source rows retained for publication %s", record_key)
+            return
+        known = False
+        if self.discovery_service:
+            known, _ = self.discovery_service.check_record_key(record_key)
+            self.discovery_service.record_detail_selected()
+        pending = (mediaTodoService.load_items(self.source_config["dataset_name"])
+                   if self.persist_pending_work else [])
+        previous = next((entry.get("extracted") or {} for entry in pending
+                         if entry.get("record_key") == record_key), {})
+        fields = {**previous, **fields, "DiscoveryMethods": sorted(set(previous.get("DiscoveryMethods", [])) |
+                  {fields.get("DiscoveryMethod", "form_search")}),
+                  "RetrievedAt": datetime.now().astimezone().isoformat()}
+        if output.get("conflict_fields"):
+            # Start fresh on each discovery; stale row conflicts must not survive
+            # a subsequent corrected listing through the retry metadata merge.
+            fields.pop("SourceRows", None)
+            fields.pop("SourceMetadataConflict", None)
+            fields.pop("SharedPDFReference", None)
+            fields["SourceRows"] = [row_evidence]
+        if document_type == "html":
+            record = next(self.parse_detail(
+                response, record_key, known, fields.get("SourceRecordId"),
+                extracted_record=fields))
+            record.update(file_url=response.url, discovery_context=item)
+        else:
+            path = self.storage.save_detail_file(digest, response.body, "pdf")
+            record = {"record_key": record_key, "is_known": known, "detail_file_path": path,
+                      "file_url": response.url,
+                      "extracted": fields, "discovery_context": item}
+            self.records.append(record)
+        self.seen_record_keys.add(record_key)
+        fields = record["extracted"]
+        if output.get("conflict_fields"):
+            references = self.form_document_references.setdefault(response.url, [])
+            if references:
+                fields["SharedPDFReference"] = True
+                for reference in references:
+                    reference["extracted"]["SharedPDFReference"] = True
+                    if self.persist_pending_work:
+                        mediaTodoService.queue_items(self.source_config["dataset_name"], [{"kind": "process", **reference}])
+                self.logger.warning("Different publication identities share document %s", response.url)
+            references.append(record)
+        if self.persist_pending_work:
+            mediaTodoService.queue_items(self.source_config["dataset_name"], [{"kind": "process", **record}])
+        self.form_publications[record_key] = record
 
     def parse_rss(self, response):
         try:
@@ -781,12 +1200,16 @@ class MediaSpider(scrapy.Spider):
         source_record_id: str | None,
         identity_fields: dict[str, Any] | None = None,
         discovery_retry_key: str | None = None,
+        extracted_record: dict[str, Any] | None = None,
     ):
         """
         Save original HTML first, then extract fields.
 
         Saving HTML before extraction ensures the original
         source remains available even if extraction fails.
+
+        Configured navigation may supply already extracted fields, preserving
+        parent metadata without extracting the final page a second time.
         """
 
         file_name_id = self._build_file_name_id(
@@ -802,11 +1225,8 @@ class MediaSpider(scrapy.Spider):
         )
 
         try:
-            extracted_record = (
-                self._extract_record(
-                    response
-                )
-            )
+            extracted_record = (self._extract_record(response) if extracted_record is None
+                                else dict(extracted_record))
 
         except Exception as error:
             self.logger.exception(
@@ -929,9 +1349,17 @@ class MediaSpider(scrapy.Spider):
     def _extract_record(
         self,
         response,
+        *,
+        fields: dict[str, Any] | None = None,
+        base_url: str | None = None,
     ) -> dict[str, Any]:
         """
-        Extract configured fields from the detail page.
+        Extract fields from a full page or a selected row using the same rules.
+
+        Existing detail-page callers use source-level extraction fields. A
+        navigation stage supplies its own fields and the parent page's base URL
+        for relative links and source: response_url. An empty fields dictionary
+        deliberately extracts nothing; it does not select source-level defaults.
 
         Example:
 
@@ -947,15 +1375,18 @@ class MediaSpider(scrapy.Spider):
 
         record: dict[str, Any] = {}
 
+        extraction_fields = self.extraction_config if fields is None else fields
+
         for (
             field_name,
             field_config,
-        ) in self.extraction_config.items():
+        ) in extraction_fields.items():
 
             record[field_name] = (
                 self._extract_field(
                     response=response,
                     field_config=field_config,
+                    base_url=base_url,
                 )
             )
 
@@ -965,6 +1396,7 @@ class MediaSpider(scrapy.Spider):
         self,
         response,
         field_config: dict[str, Any],
+        base_url: str | None = None,
     ):
         """
         Extract one configured field.
@@ -995,7 +1427,7 @@ class MediaSpider(scrapy.Spider):
         )
 
         if source == "response_url":
-            value = response.url
+            value = base_url or response.url
 
         else:
             selector = field_config.get(
@@ -1012,11 +1444,12 @@ class MediaSpider(scrapy.Spider):
                 )
             ).strip().lower()
 
-            selected_nodes = response.css(
-                selector
-            )
+            selected_nodes = (response.xpath(selector) if field_config.get("selector_type") == "xpath"
+                              else response.css(selector))
 
             if not selected_nodes:
+                if field_config.get("required"):
+                    raise ValueError(f"Required extraction field missing: {selector}")
                 return None
 
             multiple = bool(
@@ -1079,7 +1512,7 @@ class MediaSpider(scrapy.Spider):
                         continue
 
                     if attribute in {"href", "src"}:
-                        raw = response.urljoin(raw)
+                        raw = urljoin(base_url or response.url, raw)
 
                     if raw not in collected:
                         collected.append(raw)
@@ -1104,6 +1537,11 @@ class MediaSpider(scrapy.Spider):
                 value=value,
                 extraction=extraction,
             )
+
+        if "values" in field_config and value is not None:
+            value = field_config["values"].get(value, value)
+        if field_config.get("required") and not value:
+            raise ValueError(f"Required extraction field missing: {field_config.get('selector')}")
 
         prefix = field_config.get("prefix")
 
