@@ -141,6 +141,7 @@ sources:
       BodyText: {selector: '[itemprop="articleBody"]', required: true}
       Summary: {selector: 'meta[property="og:description"]', output: attribute, attribute: content}
       FeaturedImageUrl: {selector: 'meta[property="og:image"]', output: attribute, attribute: content}
+      TagNames: {selector: 'li[itemprop="keywords"] > a.label', multiple: true}
       date.originalValue: {selector: '[itemprop="articleBody"] > p:last-of-type > strong'}
 
     parser: {type: html}
