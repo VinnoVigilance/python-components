@@ -1,4 +1,9 @@
 global:
+  acquisition:
+    crawler_settings:
+      record_spool: true
+      raw_workers: 4
+
   mapping:
     file: data/rules/mediaMapping.xlsx
 
@@ -89,6 +94,87 @@ sources:
           BodyText:
             selector: '[role="main"] p, [role="main"] h2'
             join_with: "\n\n"
+
+    parser: {type: html}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
+  PHILSTAR_NEWS:
+    enabled: true
+    active: true
+    source_name: PHILSTAR_NEWS
+    dataset_name: PHILSTAR_NEWS
+    dataset_category: Media
+    schedule: hourly
+    date_order: MDY
+    source_page_url: https://www.philstar.com/headlines
+    url: https://www.philstar.com/headlines
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        transport: chrome
+        concurrent_requests: 100
+        concurrent_requests_per_domain: 100
+        download_delay: 0
+        randomize_download_delay: false
+        retry_times: 3
+        retry_http_codes: [403, 408, 429, 500, 502, 503, 504]
+
+    discovery:
+      strategy: listing_groups
+      policy: full_scan
+      parallel_groups: true
+      skip_known_details: true
+      article_base_url: https://www.philstar.com/
+      groups:
+        - url: https://www.philstar.com/headlines
+          link_selector: 'a[href^="https://www.philstar.com/headlines/20"]'
+          pagination: {type: next_link, selector: 'div.next > a[href]'}
+        - url: https://www.philstar.com/nation
+          link_selector: 'a[href^="https://www.philstar.com/nation/20"]'
+          pagination: {type: next_link, selector: 'div.next > a[href]'}
+        - url: https://www.philstar.com/business
+          link_selector: 'a[href^="https://www.philstar.com/business/20"]'
+          pagination: {type: next_link, selector: 'div.next > a[href]'}
+        - url: https://www.philstar.com/business/banking
+          link_selector: 'a[href^="https://www.philstar.com/business/banking/20"]'
+          pagination: {type: next_link, selector: 'div.next > a[href]'}
+
+    discovery_by_mode:
+      INITIAL: {policy: full_scan}
+      INCREMENTAL:
+        strategy: rss
+        policy: full_scan
+        article_url_pattern: '^https://www\.philstar\.com/(?:headlines|nation|business(?:/banking)?|banking)/\d{4}/\d{2}/\d{2}/\d+/'
+        feed_urls:
+          - https://www.philstar.com/rss/headlines
+          - https://www.philstar.com/rss/nation
+          - https://www.philstar.com/rss/business
+          - https://www.philstar.com/rss/business/banking
+
+    extraction:
+      SourceURL: {source: response_url}
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          pattern: '^https://www\.philstar\.com/(?:headlines|nation|business(?:/banking)?|banking)/\d{4}/\d{2}/\d{2}/(\d+)/'
+      Title: {selector: 'h1', required: true}
+      BodyText: {selector: 'div.article__writeup', required: true}
+      CategoryName: {selector: '.article__section-name'}
+      date.originalValue:
+        selector: '.article__date-published'
+        required: true
+        extraction: {strategy: regex, pattern: '^([A-Za-z]+ \d{1,2}, \d{4})'}
+      AuthorName: {selector: 'meta[name="author"]', output: attribute, attribute: content}
+      Summary: {selector: 'meta[property="og:description"]', output: attribute, attribute: content}
+      FeaturedImageUrl: {selector: 'meta[property="og:image"]', output: attribute, attribute: content}
+      KeywordText: {selector: 'meta[name="keywords"]', output: attribute, attribute: content}
 
     parser: {type: html}
     identity:

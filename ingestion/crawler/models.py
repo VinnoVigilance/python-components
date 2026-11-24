@@ -40,6 +40,7 @@ class CrawlerTask:
     detail_items: Optional[list[dict[str, Any]]] = None
     discovery_items: Optional[list[dict[str, Any]]] = None
     saved_listing_files: dict[str, str] = field(default_factory=dict)
+    spool_scope: str = "default"
 
 
 @dataclass
@@ -52,7 +53,7 @@ class CrawlResult:
     """
 
     source_file_path: Optional[str]
-    records: list[dict[str, Any]]
+    records: Any
     record_count: int
     discovered_count: int | None = None
     known_count: int = 0
@@ -71,3 +72,5 @@ class CrawlResult:
     broken_details: list[dict[str, Any]] = field(
         default_factory=list
     )
+    record_spool_path: Optional[str] = None
+    record_spool_manifest_path: Optional[str] = None

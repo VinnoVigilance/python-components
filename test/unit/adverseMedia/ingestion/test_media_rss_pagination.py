@@ -101,3 +101,21 @@ def test_empty_first_rss_page_is_an_error(monkeypatch):
     _, service, first = make_spider(monkeypatch)
     assert parse(first, []) == []
     assert not service.get_summary()["completed_safely"]
+
+
+def test_out_of_scope_publisher_feed_item_is_skipped_safely(monkeypatch):
+    spider, service, first = make_spider(monkeypatch)
+    spider.discovery_config["article_url_pattern"] = r"/news/"
+    published = format_datetime(datetime(2026, 11, 20, tzinfo=timezone.utc))
+    body = (
+        f"<rss><channel><item><link>{BASE}/other/2026/11/20/123/story</link>"
+        f"<pubDate>{published}</pubDate></item>"
+        f"<item><link>{BASE}/news/valid</link><pubDate>{published}</pubDate></item>"
+        "</channel></rss>"
+    ).encode()
+    response = TextResponse(first.url, body=body)
+    detail, next_page = list(first.callback(response, **first.cb_kwargs))
+    assert detail.url == BASE + "/news/valid"
+    assert parse(next_page, []) == []
+    assert service.discovery_failure_count == 0
+    assert service.get_summary()["completed_safely"]

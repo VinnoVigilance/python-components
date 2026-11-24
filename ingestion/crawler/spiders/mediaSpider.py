@@ -128,6 +128,19 @@ class MediaSpider(scrapy.Spider):
         if self.discovery_config.get("strategy") == "listing_groups":
             self.group_known_stop = getattr(self.discovery_service, "stop_after_known", False)
             self.group_stopped_early = False
+            groups = self.discovery_config["groups"]
+            self.parallel_html_listing_groups = bool(
+                self.discovery_config.get("parallel_groups")
+                and self.discovery_policy == "full_scan"
+                and groups
+                and all("link_selector" in group for group in groups)
+            )
+            if self.parallel_html_listing_groups:
+                self.html_group_states = {}
+                self.completed_html_groups = set()
+                for index in range(len(groups)):
+                    yield self._html_listing_group_request(index)
+                return
             for request in self._start_listing_group(0):
                 yield request
             return
@@ -637,6 +650,9 @@ class MediaSpider(scrapy.Spider):
                     return
             yield from self._start_listing_group(index + 1)
         elif "link_selector" in group:
+            self.group_seen_urls = set()
+            self.group_seen_pages = set()
+            self.group_seen_page_urls = set()
             yield scrapy.Request(
                 group["url"], callback=self.parse_html_listing_group,
                 errback=self.html_listing_group_failed,
@@ -647,6 +663,29 @@ class MediaSpider(scrapy.Spider):
             self.group_seen_pages = set()
             self.group_last_date = None
             yield self._listing_group_page(index, 0)
+
+    def _html_listing_group_request(self, index):
+        """Start one HTML group with state isolated from every other group."""
+        group = self.discovery_config["groups"][index]
+        self.html_group_states[index] = {
+            "seen_urls": set(),
+            "seen_pages": set(),
+            "seen_page_urls": set(),
+        }
+        return scrapy.Request(
+            group["url"], callback=self.parse_html_listing_group,
+            errback=self.html_listing_group_failed,
+            cb_kwargs={"index": index},
+        )
+
+    def _finish_html_listing_group(self, index):
+        """Finish one group and close the source only after every group ends."""
+        if not getattr(self, "parallel_html_listing_groups", False):
+            yield from self._start_listing_group(index + 1)
+            return
+        self.completed_html_groups.add(index)
+        if len(self.completed_html_groups) == len(self.discovery_config["groups"]):
+            self.discovery_service.mark_source_end()
 
     def _listing_group_page(self, index, offset):
         config = self.discovery_config
@@ -761,14 +800,42 @@ class MediaSpider(scrapy.Spider):
         yield from self._start_listing_group(failure.request.cb_kwargs["index"] + 1)
 
     def parse_html_listing_group(self, response, index):
-        """Discover detail links from a finite HTML collection page."""
+        """Discover one HTML listing group, following its next link when configured."""
         group = self.discovery_config["groups"][index]
+        pagination = group.get("pagination")
+        if getattr(self, "parallel_html_listing_groups", False):
+            state = self.html_group_states[index]
+            seen_urls = state["seen_urls"]
+            seen_pages = state["seen_pages"]
+            seen_page_urls = state["seen_page_urls"]
+        else:
+            seen_urls = self.group_seen_urls
+            seen_pages = self.group_seen_pages
+            seen_page_urls = self.group_seen_page_urls
+        if pagination and pagination.get("type", "next_link") != "next_link":
+            raise ValueError("HTML listing groups support next-link pagination only")
+        if response.url in seen_page_urls:
+            self.discovery_service.mark_discovery_failure("REPEATED_HTML_LISTING_GROUP_PAGE")
+            yield from self._finish_html_listing_group(index)
+            return
+        seen_page_urls.add(response.url)
         hrefs = response.css(f'{group["link_selector"]}::attr(href)').getall()
         if not hrefs:
+            if pagination and len(seen_page_urls) > 1:
+                self.logger.info("HTML listing group reached its end: %s", response.url)
+                yield from self._finish_html_listing_group(index)
+                return
             self.logger.error("HTML listing has no detail links: %s", response.url)
             self.discovery_service.mark_discovery_failure("EMPTY_HTML_LISTING_GROUP")
-            yield from self._start_listing_group(index + 1)
+            yield from self._finish_html_listing_group(index)
             return
+
+        signature = hashlib.sha256(json.dumps(hrefs).encode()).digest()
+        if signature in seen_pages:
+            self.discovery_service.mark_discovery_failure("REPEATED_HTML_LISTING_GROUP_PAGE")
+            yield from self._finish_html_listing_group(index)
+            return
+        seen_pages.add(signature)
 
         urls = []
         for href in hrefs:
@@ -783,8 +850,15 @@ class MediaSpider(scrapy.Spider):
 
         if not urls:
             self.discovery_service.mark_discovery_failure("EMPTY_HTML_LISTING_GROUP")
-            yield from self._start_listing_group(index + 1)
+            yield from self._finish_html_listing_group(index)
             return
+
+        new_urls = [url for url in urls if url not in seen_urls]
+        if pagination and not new_urls:
+            self.discovery_service.mark_discovery_failure("HTML_LISTING_GROUP_NO_NEW_URLS")
+            yield from self._finish_html_listing_group(index)
+            return
+        seen_urls.update(new_urls)
 
         if group.get("include_page"):
             request, stop = self._discover_detail(response.url)
@@ -793,19 +867,44 @@ class MediaSpider(scrapy.Spider):
             if stop:
                 return
 
-        for url in urls:
+        for url in new_urls:
             request, stop = self._discover_detail(url)
             if request is not None:
                 yield request
             if stop:
                 return
 
-        yield from self._start_listing_group(index + 1)
+        if pagination:
+            links = response.css(pagination["selector"])
+            if len(links) > 1:
+                self.discovery_service.mark_discovery_failure("INVALID_HTML_LISTING_GROUP_NEXT")
+                yield from self._finish_html_listing_group(index)
+                return
+            if links:
+                try:
+                    next_url = resolve_next_page_url(
+                        response.url, links[0].attrib.get("href", ""),
+                        visited_urls=seen_page_urls,
+                    )
+                except ValueError as exc:
+                    self.logger.error("Invalid HTML listing next link in %s: %s", response.url, exc)
+                    self.discovery_service.mark_discovery_failure("INVALID_HTML_LISTING_GROUP_NEXT")
+                    yield from self._finish_html_listing_group(index)
+                    return
+                yield scrapy.Request(
+                    next_url, callback=self.parse_html_listing_group,
+                    errback=self.html_listing_group_failed,
+                    cb_kwargs={"index": index},
+                    priority=10,
+                )
+                return
+
+        yield from self._finish_html_listing_group(index)
 
     def html_listing_group_failed(self, failure):
         self.logger.error("HTML listing group fetch failed: %s", failure)
         self.discovery_service.mark_discovery_failure("HTML_LISTING_GROUP_FETCH_FAILED")
-        yield from self._start_listing_group(failure.request.cb_kwargs["index"] + 1)
+        yield from self._finish_html_listing_group(failure.request.cb_kwargs["index"])
 
     def _rss_page_url(self, feed_url, offset):
         parsed = urlsplit(feed_url)
@@ -861,8 +960,16 @@ class MediaSpider(scrapy.Spider):
                 if (
                     parsed.scheme not in {"https", "http"}
                     or parsed.hostname != article_host
-                    or not self._extract_source_record_id(url)
                 ):
+                    self.discovery_service.mark_discovery_failure(
+                        "INVALID_RSS_ARTICLE_URL", prevent_known_stop=paginated,
+                    )
+                    continue
+
+                article_url_pattern = self.discovery_config.get("article_url_pattern")
+                if article_url_pattern and not re.search(article_url_pattern, url):
+                    continue
+                if not self._extract_source_record_id(url):
                     self.discovery_service.mark_discovery_failure(
                         "INVALID_RSS_ARTICLE_URL", prevent_known_stop=paginated,
                     )

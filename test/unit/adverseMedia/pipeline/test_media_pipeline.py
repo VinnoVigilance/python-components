@@ -50,6 +50,8 @@ def _acquisition(records):
         acquired_count=len(records),
         known_count=0,
         new_count=len(records),
+        selected_detail_count=len(records),
+        missing_detail_count=0,
         discovery_failed_count=0,
         identity_failure_count=0,
         reached_source_end=True,
@@ -227,6 +229,29 @@ class TestMediaPipelineWiring:
             mode="INITIAL",
         )
 
+    def test_global_acquisition_defaults_apply_to_every_source_and_allow_override(
+        self, monkeypatch,
+    ):
+        mocks = _wire(monkeypatch, [{"record_key": "a", "media_file_id": 10}])
+        config = _config()
+        config["global"] = {
+            "acquisition": {
+                "crawler_settings": {"record_spool": True, "raw_workers": 4}
+            }
+        }
+        config["sources"]["TEST_DATASET"]["acquisition"] = {
+            "crawler_settings": {"raw_workers": 2}
+        }
+        monkeypatch.setattr(mp, "load_media_config", lambda: config)
+
+        mp.run_media_pipeline("TEST_DATASET", mode="INITIAL")
+
+        resolved = mocks.acquisition.acquire.call_args.kwargs["source_config"]
+        assert resolved["acquisition"]["crawler_settings"] == {
+            "record_spool": True,
+            "raw_workers": 2,
+        }
+
     def test_reprocess_uses_raw_loader_not_acquisition(
         self,
         monkeypatch,
@@ -275,6 +300,25 @@ class TestMediaPipelineWiring:
 
         assert result["run_status"] == "PARTIAL"
         assert result["stop_reason"] == "UNEXPECTED_STOP"
+        assert mp.media_pipeline_exit_code(result) == 2
+
+    def test_unaccounted_record_is_not_reported_as_success(self, monkeypatch):
+        mocks = _wire(
+            monkeypatch,
+            [
+                {"record_key": "a", "media_file_id": 10},
+                {"record_key": "b", "media_file_id": 11},
+            ],
+        )
+        mocks.acquisition.acquire.return_value.stored_count = 1
+
+        result = mp.run_media_pipeline("TEST_DATASET", mode="INITIAL")
+
+        assert result["run_status"] == "PARTIAL"
+        assert result["stop_reason"] == "COUNT_RECONCILIATION_FAILED"
+        assert result["acquisition_completed_safely"] is False
+        assert result["count_reconciliation"]["persistence_delta"] == 1
+        assert result["failure_summary"]["COUNT_RECONCILIATION_FAILED"] == 1
         assert mp.media_pipeline_exit_code(result) == 2
 
     @pytest.mark.parametrize(

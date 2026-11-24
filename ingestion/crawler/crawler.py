@@ -1,5 +1,7 @@
 import logging
 import os
+import json
+from pathlib import Path
 
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import (
@@ -28,9 +30,24 @@ from ingestion.crawler.spiders.savedHtmlMediaSpider import (
 from ingestion.crawler.spiders.savedHtmlSpider import (
     SavedHtmlSpider,
 )
+from utils.jsonlRecordBuffer import JsonlRecordBuffer
 
 
 logger = logging.getLogger(__name__)
+
+
+def _media_spool_paths(task: CrawlerTask) -> tuple[Path, Path]:
+    spool_scope = str(getattr(task, "spool_scope", "default")).strip().lower()
+    if not spool_scope.replace("_", "").isalnum():
+        raise ValueError("Crawler spool_scope must be alphanumeric")
+    directory = (
+        Path(task.download_dir or "data/downloads")
+        / task.source_name / task.list_name / ".spool"
+    )
+    return (
+        directory / f"{spool_scope}.records.pending.jsonl",
+        directory / f"{spool_scope}.records.complete.json",
+    )
 
 
 def _resolve_user_agent(crawler_settings: dict) -> str | None:
@@ -357,7 +374,32 @@ def crawl_source(
     # 5. RESULT CONTAINER
     # =====================================================
 
-    records = []
+    spool_enabled = bool(
+        is_media
+        and acquisition_config.get("crawler_settings", {}).get("record_spool", False)
+    )
+    spool_path = None
+    spool_manifest_path = None
+    if spool_enabled:
+        spool_path, spool_manifest_path = _media_spool_paths(task)
+        if spool_manifest_path.exists() and spool_path.exists():
+            manifest = json.loads(spool_manifest_path.read_text(encoding="utf-8"))
+            if manifest.get("version") == 1:
+                logger.info(
+                    "Resuming completed Media crawl from disk spool. dataset=%s records=%s",
+                    task.list_name,
+                    manifest["record_count"],
+                )
+                return CrawlResult(
+                    source_file_path=None,
+                    records=JsonlRecordBuffer(spool_path),
+                    record_spool_path=str(spool_path),
+                    record_spool_manifest_path=str(spool_manifest_path),
+                    **manifest["result"],
+                )
+        records = JsonlRecordBuffer(spool_path, reset=True)
+    else:
+        records = []
     expected_details = []
 
     # Direct next-link listings must reach their final page.
@@ -667,7 +709,7 @@ def crawl_source(
             missing_details
         )
 
-    return CrawlResult(
+    result = CrawlResult(
         source_file_path=(
             result_source_file_path
         ),
@@ -714,4 +756,37 @@ def crawl_source(
         completed_safely=completed_safely,
         missing_details=missing_details,
         broken_details=broken_details,
+        record_spool_path=str(spool_path) if spool_path else None,
+        record_spool_manifest_path=(
+            str(spool_manifest_path) if spool_manifest_path else None
+        ),
     )
+
+    if spool_enabled:
+        records.close()
+        manifest = {
+            "version": 1,
+            "record_count": len(records),
+            "result": {
+                "record_count": result.record_count,
+                "discovered_count": result.discovered_count,
+                "known_count": result.known_count,
+                "new_count": result.new_count,
+                "selected_detail_count": result.selected_detail_count,
+                "missing_detail_count": result.missing_detail_count,
+                "identity_failure_count": result.identity_failure_count,
+                "discovery_failure_count": result.discovery_failure_count,
+                "discovery_retry_items": result.discovery_retry_items,
+                "reached_source_end": result.reached_source_end,
+                "stop_reason": result.stop_reason,
+                "completed_safely": result.completed_safely,
+                "missing_details": result.missing_details,
+                "broken_details": result.broken_details,
+            },
+        }
+        temporary = spool_manifest_path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(spool_manifest_path)
+        result.records = JsonlRecordBuffer(spool_path)
+
+    return result

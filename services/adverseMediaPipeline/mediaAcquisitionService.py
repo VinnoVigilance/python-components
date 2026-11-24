@@ -1,7 +1,10 @@
 import logging
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from itertools import islice
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from infrastructure.database.connection import (
@@ -48,6 +51,7 @@ from services.adverseMediaPipeline import (
 from services.adverseMediaPipeline.mediaFileStorageService import (
     MediaRawService,
 )
+from utils.jsonlRecordBuffer import JsonlRecordBuffer
 
 
 logger = logging.getLogger(__name__)
@@ -83,6 +87,9 @@ class MediaAcquisitionResult:
     records: list[dict[str, Any]] = field(
         default_factory=list
     )
+    record_spool_path: str | None = None
+    record_spool_manifest_path: str | None = None
+    processed_spool_path: str | None = None
 
 
 @dataclass
@@ -103,6 +110,8 @@ class MediaSourceAcquisitionResult:
     reached_source_end: bool | None = None
     stop_reason: str = "UNEXPECTED_STOP"
     completed_safely: bool = False
+    record_spool_path: str | None = None
+    record_spool_manifest_path: str | None = None
 
 def collect_rendered_article_links(read_listing, scroll_to_more, wait_for_batch):
     """Collect unique links until the listing ends or progress times out."""
@@ -318,9 +327,18 @@ class MediaAcquisitionService:
         # 5. Persist every acquired detail file
         # =================================================
 
-        processed_results: list[
-            dict[str, Any]
-        ] = []
+        raw_workers = int(acquisition_config.get("crawler_settings", {}).get("raw_workers", 1))
+        if raw_workers < 1 or raw_workers > 8:
+            raise ValueError("crawler_settings.raw_workers must be between 1 and 8")
+
+        processed_spool_path = None
+        if source_result.record_spool_path:
+            processed_spool_path = str(
+                Path(source_result.record_spool_path).with_name("records.processed.jsonl")
+            )
+            processed_results = JsonlRecordBuffer(processed_spool_path, reset=True)
+        else:
+            processed_results = []
 
         stored_count = 0
         duplicate_count = 0
@@ -328,43 +346,71 @@ class MediaAcquisitionService:
             source_result.discovery_failed_count
             + source_result.missing_detail_count
         )
+        record_failed_count = 0
+        persistence_total = len(acquired_records)
+        persistence_started_at = perf_counter()
 
-        for record in acquired_records:
+        def persist_one(record):
+            if record.get("discovery_retry_complete"):
+                return record, "control"
+            if record.get("failed"):
+                failed = dict(record)
+                failed.setdefault("error_stage", "DETAIL_FETCH")
+                failed.setdefault("error_type", "DetailFetchError")
+                return failed, "failed"
+            try:
+                return self._persist_record(
+                    record=record,
+                    source_id=source_id,
+                    dataset_id=dataset_id,
+                    source_name=source_name,
+                    dataset_name=dataset_name,
+                    download_method=download_method,
+                    acquisition_url=source_url,
+                ), "persisted"
+            except Exception as error:
+                logger.exception(
+                    "Media acquisition persistence failed. record_key=%s",
+                    record.get("record_key"),
+                )
+                return {
+                    "record_key": record.get("record_key"),
+                    "is_known": record.get("is_known"),
+                    "extracted": record.get("extracted"),
+                    "detail_file_path": record.get("detail_file_path"),
+                    "failed": True,
+                    "error": str(error),
+                    "error_stage": "RAW_PERSISTENCE",
+                    "error_type": type(error).__name__,
+                    "discovery_retry_key": record.get("discovery_retry_key"),
+                    "discovery_context": record.get("discovery_context"),
+                }, "failed"
+
+        executor = ThreadPoolExecutor(max_workers=raw_workers) if raw_workers > 1 else None
+
+        def persist_records():
+            if executor is None:
+                yield from map(persist_one, acquired_records)
+                return
+            iterator = iter(acquired_records)
+            while True:
+                batch = list(islice(iterator, raw_workers * 4))
+                if not batch:
+                    return
+                yield from executor.map(persist_one, batch)
+
+        persisted_records = persist_records()
+
+        for record_index, (processed_record, outcome) in enumerate(persisted_records, start=1):
 
             try:
-                if record.get("discovery_retry_complete"):
-                    processed_results.append(record)
+                processed_results.append(processed_record)
+                if outcome == "control":
                     continue
-                if record.get("failed"):
+                if outcome == "failed":
                     failed_count += 1
-                    record.setdefault(
-                        "error_stage",
-                        "DETAIL_FETCH",
-                    )
-                    record.setdefault(
-                        "error_type",
-                        "DetailFetchError",
-                    )
-                    processed_results.append(
-                        record
-                    )
+                    record_failed_count += 1
                     continue
-
-                processed_record = (
-                    self._persist_record(
-                        record=record,
-                        source_id=source_id,
-                        dataset_id=dataset_id,
-                        source_name=source_name,
-                        dataset_name=dataset_name,
-                        download_method=download_method,
-                        acquisition_url=source_url,
-                    )
-                )
-
-                processed_results.append(
-                    processed_record
-                )
 
                 if processed_record[
                     "is_duplicate"
@@ -374,40 +420,32 @@ class MediaAcquisitionService:
                 else:
                     stored_count += 1
 
-            except Exception as error:
+            finally:
+                if record_index % 100 == 0 or record_index == persistence_total:
+                    elapsed = max(perf_counter() - persistence_started_at, 0.001)
+                    logger.info(
+                        "Media Raw persistence progress. "
+                        "dataset=%s processed=%s total=%s stored=%s "
+                        "duplicates=%s failed=%s remaining=%s "
+                        "elapsed_seconds=%.2f records_per_second=%.2f",
+                        dataset_name,
+                        record_index,
+                        persistence_total,
+                        stored_count,
+                        duplicate_count,
+                        record_failed_count,
+                        persistence_total - record_index,
+                        elapsed,
+                        record_index / elapsed,
+                    )
 
-                failed_count += 1
-
-                logger.exception(
-                    "Media acquisition persistence failed. "
-                    "record_key=%s",
-                    record.get(
-                        "record_key"
-                    ),
-                )
-
-                processed_results.append(
-                    {
-                        "record_key": record.get(
-                            "record_key"
-                        ),
-                        "is_known": record.get(
-                            "is_known"
-                        ),
-                        "extracted": record.get(
-                            "extracted"
-                        ),
-                        "detail_file_path": record.get(
-                            "detail_file_path"
-                        ),
-                        "failed": True,
-                        "error": str(error),
-                        "error_stage": "RAW_PERSISTENCE",
-                        "error_type": type(error).__name__,
-                        "discovery_retry_key": record.get("discovery_retry_key"),
-                        "discovery_context": record.get("discovery_context"),
-                    }
-                )
+        if executor is not None:
+            executor.shutdown(wait=True)
+        if isinstance(acquired_records, JsonlRecordBuffer):
+            acquired_records.close()
+        if isinstance(processed_results, JsonlRecordBuffer):
+            processed_results.close()
+            processed_results = JsonlRecordBuffer(processed_spool_path)
 
         # =================================================
         # 6. Return acquisition result
@@ -452,6 +490,9 @@ class MediaAcquisitionService:
             ),
 
             records=processed_results,
+            record_spool_path=source_result.record_spool_path,
+            record_spool_manifest_path=source_result.record_spool_manifest_path,
+            processed_spool_path=processed_spool_path,
         )
 
     # =====================================================
@@ -553,6 +594,7 @@ class MediaAcquisitionService:
                     source_url=source_config[
                         "url"
                     ],
+                    mode=mode,
                 )
             )
 
@@ -625,6 +667,10 @@ class MediaAcquisitionService:
                         False,
                     )
                 ),
+                record_spool_path=getattr(crawl_result, "record_spool_path", None),
+                record_spool_manifest_path=getattr(
+                    crawl_result, "record_spool_manifest_path", None
+                ),
             )
 
         if acquisition_type == "api":
@@ -683,6 +729,8 @@ class MediaAcquisitionService:
                                and not Path(item["detail_file_path"]).is_file())
 
         crawl_completed = True
+        record_spool_path = None
+        record_spool_manifest_path = None
         if fetch_items or discovery_items:
             fetch_strategy = str(
                 source_config.get(
@@ -708,13 +756,21 @@ class MediaAcquisitionService:
                     ),
                     detail_items=fetch_items,
                     discovery_items=discovery_items,
+                    spool_scope="retry",
                 ),
             )
 
             records.extend(
                 crawl_result.records
             )
+            close_crawl_records = getattr(crawl_result.records, "close", None)
+            if callable(close_crawl_records):
+                close_crawl_records()
             crawl_completed = bool(getattr(crawl_result, "completed_safely", True))
+            record_spool_path = getattr(crawl_result, "record_spool_path", None)
+            record_spool_manifest_path = getattr(
+                crawl_result, "record_spool_manifest_path", None
+            )
 
         if any(item.get("kind") == "form_search" for item in discovery_items):
             records = list({record["record_key"]: record for record in records}.values())
@@ -730,6 +786,8 @@ class MediaAcquisitionService:
             completed_safely=(len(records) >= sum(item["kind"] != "form_search" for item in items)
                               and crawl_completed
                               and not any(record.get("failed") for record in records)),
+            record_spool_path=record_spool_path,
+            record_spool_manifest_path=record_spool_manifest_path,
         )
 
     @staticmethod
@@ -742,6 +800,7 @@ class MediaAcquisitionService:
         source_name: str,
         dataset_name: str,
         source_url: str,
+        mode: str = "INITIAL",
     ):
         """
         Acquire a crawler-based Media source.
@@ -863,6 +922,7 @@ class MediaAcquisitionService:
                         / "data"
                         / "downloads"
                     ),
+                    spool_scope=mode.lower(),
                 )
 
                 return crawl(

@@ -1,4 +1,7 @@
 import os
+import logging
+import threading
+import time
 from copy import deepcopy
 
 from types import SimpleNamespace
@@ -360,3 +363,108 @@ def test_persistence_failure_keeps_navigation_context_for_recovery(monkeypatch):
     assert failed["error_stage"] == "RAW_PERSISTENCE"
     assert failed["discovery_context"] == context
     assert failed["detail_file_path"] == "decision.pdf"
+
+
+def test_raw_persistence_logs_progress_every_100_records(monkeypatch, caplog):
+    from services.adverseMediaPipeline import mediaAcquisitionService as module
+
+    records = [
+        {"record_key": f"record-{index}", "detail_file_path": f"{index}.html"}
+        for index in range(101)
+    ]
+    source = {**_crawler_config(), "discovery": {"policy": "full_scan"}}
+    monkeypatch.setattr(MediaAcquisitionService, "_validate_source_config", lambda *_: None)
+    monkeypatch.setattr(
+        MediaAcquisitionService,
+        "_resolve_lookup_values",
+        lambda *_, **__: {"source_id": 1, "dataset_id": 2},
+    )
+    monkeypatch.setattr(
+        MediaAcquisitionService,
+        "_acquire_source",
+        lambda *_, **__: module.MediaSourceAcquisitionResult(
+            records=records,
+            discovered_count=101,
+            new_count=101,
+            selected_detail_count=101,
+            reached_source_end=True,
+            completed_safely=True,
+        ),
+    )
+    monkeypatch.setattr(
+        MediaAcquisitionService,
+        "_persist_record",
+        MagicMock(side_effect=lambda **kwargs: {
+            **kwargs["record"], "is_duplicate": False, "media_file_id": 1,
+        }),
+    )
+
+    with caplog.at_level(logging.INFO):
+        result = MediaAcquisitionService().acquire(source, "INITIAL")
+
+    progress = [
+        record.message for record in caplog.records
+        if "Media Raw persistence progress" in record.message
+    ]
+    assert len(progress) == 2
+    assert "processed=100 total=101 stored=100" in progress[0]
+    assert "processed=101 total=101 stored=101" in progress[1]
+    assert "remaining=0" in progress[1]
+    assert result.stored_count == 101
+
+
+def test_four_raw_workers_preserve_order_and_isolate_one_failure(monkeypatch):
+    from services.adverseMediaPipeline import mediaAcquisitionService as module
+
+    records = [
+        {"record_key": f"record-{index}", "detail_file_path": f"{index}.html"}
+        for index in range(8)
+    ]
+    source = {
+        **_crawler_config(),
+        "discovery": {"policy": "full_scan"},
+        "acquisition": {"crawler_settings": {"raw_workers": 4}},
+    }
+    monkeypatch.setattr(MediaAcquisitionService, "_validate_source_config", lambda *_: None)
+    monkeypatch.setattr(
+        MediaAcquisitionService, "_resolve_lookup_values",
+        lambda *_, **__: {"source_id": 1, "dataset_id": 2},
+    )
+    monkeypatch.setattr(
+        MediaAcquisitionService, "_acquire_source",
+        lambda *_, **__: module.MediaSourceAcquisitionResult(
+            records=records, discovered_count=8, new_count=8,
+            selected_detail_count=8, reached_source_end=True, completed_safely=True,
+        ),
+    )
+    lock = threading.Lock()
+    active = 0
+    maximum_active = 0
+
+    def persist(_self, **kwargs):
+        nonlocal active, maximum_active
+        key = kwargs["record"]["record_key"]
+        with lock:
+            active += 1
+            maximum_active = max(maximum_active, active)
+        try:
+            time.sleep(0.01)
+            if key == "record-3":
+                raise OSError("Seaweed unavailable")
+            return {**kwargs["record"], "is_duplicate": False, "media_file_id": 1}
+        finally:
+            with lock:
+                active -= 1
+
+    monkeypatch.setattr(MediaAcquisitionService, "_persist_record", persist)
+
+    result = MediaAcquisitionService().acquire(source, "INITIAL")
+
+    assert maximum_active == 4
+    assert [record["record_key"] for record in result.records] == [
+        f"record-{index}" for index in range(8)
+    ]
+    assert result.stored_count == 7
+    assert result.failed_count == 1
+    assert result.records[3]["failed"] is True
+    assert result.records[3]["error_stage"] == "RAW_PERSISTENCE"

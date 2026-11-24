@@ -216,9 +216,15 @@ class MediaRawService:
                     )
 
                     if media_file_id is None:
-                        raise RuntimeError(
-                            "raw.media_file insert failed."
+                        existing = mediaRepository.find_media_file_by_hash(
+                            cursor=cursor,
+                            source_id=file_data["source_id"],
+                            dataset_id=file_data["dataset_id"],
+                            file_hash=file_data["file_hash"],
                         )
+                        if existing is None:
+                            raise RuntimeError("raw.media_file insert failed.")
+                        media_file_id = existing["id"]
 
                     return media_file_id
 

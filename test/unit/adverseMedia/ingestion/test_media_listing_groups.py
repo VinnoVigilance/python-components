@@ -170,6 +170,114 @@ def test_html_listing_group_discovers_links_and_uses_landing_page(monkeypatch):
     assert discovery.discovered_count == 3
 
 
+def test_html_listing_group_follows_next_links_and_deduplicates_pages(monkeypatch):
+    spider, discovery, _ = make_spider(monkeypatch, set(), incremental=False)
+    spider.discovery_config["groups"][2] = {
+        "url": BASE + "section",
+        "link_selector": "a[href^='/story/part']",
+        "pagination": {"type": "next_link", "selector": "div.next > a[href]"},
+    }
+    [landing] = list(spider._start_listing_group(2))
+    first = HtmlResponse(
+        landing.url,
+        body=(b"<a href='/story/part1'>One</a><a href='/story/part2'>Two</a>"
+              b"<div class='next'><a href='/lazy?page=1'>next</a></div>"),
+        encoding="utf-8",
+    )
+    one, two, next_page = list(landing.callback(first, **landing.cb_kwargs))
+    assert [one.url, two.url] == [BASE + "story/part1", BASE + "story/part2"]
+    assert next_page.url == BASE + "lazy?page=1"
+    second = HtmlResponse(
+        next_page.url,
+        body=b"<a href='/story/part2'>Repeated</a><a href='/story/part3'>Three</a>",
+        encoding="utf-8",
+    )
+    [three] = list(next_page.callback(second, **next_page.cb_kwargs))
+    assert three.url == BASE + "story/part3"
+    assert discovery.reached_source_end
+    assert discovery.discovered_count == 3
+
+
+def test_html_listing_group_repeated_page_does_not_claim_complete(monkeypatch):
+    spider, discovery, _ = make_spider(monkeypatch, set(), incremental=False)
+    spider.discovery_config["groups"][2] = {
+        "url": BASE + "section",
+        "link_selector": "a[href^='/story/part']",
+        "pagination": {"type": "next_link", "selector": "div.next > a[href]"},
+    }
+    [landing] = list(spider._start_listing_group(2))
+    body = b"<a href='/story/part1'>One</a><div class='next'><a href='/lazy?page=1'>next</a></div>"
+    first = HtmlResponse(landing.url, body=body, encoding="utf-8")
+    _, next_page = list(landing.callback(first, **landing.cb_kwargs))
+    repeated = HtmlResponse(next_page.url, body=body, encoding="utf-8")
+    assert list(next_page.callback(repeated, **next_page.cb_kwargs)) == []
+    assert not discovery.get_summary()["completed_safely"]
+
+
+def test_empty_later_html_listing_page_is_the_group_end(monkeypatch):
+    spider, discovery, _ = make_spider(monkeypatch, set(), incremental=False)
+    spider.discovery_config["groups"][2] = {
+        "url": BASE + "section",
+        "link_selector": "a[href^='/story/part']",
+        "pagination": {"type": "next_link", "selector": "div.next > a[href]"},
+    }
+    [landing] = list(spider._start_listing_group(2))
+    first = HtmlResponse(
+        landing.url,
+        body=b"<a href='/story/part1'>One</a><div class='next'><a href='/lazy?page=1'>next</a></div>",
+        encoding="utf-8",
+    )
+    _, next_page = list(landing.callback(first, **landing.cb_kwargs))
+    empty = HtmlResponse(next_page.url, body=b"<div>No more articles</div>", encoding="utf-8")
+    assert list(next_page.callback(empty, **next_page.cb_kwargs)) == []
+    assert discovery.discovery_failure_count == 0
+    assert discovery.get_summary()["completed_safely"]
+
+
+def test_parallel_html_groups_keep_pagination_state_isolated(monkeypatch):
+    spider, discovery, _ = make_spider(monkeypatch, set(), incremental=False)
+    spider.discovery_config["groups"] = [
+        {
+            "url": BASE + "first", "link_selector": "a[href^='/story/']",
+            "pagination": {"type": "next_link", "selector": "div.next > a[href]"},
+        },
+        {
+            "url": BASE + "second", "link_selector": "a[href^='/story/']",
+            "pagination": {"type": "next_link", "selector": "div.next > a[href]"},
+        },
+    ]
+    spider.parallel_html_listing_groups = True
+    spider.html_group_states = {}
+    spider.completed_html_groups = set()
+    first, second = [spider._html_listing_group_request(index) for index in range(2)]
+
+    first_response = HtmlResponse(
+        first.url,
+        body=b"<a href='/story/a'>A</a><div class='next'><a href='/first?page=2'>next</a></div>",
+        encoding="utf-8",
+    )
+    first_detail, first_next = list(first.callback(first_response, **first.cb_kwargs))
+    second_response = HtmlResponse(
+        second.url,
+        body=b"<a href='/story/b'>B</a><div class='next'><a href='/second?page=2'>next</a></div>",
+        encoding="utf-8",
+    )
+    second_detail, second_next = list(second.callback(second_response, **second.cb_kwargs))
+
+    assert [first_detail.url, second_detail.url] == [BASE + "story/a", BASE + "story/b"]
+    assert spider.html_group_states[0]["seen_urls"] == {BASE + "story/a"}
+    assert spider.html_group_states[1]["seen_urls"] == {BASE + "story/b"}
+    assert first_next.priority == second_next.priority == 10
+
+    empty_first = HtmlResponse(first_next.url, body=b"<div>done</div>", encoding="utf-8")
+    empty_second = HtmlResponse(second_next.url, body=b"<div>done</div>", encoding="utf-8")
+    assert list(first_next.callback(empty_first, **first_next.cb_kwargs)) == []
+    assert not discovery.reached_source_end
+    assert list(second_next.callback(empty_second, **second_next.cb_kwargs)) == []
+    assert discovery.reached_source_end
+    assert discovery.discovery_failure_count == 0
+
+
 def test_empty_html_listing_group_is_not_a_complete_archive(monkeypatch):
     spider, discovery, _ = make_spider(monkeypatch, set(), incremental=False)
     spider.discovery_config["groups"][2] = {
