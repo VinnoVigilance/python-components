@@ -145,6 +145,44 @@ def test_unusable_listing_date_does_not_drop_valid_url(monkeypatch):
     assert not discovery.stop_after_known
 
 
+def test_html_listing_group_discovers_links_and_uses_landing_page(monkeypatch):
+    spider, discovery, _ = make_spider(monkeypatch, set(), incremental=False)
+    spider.discovery_config["groups"][2] = {
+        "url": BASE + "story/series",
+        "link_selector": "a[href^='/story/part']",
+        "include_page": True,
+    }
+    spider.storage = SimpleNamespace(save_detail_html=lambda **kwargs: "saved.html")
+    [landing] = list(spider._start_listing_group(2))
+    response = HtmlResponse(
+        landing.url,
+        body=(b"<title>Series title</title><article><p>Introduction.</p></article>"
+              b"<a href='/story/part1'>One</a><a href='/story/part2'>Two</a>"
+              b"<a href='/story/part1'>Duplicate</a>"),
+        encoding="utf-8",
+    )
+    results = list(landing.callback(response, **landing.cb_kwargs))
+    assert results[0]["extracted"]["BodyText"] == "Introduction."
+    assert [result.url for result in results[1:]] == [
+        BASE + "story/part1", BASE + "story/part2",
+    ]
+    assert discovery.reached_source_end
+    assert discovery.discovered_count == 3
+
+
+def test_empty_html_listing_group_is_not_a_complete_archive(monkeypatch):
+    spider, discovery, _ = make_spider(monkeypatch, set(), incremental=False)
+    spider.discovery_config["groups"][2] = {
+        "url": BASE + "story/series", "link_selector": "a[href^='/story/part']",
+        "include_page": True,
+    }
+    [landing] = list(spider._start_listing_group(2))
+    response = HtmlResponse(landing.url, body=b"<title>No links</title>")
+    assert list(landing.callback(response, **landing.cb_kwargs)) == []
+    assert discovery.discovery_failure_count == 1
+    assert not discovery.get_summary()["completed_safely"]
+
+
 @pytest.mark.parametrize("path", [
     "/news/nation/2026/11/23/example-1234",
     "/news/01/31/24/example",
@@ -154,6 +192,7 @@ def test_unusable_listing_date_does_not_drop_valid_url(monkeypatch):
     "/sports/othersports/2026/3/25/example-1949",
     "/2026/3/25/example-1011",
     "/war-on-drugs/part1",
+    "/war-on-drugs/part7",
 ])
 def test_abs_cbn_archive_urls_keep_path_as_record_identity(path):
     config_path = Path(__file__).resolve().parents[4] / "config/mediaSources.yaml"

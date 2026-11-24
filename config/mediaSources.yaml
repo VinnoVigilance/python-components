@@ -52,15 +52,9 @@ sources:
         - params: {sectionId: business}
         - params: {pageCategory: duterte-at-the-icc}
         - params: {pageCategory: sara-duterte-impeachment-trial}
-        # The fixed series includes a landing page with original reporting.
-        - detail_urls:
-            - https://www.abs-cbn.com/war-on-drugs
-            - https://www.abs-cbn.com/war-on-drugs/part1
-            - https://www.abs-cbn.com/war-on-drugs/part2
-            - https://www.abs-cbn.com/war-on-drugs/part3
-            - https://www.abs-cbn.com/war-on-drugs/part4
-            - https://www.abs-cbn.com/war-on-drugs/part5
-            - https://www.abs-cbn.com/war-on-drugs/part6
+        - url: https://www.abs-cbn.com/war-on-drugs
+          link_selector: 'a[href*="/war-on-drugs/part"]'
+          include_page: true
 
     discovery_by_mode:
       INITIAL:
@@ -76,7 +70,7 @@ sources:
         extraction:
           strategy: regex
           # Listings contain both YYYY/M/D and older M/D/YY URLs across sections.
-          pattern: '^https://www\.abs-cbn\.com/((?:[^/?#]+/)*(?:\d{4}/\d{1,2}/\d{1,2}|\d{1,2}/\d{1,2}/\d{2})/[^/?#]+|war-on-drugs(?:/part[1-6])?)/?(?:[?#].*)?$'
+          pattern: '^https://www\.abs-cbn\.com/((?:[^/?#]+/)*(?:\d{4}/\d{1,2}/\d{1,2}|\d{1,2}/\d{1,2}/\d{2})/[^/?#]+|war-on-drugs(?:/part\d+)?)/?(?:[?#].*)?$'
       Title: {selector: 'h1', required: true}
       BodyText:
         selector: '#bodyTopPart p, #bodyBottomPart p'

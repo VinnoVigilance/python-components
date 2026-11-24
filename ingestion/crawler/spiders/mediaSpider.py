@@ -614,7 +614,11 @@ class MediaSpider(scrapy.Spider):
 
         group = groups[index]
         service.consecutive_known_records = 0
-        service.stop_after_known = self.group_known_stop and "detail_urls" not in group
+        service.stop_after_known = (
+            self.group_known_stop
+            and "detail_urls" not in group
+            and "link_selector" not in group
+        )
         if "detail_urls" in group:
             for url in group["detail_urls"]:
                 request, stop = self._discover_detail(url)
@@ -623,6 +627,12 @@ class MediaSpider(scrapy.Spider):
                 if stop:
                     return
             yield from self._start_listing_group(index + 1)
+        elif "link_selector" in group:
+            yield scrapy.Request(
+                group["url"], callback=self.parse_html_listing_group,
+                errback=self.html_listing_group_failed,
+                cb_kwargs={"index": index},
+            )
         else:
             self.group_seen_urls = set()
             self.group_seen_pages = set()
@@ -739,6 +749,53 @@ class MediaSpider(scrapy.Spider):
     def listing_group_failed(self, failure):
         self.logger.error("Listing group fetch failed: %s", failure)
         self.discovery_service.mark_discovery_failure("LISTING_GROUP_FETCH_FAILED")
+        yield from self._start_listing_group(failure.request.cb_kwargs["index"] + 1)
+
+    def parse_html_listing_group(self, response, index):
+        """Discover detail links from a finite HTML collection page."""
+        group = self.discovery_config["groups"][index]
+        hrefs = response.css(f'{group["link_selector"]}::attr(href)').getall()
+        if not hrefs:
+            self.logger.error("HTML listing has no detail links: %s", response.url)
+            self.discovery_service.mark_discovery_failure("EMPTY_HTML_LISTING_GROUP")
+            yield from self._start_listing_group(index + 1)
+            return
+
+        urls = []
+        for href in hrefs:
+            try:
+                url = self._listing_group_url(response.urljoin(href))
+            except ValueError as exc:
+                self.logger.warning("Invalid HTML listing link in %s: %s", response.url, exc)
+                self.discovery_service.mark_discovery_failure("INVALID_HTML_LISTING_GROUP_ITEM")
+                continue
+            if url not in urls:
+                urls.append(url)
+
+        if not urls:
+            self.discovery_service.mark_discovery_failure("EMPTY_HTML_LISTING_GROUP")
+            yield from self._start_listing_group(index + 1)
+            return
+
+        if group.get("include_page"):
+            request, stop = self._discover_detail(response.url)
+            if request is not None:
+                yield from self.parse_detail(response, **request.cb_kwargs)
+            if stop:
+                return
+
+        for url in urls:
+            request, stop = self._discover_detail(url)
+            if request is not None:
+                yield request
+            if stop:
+                return
+
+        yield from self._start_listing_group(index + 1)
+
+    def html_listing_group_failed(self, failure):
+        self.logger.error("HTML listing group fetch failed: %s", failure)
+        self.discovery_service.mark_discovery_failure("HTML_LISTING_GROUP_FETCH_FAILED")
         yield from self._start_listing_group(failure.request.cb_kwargs["index"] + 1)
 
     def parse_rss(self, response):
