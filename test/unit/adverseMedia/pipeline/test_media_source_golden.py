@@ -167,6 +167,32 @@ def test_samples_and_golden_cover_the_same_sources():
     )
 
 
+@pytest.mark.parametrize("legacy", [False, True])
+def test_abs_cbn_plain_text_reaches_canonical_body(legacy):
+    """Plain text must be mapped directly after staging moved HTML conversion."""
+    source_id = "war-on-drugs/part1" if legacy else "news/nation/2026/11/23/example-1234"
+    body = "First paragraph.\n\nSecond paragraph."
+    global_config, sources = _config()
+    config = sources["ABS_CBN_NEWS"]
+    sample = {
+        "SourceURL": f"https://www.abs-cbn.com/{source_id}",
+        "SourceRecordId": source_id,
+        "Title": "Example title",
+        "BodyText": body,
+        "date.originalValue": None if legacy else "2026-11-23T08:08:29Z",
+    }
+    with redirect_stdout(io.StringIO()):
+        [raw] = MediaRawRecordService().process(source_config=config, records=[sample])
+        result = MediaNormalizationService(global_config, config).normalize(raw)
+
+    assert result["Content"]["BodyOriginalValue"] == body
+    assert result["Content"]["BodyText"] == body
+    assert result["Sources"][0]["DatasetName"] == "ABS_CBN_NEWS"
+    assert result["Sources"][0]["SourceRecordId"] == source_id
+    assert result["Publisher"]["Name"] == "ABS-CBN News"
+    assert any(item.get("FullDate") for item in result["Dates"]) is (not legacy)
+
+
 @pytest.mark.parametrize("dataset_name", list(GOLDEN))
 class TestMediaSourceGolden:
 

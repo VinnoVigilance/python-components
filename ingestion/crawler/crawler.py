@@ -411,6 +411,12 @@ def crawl_source(
         # Concurrent requests
         # ---------------------------------------------
 
+        if "concurrent_requests" in crawler_settings:
+            settings.set(
+                "CONCURRENT_REQUESTS",
+                int(crawler_settings["concurrent_requests"]),
+            )
+
         if (
             "concurrent_requests_per_domain"
             in crawler_settings
@@ -518,6 +524,11 @@ def crawl_source(
     # =====================================================
     # 8. CREATE CRAWLER PROCESS
     # =====================================================
+
+    if crawler_settings.get("transport") == "chrome":
+        handler = "ingestion.crawler.chromeDownloadHandler.ChromeDownloadHandler"
+        handlers = settings.getdict("DOWNLOAD_HANDLERS")
+        settings.set("DOWNLOAD_HANDLERS", {**handlers, "http": handler, "https": handler})
 
     process = CrawlerProcess(
         settings=settings,

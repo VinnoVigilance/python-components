@@ -8,10 +8,14 @@ def build_query(
     pagination: Dict[str, Any],
     params: Dict[str, Any],
     page: int,
+    *,
+    offset: int | None = None,
 ) -> Dict[str, Any]:
     """Build one page's query: static ``params`` plus the declared page controls.
     ``type: "none"`` gets no page param (fetched once); ``type: "offset"`` turns
-    the zero-based loop counter into a record offset (set ``start_page: 0``)."""
+    the zero-based loop counter into a record offset (set ``start_page: 0``).
+    Callers that advance by the actual result count can pass an explicit offset.
+    """
 
     query: Dict[str, Any] = dict(params or {})
 
@@ -23,7 +27,7 @@ def build_query(
     if pagination.get("type") == "offset":
         offset_param = pagination.get("offset_param", "offset")
         size_param = pagination.get("size_param", "size")
-        query[offset_param] = page * (page_size or 0)
+        query[offset_param] = offset if offset is not None else page * (page_size or 0)
         if size_param and page_size:
             query[size_param] = page_size
         return query

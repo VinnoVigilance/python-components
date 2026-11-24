@@ -11,6 +11,97 @@ global:
 
 sources:
 
+  ABS_CBN_NEWS:
+    enabled: true
+    active: true
+    source_name: ABS_CBN
+    dataset_name: ABS_CBN_NEWS
+    dataset_category: Media
+    schedule: daily
+    date_order: YMD
+    source_page_url: https://www.abs-cbn.com/news
+    url: https://www.abs-cbn.com/news/nation
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        transport: chrome
+        concurrent_requests: 100
+        concurrent_requests_per_domain: 100
+        download_delay: 0
+        randomize_download_delay: false
+        retry_times: 3
+        retry_http_codes: [403, 408, 429, 500, 502, 503, 504]
+
+    discovery:
+      strategy: listing_groups
+      policy: full_scan
+      skip_known_details: true
+      start_url: https://od2-content-api.abs-cbn.com/prod/latest
+      params: {brand: NEWS, partner: imp-01}
+      items_path: listItem
+      url_path: slugline_url
+      sort_date_path: createdDateFull
+      article_base_url: https://www.abs-cbn.com/
+      pagination: {type: offset, page_size: 12, size_param: limit, offset_param: offset}
+      groups:
+        - params: {sectionId: nation}
+        - params: {pageCategory: pmss}
+        - params: {sectionId: business}
+        - params: {pageCategory: duterte-at-the-icc}
+        - params: {pageCategory: sara-duterte-impeachment-trial}
+        # The fixed series includes a landing page with original reporting.
+        - detail_urls:
+            - https://www.abs-cbn.com/war-on-drugs
+            - https://www.abs-cbn.com/war-on-drugs/part1
+            - https://www.abs-cbn.com/war-on-drugs/part2
+            - https://www.abs-cbn.com/war-on-drugs/part3
+            - https://www.abs-cbn.com/war-on-drugs/part4
+            - https://www.abs-cbn.com/war-on-drugs/part5
+            - https://www.abs-cbn.com/war-on-drugs/part6
+
+    discovery_by_mode:
+      INITIAL:
+        policy: full_scan
+      INCREMENTAL:
+        policy: stop_after_known
+        threshold: 10
+
+    extraction:
+      SourceURL: {source: response_url}
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          # Listings contain both YYYY/M/D and older M/D/YY URLs across sections.
+          pattern: '^https://www\.abs-cbn\.com/((?:[^/?#]+/)*(?:\d{4}/\d{1,2}/\d{1,2}|\d{1,2}/\d{1,2}/\d{2})/[^/?#]+|war-on-drugs(?:/part[1-6])?)/?(?:[?#].*)?$'
+      Title: {selector: 'h1', required: true}
+      BodyText:
+        selector: '#bodyTopPart p, #bodyBottomPart p'
+        required: true
+        join_with: "\n\n"
+      date.originalValue: {selector: 'meta[property="article:published_time"]', output: attribute, attribute: content, required: true}
+      AuthorName: {selector: 'meta[name="author"]', output: attribute, attribute: content}
+      Summary: {selector: 'meta[property="og:description"]', output: attribute, attribute: content}
+      FeaturedImageUrl: {selector: 'meta[property="og:image"]', output: attribute, attribute: content}
+    extraction_by_url:
+      - pattern: '/war-on-drugs(?:/|$)'
+        fields:
+          Title: {selector: 'title'}
+          date.originalValue: {required: false}
+          AuthorName: {selector: '.author-name'}
+          BodyText:
+            selector: '[role="main"] p, [role="main"] h2'
+            join_with: "\n\n"
+
+    parser: {type: html}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
   COURT_OF_APPEALS_PH_DECISIONS_AND_RESOLUTIONS:
     enabled: true
     active: true

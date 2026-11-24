@@ -5,12 +5,13 @@ import re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
 import scrapy
 
 from scrapy.http import HtmlResponse
+from ingestion.apiCollector.pagination import build_query, read_path
 from ingestion.crawler.pagination import resolve_next_page_url
 from services.adverseMediaPipeline import mediaTodoService
 from services.adverseMediaPipeline.mediaIdentityService import MediaIdentityService
@@ -122,6 +123,13 @@ class MediaSpider(scrapy.Spider):
             "start_url",
             self.task.url,
         )
+
+        if self.discovery_config.get("strategy") == "listing_groups":
+            self.group_known_stop = getattr(self.discovery_service, "stop_after_known", False)
+            self.group_stopped_early = False
+            for request in self._start_listing_group(0):
+                yield request
+            return
 
         if self.discovery_config.get("strategy") == "json_manifest":
             yield scrapy.Request(
@@ -591,6 +599,148 @@ class MediaSpider(scrapy.Spider):
             mediaTodoService.queue_items(self.source_config["dataset_name"], [{"kind": "process", **record}])
         self.form_publications[record_key] = record
 
+    def _start_listing_group(self, index):
+        """Start the next independent listing, or complete the source."""
+        groups = self.discovery_config["groups"]
+        service = self.discovery_service
+        if getattr(service, "stop_reason", None) == "KNOWN_THRESHOLD_REACHED":
+            service.stop_reason = None
+        if index == len(groups):
+            if not self.group_stopped_early:
+                service.mark_source_end()
+            elif not getattr(service, "discovery_failure_count", 0):
+                service.stop_reason = "KNOWN_THRESHOLD_REACHED"
+            return
+
+        group = groups[index]
+        service.consecutive_known_records = 0
+        service.stop_after_known = self.group_known_stop and "detail_urls" not in group
+        if "detail_urls" in group:
+            for url in group["detail_urls"]:
+                request, stop = self._discover_detail(url)
+                if request is not None:
+                    yield request
+                if stop:
+                    return
+            yield from self._start_listing_group(index + 1)
+        else:
+            self.group_seen_urls = set()
+            self.group_seen_pages = set()
+            self.group_last_date = None
+            yield self._listing_group_page(index, 0)
+
+    def _listing_group_page(self, index, offset):
+        config = self.discovery_config
+        group = config["groups"][index]
+        params = build_query(
+            config["pagination"], {**config.get("params", {}), **group.get("params", {})},
+            page=0, offset=offset,
+        )
+        return scrapy.Request(
+            f'{group.get("url") or config["start_url"]}?{urlencode(params)}',
+            callback=self.parse_listing_group, errback=self.listing_group_failed,
+            cb_kwargs={"index": index, "offset": offset},
+        )
+
+    def _listing_group_url(self, href):
+        if not isinstance(href, str) or not href.strip():
+            raise ValueError("Article URL is missing")
+        base = self.discovery_config["article_base_url"]
+        parsed = urlsplit(urljoin(base, href))
+        origin = urlsplit(base)
+        if (parsed.scheme, parsed.netloc) != (origin.scheme, origin.netloc):
+            raise ValueError(f"Unexpected article host: {parsed.netloc}")
+        url = urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
+        if not self._extract_source_record_id(url):
+            raise ValueError(f"Article URL does not match the configured identity: {url}")
+        return url
+
+    def parse_listing_group(self, response, index, offset):
+        service = self.discovery_service
+        config = self.discovery_config
+        try:
+            payload = response.json()
+            items = read_path(payload, config["items_path"])
+            if not isinstance(items, list) or (not items and offset == 0):
+                raise ValueError("Missing articles or unexpectedly empty first page")
+            hrefs = [read_path(item, config["url_path"]) for item in items]
+            # Also detect repeats on a wholly invalid page, where no usable
+            # URL would be added to group_seen_urls.
+            signature = hashlib.sha256(json.dumps(
+                [href if isinstance(href, str) and href.strip() else item
+                 for href, item in zip(hrefs, items)], sort_keys=True,
+            ).encode()).digest()
+            if signature in self.group_seen_pages:
+                raise ValueError("Pagination repeated a previous listing page")
+        except (TypeError, ValueError) as exc:
+            self.logger.error("Invalid listing page %s: %s", response.url, exc)
+            service.mark_discovery_failure("INVALID_LISTING_GROUP_PAGE")
+            yield from self._start_listing_group(index + 1)
+            return
+
+        if not items:
+            yield from self._start_listing_group(index + 1)
+            return
+
+        self.group_seen_pages.add(signature)
+        urls = {}
+        invalid_item = False
+        ordered = True
+        date_field = config.get("sort_date_path")
+        for position, (item, href) in enumerate(zip(items, hrefs), start=offset + 1):
+            try:
+                url = self._listing_group_url(href)
+            except ValueError as exc:
+                self.logger.warning("Invalid listing item %s in %s: %s", position, response.url, exc)
+                service.mark_discovery_failure("INVALID_LISTING_GROUP_ITEM")
+                invalid_item = True
+                continue
+            if url in self.group_seen_urls or url in urls:
+                continue
+            urls[url] = None
+            if date_field:
+                try:
+                    published = datetime.fromisoformat(read_path(item, date_field))
+                    if published.tzinfo is None:
+                        raise ValueError("Article date lacks a timezone")
+                except (TypeError, ValueError):
+                    ordered = False
+                    continue
+                if self.group_last_date is not None and published > self.group_last_date:
+                    ordered = False
+                self.group_last_date = published
+
+        if not urls and not invalid_item:
+            self.logger.error("Pagination returned no new article URLs: %s", response.url)
+            service.mark_discovery_failure("INVALID_LISTING_GROUP_PAGE")
+            yield from self._start_listing_group(index + 1)
+            return
+        if invalid_item or not ordered:
+            service.stop_after_known = False
+            service.consecutive_known_records = 0
+        if not ordered:
+            self.logger.warning("Listing order could not be verified, scanning the rest: %s", response.url)
+
+        self.group_seen_urls.update(urls)
+        for url in urls:
+            request, stop = self._discover_detail(url)
+            if request is not None:
+                yield request
+            if stop:
+                if getattr(service, "stop_reason", None) != "KNOWN_THRESHOLD_REACHED":
+                    # The DB-free harness uses the same stop signal for its sample cap.
+                    return
+                self.group_stopped_early = True
+                yield from self._start_listing_group(index + 1)
+                return
+
+        yield self._listing_group_page(index, offset + len(items))
+
+    def listing_group_failed(self, failure):
+        self.logger.error("Listing group fetch failed: %s", failure)
+        self.discovery_service.mark_discovery_failure("LISTING_GROUP_FETCH_FAILED")
+        yield from self._start_listing_group(failure.request.cb_kwargs["index"] + 1)
+
     def parse_rss(self, response):
         try:
             channel = ElementTree.fromstring(response.body).find("channel")
@@ -932,7 +1082,9 @@ class MediaSpider(scrapy.Spider):
         # stop_after_known sources skip known detail
         # downloads and use them only as the safe
         # incremental stopping signal.
-        if is_known and self.discovery_policy != "full_scan":
+        if is_known and (
+            self.discovery_policy != "full_scan" or self.discovery_config.get("skip_known_details")
+        ):
             self.logger.info("Known Media detail download skipped | key=%s", record_key)
             return None, should_stop
 
@@ -1376,6 +1528,17 @@ class MediaSpider(scrapy.Spider):
         record: dict[str, Any] = {}
 
         extraction_fields = self.extraction_config if fields is None else fields
+        if fields is None:
+            for variant in self.source_config.get("extraction_by_url", []):
+                if re.search(variant["pattern"], response.url):
+                    extraction_fields = {
+                        **extraction_fields,
+                        **{
+                            name: {**extraction_fields.get(name, {}), **overrides}
+                            for name, overrides in variant["fields"].items()
+                        },
+                    }
+                    break
 
         for (
             field_name,
@@ -1457,8 +1620,11 @@ class MediaSpider(scrapy.Spider):
             )
 
             if output == "text":
-
-                if multiple:
+                join_with = field_config.get("join_with")
+                if join_with is not None:
+                    texts = [self._clean_text(node.xpath("string(.)").get()) for node in selected_nodes]
+                    value = join_with.join(text for text in texts if text) or None
+                elif multiple:
                     value = [
                         self._clean_text(
                             " ".join(
