@@ -3,9 +3,10 @@ import itertools
 import json
 import re
 from datetime import date, datetime
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode, urljoin, urlparse, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
 import scrapy
@@ -166,12 +167,20 @@ class MediaSpider(scrapy.Spider):
                 self.discovery_service.mark_discovery_failure("MISSING_RSS_FEEDS")
                 return
 
+            self.rss_pagination = self.discovery_config.get("pagination")
+            if self.rss_pagination and (
+                self.rss_pagination.get("type") != "offset" or len(feeds) != 1
+            ):
+                raise ValueError("Paginated RSS requires offset pagination and one feed URL")
             self.pending_rss_feeds = len(feeds)
+            self.rss_seen_pages = set()
+            self.rss_last_date = None
             for url in feeds:
                 yield scrapy.Request(
-                    url,
+                    self._rss_page_url(url, 0) if self.rss_pagination else url,
                     callback=self.parse_rss,
                     errback=self.rss_failed,
+                    cb_kwargs={"feed_url": url, "offset": 0},
                 )
             return
 
@@ -798,7 +807,15 @@ class MediaSpider(scrapy.Spider):
         self.discovery_service.mark_discovery_failure("HTML_LISTING_GROUP_FETCH_FAILED")
         yield from self._start_listing_group(failure.request.cb_kwargs["index"] + 1)
 
-    def parse_rss(self, response):
+    def _rss_page_url(self, feed_url, offset):
+        parsed = urlsplit(feed_url)
+        params = build_query(
+            self.rss_pagination, dict(parse_qsl(parsed.query)), page=0, offset=offset,
+        )
+        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(params), parsed.fragment))
+
+    def parse_rss(self, response, feed_url=None, offset=0):
+        paginated = bool(getattr(self, "rss_pagination", None))
         try:
             channel = ElementTree.fromstring(response.body).find("channel")
             if channel is None:
@@ -806,10 +823,39 @@ class MediaSpider(scrapy.Spider):
 
             items = channel.findall("item")
             if not items:
-                raise ValueError("RSS feed contains no items")
+                if not paginated or offset == 0:
+                    raise ValueError("RSS feed contains no items")
+                self.finish_rss_feed()
+                return
+
+            if paginated:
+                signature = tuple(item.findtext("link", "").strip() for item in items)
+                if signature in self.rss_seen_pages:
+                    raise ValueError("RSS pagination repeated a previous page")
+                self.rss_seen_pages.add(signature)
+
+                dates = []
+                for item in items:
+                    try:
+                        published = parsedate_to_datetime(item.findtext("pubDate", ""))
+                        if published.tzinfo is None:
+                            raise ValueError("RSS date has no timezone")
+                    except (TypeError, ValueError):
+                        published = None
+                    dates.append(published)
+                ordered = all(
+                    published is not None and (
+                        previous is None or published <= previous
+                    )
+                    for published, previous in zip(dates, [self.rss_last_date, *dates[:-1]])
+                )
+                if not ordered:
+                    self.logger.warning("RSS date order could not be verified: %s", response.url)
+                    self.discovery_service.stop_after_known = False
+                self.rss_last_date = dates[-1]
 
             article_host = urlparse(self.task.url).hostname
-            for item in items:
+            for item, published in zip(items, dates if paginated else [None] * len(items)):
                 url = item.findtext("link", "").strip()
                 parsed = urlparse(url)
                 if (
@@ -818,28 +864,49 @@ class MediaSpider(scrapy.Spider):
                     or not self._extract_source_record_id(url)
                 ):
                     self.discovery_service.mark_discovery_failure(
-                        "INVALID_RSS_ARTICLE_URL"
+                        "INVALID_RSS_ARTICLE_URL", prevent_known_stop=paginated,
                     )
                     continue
 
-                request, _ = self._discover_detail(url)
+                request, should_stop = self._discover_detail(url)
                 if request is not None:
+                    if self.discovery_config.get("use_item_pub_date"):
+                        if published is None:
+                            self.discovery_service.mark_discovery_failure(
+                                "INVALID_RSS_DATE", prevent_known_stop=paginated,
+                            )
+                        else:
+                            request.cb_kwargs["identity_fields"] = {
+                                **request.cb_kwargs.get("identity_fields", {}),
+                                "date.originalValue": published.date().isoformat(),
+                            }
                     yield request
+                if paginated and should_stop:
+                    self.finish_rss_feed(reached_end=False)
+                    return
+
+            if paginated:
+                yield scrapy.Request(
+                    self._rss_page_url(feed_url, offset + len(items)),
+                    callback=self.parse_rss,
+                    errback=self.rss_failed,
+                    cb_kwargs={"feed_url": feed_url, "offset": offset + len(items)},
+                )
+                return
 
         except (ElementTree.ParseError, ValueError) as exc:
             self.logger.warning("Invalid RSS feed %s: %s", response.url, exc)
             self.discovery_service.mark_discovery_failure("INVALID_RSS_FEED")
-        finally:
-            self.finish_rss_feed()
+        self.finish_rss_feed()
 
     def rss_failed(self, failure):
         self.logger.warning("RSS download failed: %s", failure)
         self.discovery_service.mark_discovery_failure("RSS_FETCH_FAILED")
         self.finish_rss_feed()
 
-    def finish_rss_feed(self):
+    def finish_rss_feed(self, *, reached_end=True):
         self.pending_rss_feeds -= 1
-        if self.pending_rss_feeds == 0:
+        if self.pending_rss_feeds == 0 and reached_end:
             self.discovery_service.mark_source_end()
 
     def parse_month_archive(self, response):

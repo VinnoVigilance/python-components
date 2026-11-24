@@ -96,6 +96,59 @@ sources:
       record_key:
         fields: [source_name, dataset_name, SourceRecordId]
 
+  NCA_NEWS:
+    enabled: true
+    active: true
+    source_name: NCA
+    dataset_name: NCA_NEWS
+    dataset_category: Media
+    schedule: daily
+    date_order: DMY
+    source_page_url: https://www.nationalcrimeagency.gov.uk/news
+    url: https://www.nationalcrimeagency.gov.uk/news
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        transport: chrome
+        concurrent_requests_per_domain: 3
+        download_delay: 0.25
+        retry_times: 3
+        retry_http_codes: [403, 408, 429, 500, 502, 503, 504]
+
+    discovery:
+      strategy: rss
+      policy: full_scan
+      feed_urls:
+        - https://www.nationalcrimeagency.gov.uk/news?format=feed&type=rss
+      pagination: {type: offset, page_size: 20, offset_param: start, size_param: null}
+      use_item_pub_date: true
+
+    discovery_by_mode:
+      INITIAL: {policy: full_scan}
+      INCREMENTAL: {policy: stop_after_known, threshold: 10}
+
+    extraction:
+      SourceURL: {source: response_url}
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          pattern: '^https://www\.nationalcrimeagency\.gov\.uk/news/([^/?#]+)'
+      Title: {selector: 'h1[itemprop="headline"]', required: true}
+      BodyText: {selector: '[itemprop="articleBody"]', required: true}
+      Summary: {selector: 'meta[property="og:description"]', output: attribute, attribute: content}
+      FeaturedImageUrl: {selector: 'meta[property="og:image"]', output: attribute, attribute: content}
+      date.originalValue: {selector: '[itemprop="articleBody"] > p:last-of-type > strong'}
+
+    parser: {type: html}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
   COURT_OF_APPEALS_PH_DECISIONS_AND_RESOLUTIONS:
     enabled: true
     active: true
