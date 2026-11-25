@@ -16,6 +16,75 @@ global:
 
 sources:
 
+  AL_JAZEERA_PHILIPPINES_NEWS:
+    enabled: true
+    active: true
+    source_name: AL_JAZEERA
+    dataset_name: AL_JAZEERA_PHILIPPINES_NEWS
+    dataset_category: Media
+    schedule: hourly
+    date_order: DMY
+    source_page_url: https://www.aljazeera.com/where/philippines/
+    url: https://www.aljazeera.com/where/philippines/
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        transport: chrome
+        concurrent_requests: 8
+        concurrent_requests_per_domain: 8
+        download_delay: 0.1
+        randomize_download_delay: false
+        retry_times: 3
+        retry_http_codes: [403, 408, 429, 500, 502, 503, 504]
+
+    discovery:
+      strategy: listing_groups
+      policy: full_scan
+      skip_known_details: true
+      article_base_url: https://www.aljazeera.com/
+      groups:
+        - url: https://www.aljazeera.com/where/philippines/
+          link_selector: 'a[href^="/news/202"]'
+          pagination: {type: next_link, selector: 'a[rel="next"], a[href*="?page="]'}
+
+    discovery_by_mode:
+      INITIAL: {policy: full_scan}
+      INCREMENTAL:
+        strategy: listing_groups
+        policy: stop_after_known
+        threshold: 10
+
+    extraction:
+      SourceURL: {source: response_url}
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          pattern: '^https://www\.aljazeera\.com/news/(\d{4}/\d{1,2}/\d{1,2}/[^/?#]+)'
+      Title: {selector: 'h1', required: true}
+      BodyText:
+        selector: '[data-testid="article-body"], .wysiwyg, article p'
+        required: true
+        join_with: "\n\n"
+      date.originalValue:
+        selector: 'meta[property="article:published_time"]'
+        output: attribute
+        attribute: content
+        required: false
+      AuthorName: {selector: 'meta[name="author"]', output: attribute, attribute: content}
+      Summary: {selector: 'meta[property="og:description"]', output: attribute, attribute: content}
+      FeaturedImageUrl: {selector: 'meta[property="og:image"]', output: attribute, attribute: content}
+      KeywordText: {selector: 'meta[name="keywords"]', output: attribute, attribute: content}
+
+    parser: {type: html}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
   ABS_CBN_NEWS:
     enabled: true
     active: true
