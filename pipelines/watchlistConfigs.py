@@ -3045,7 +3045,7 @@ WATCHLIST_CONFIGS = {
     },
 
     "DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY": {
-        "source_name": "BPM_PH",
+        "source_name": "DBM_PH",
         "list_name": "DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY",
         # No source dates are mapped; canonical date strings use ISO order.
         "date_order": "YMD",

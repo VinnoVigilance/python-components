@@ -32,6 +32,35 @@ from services.watchlistPipeline import watchlistFileService as fs  # noqa: E402
 pytestmark = pytest.mark.unit
 
 
+def test_dbm_directory_resolves_registered_source_and_dataset(monkeypatch):
+    from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+
+    connection = MagicMock()
+    monkeypatch.setattr(fs.connection_pool, "getconn", lambda: connection)
+    release = MagicMock()
+    monkeypatch.setattr(fs.connection_pool, "putconn", release)
+    source_lookup = MagicMock(
+        side_effect=lambda *, cursor, source_name: 17 if source_name == "DBM_PH" else None
+    )
+    dataset_lookup = MagicMock(
+        side_effect=lambda *, cursor, source_id, list_name: (
+            23 if (source_id, list_name) == (17, "DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY") else None
+        )
+    )
+    monkeypatch.setattr(fs.watchlistFileRepository, "find_source_id", source_lookup)
+    monkeypatch.setattr(fs.watchlistFileRepository, "find_list_type_id", dataset_lookup)
+
+    result = fs.resolve_lookup_values(WATCHLIST_CONFIGS["DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"])
+
+    assert result == {"source_id": 17, "list_type_id": 23}
+    cursor = connection.cursor.return_value.__enter__.return_value
+    source_lookup.assert_called_once_with(cursor=cursor, source_name="DBM_PH")
+    dataset_lookup.assert_called_once_with(
+        cursor=cursor, source_id=17, list_name="DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"
+    )
+    release.assert_called_once_with(connection)
+
+
 def test_meti_uses_existing_resolver_and_downloader(monkeypatch, tmp_path):
     config = {
         "source_name": "METI", "list_name": "METI_FOREIGN_END_USER_LIST",
