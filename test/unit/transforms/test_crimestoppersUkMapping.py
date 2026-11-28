@@ -77,7 +77,7 @@ class TestCrimestoppersUkMapping(unittest.TestCase):
     def test_source_metadata(self):
         s=self.canonical(self.raw())['Sources'][0]
         for field,value in {'SourceType':'NGO','DatasetCategory':'Law Enforcement',
-                            'SourceName':'CRIMESTOPPERS-UK','ListName':SOURCE}.items():
+                            'SourceName':'CRIMESTOPPERS_UK','ListName':SOURCE}.items():
             self.assertEqual(s[field],value)
 
     def test_source_uses_detail_url_and_real_appeal_id(self):

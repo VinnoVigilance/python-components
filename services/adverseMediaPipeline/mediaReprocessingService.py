@@ -49,6 +49,10 @@ class MediaReprocessingService:
 
         records: list[dict[str, Any]] = []
         failed_count = 0
+        retry_listing = (
+            source_config.get("discovery", {}).get("strategy") == "list_only"
+            and bool(source_config.get("document_download"))
+        )
         raw_record_service = MediaRawRecordService()
 
         with TemporaryDirectory(
@@ -89,6 +93,7 @@ class MediaReprocessingService:
                     records.append(
                         {
                             "record_key": record_key,
+                            "retry_listing": retry_listing,
                             "is_known": True,
                             "extracted": (
                                 extracted_records[0]
@@ -122,6 +127,7 @@ class MediaReprocessingService:
                     records.append(
                         {
                             "record_key": record_key,
+                            "retry_listing": retry_listing,
                             "media_file_id": media_file_id,
                             "failed": True,
                             "error": str(error),

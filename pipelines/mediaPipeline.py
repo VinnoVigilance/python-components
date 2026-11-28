@@ -98,6 +98,52 @@ def determine_media_run_status(
     return "FAILED"
 
 
+def reconcile_media_acquisition_counts(
+    acquisition_result: Any,
+) -> dict[str, Any]:
+    """Prove that discovery, detail results, and Raw persistence balance."""
+
+    discovered = int(acquisition_result.discovered_count)
+    known = int(getattr(acquisition_result, "known_count", 0))
+    new = int(getattr(acquisition_result, "new_count", 0))
+    identity_failures = int(getattr(acquisition_result, "identity_failure_count", 0))
+    discovery_delta = discovered - (known + new + identity_failures)
+
+    records = list(acquisition_result.records)
+    acquired = int(getattr(acquisition_result, "acquired_count", len(records)))
+    selected_value = getattr(acquisition_result, "selected_detail_count", None)
+    missing = int(getattr(acquisition_result, "missing_detail_count", 0))
+    detail_delta = (
+        int(selected_value) - (acquired + missing)
+        if selected_value is not None
+        else 0
+    )
+
+    control_records = sum(
+        1 for record in records if record.get("discovery_retry_complete")
+    )
+    failed_records = sum(
+        1 for record in records
+        if record.get("failed") and not record.get("discovery_retry_complete")
+    )
+    persistence_accounted = (
+        int(acquisition_result.stored_count)
+        + int(acquisition_result.duplicate_count)
+        + failed_records
+        + control_records
+    )
+    persistence_delta = acquired - persistence_accounted
+
+    return {
+        "valid": not any((discovery_delta, detail_delta, persistence_delta)),
+        "discovery_delta": discovery_delta,
+        "detail_delta": detail_delta,
+        "persistence_delta": persistence_delta,
+        "failed_record_count": failed_records,
+        "control_record_count": control_records,
+    }
+
+
 def media_pipeline_exit_code(
     result: dict[str, Any],
 ) -> int:
@@ -196,6 +242,21 @@ def run_media_pipeline(
         dataset_name
     ]
 
+    global_acquisition = global_config.get("acquisition", {})
+    source_acquisition = source_config.get("acquisition", {})
+    if global_acquisition:
+        source_config = {
+            **source_config,
+            "acquisition": {
+                **global_acquisition,
+                **source_acquisition,
+                "crawler_settings": {
+                    **global_acquisition.get("crawler_settings", {}),
+                    **source_acquisition.get("crawler_settings", {}),
+                },
+            },
+        }
+
     if not source_config.get(
         "enabled",
         True,
@@ -255,6 +316,20 @@ def run_media_pipeline(
         acquisition_result.failed_count,
     )
 
+    count_reconciliation = reconcile_media_acquisition_counts(
+        acquisition_result
+    )
+    if not count_reconciliation["valid"]:
+        logger.error(
+            "Media acquisition count reconciliation failed. "
+            "dataset=%s discovery_delta=%s detail_delta=%s "
+            "persistence_delta=%s",
+            dataset_name,
+            count_reconciliation["discovery_delta"],
+            count_reconciliation["detail_delta"],
+            count_reconciliation["persistence_delta"],
+        )
+
     # =====================================================
     # 3. Create processing services
     # =====================================================
@@ -306,6 +381,8 @@ def run_media_pipeline(
                 "media_file_id"
             )
         )
+
+        document_errors = (acquired_record.get("extracted") or {}).get("DocumentErrors", [])
 
         try:
 
@@ -388,6 +465,7 @@ def run_media_pipeline(
             raw_record = (
                 raw_records[0]
             )
+            document_errors = raw_record.get("DocumentErrors", [])
 
             # -------------------------------------------------
             # Normalization
@@ -502,6 +580,7 @@ def run_media_pipeline(
                     "status": (
                         status
                     ),
+                    "document_errors": document_errors,
                     "content_hash": (
                         core_result[
                             "content_hash"
@@ -565,6 +644,7 @@ def run_media_pipeline(
                         str(error)
                     ),
                     "error_stage": "PROCESSING",
+                    "document_errors": document_errors,
                     "error_type": type(error).__name__,
                 }
             )
@@ -598,6 +678,10 @@ def run_media_pipeline(
             "completed_safely",
             True,
         )
+    )
+    acquisition_completed_safely = (
+        acquisition_completed_safely
+        and count_reconciliation["valid"]
     )
 
     successful_work_count = (
@@ -667,6 +751,9 @@ def run_media_pipeline(
         failure_summary[
             "DETAIL_RESULT_MISSING"
         ] = missing_detail_count
+
+    if not count_reconciliation["valid"]:
+        failure_summary["COUNT_RECONCILIATION_FAILED"] = 1
 
     for record_result in record_results:
         status = str(
@@ -759,15 +846,17 @@ def run_media_pipeline(
             None,
         ),
 
-        "stop_reason": getattr(
-            acquisition_result,
-            "stop_reason",
-            "UNKNOWN",
+        "stop_reason": (
+            "COUNT_RECONCILIATION_FAILED"
+            if not count_reconciliation["valid"]
+            else getattr(acquisition_result, "stop_reason", "UNKNOWN")
         ),
 
         "acquisition_completed_safely": (
             acquisition_completed_safely
         ),
+
+        "count_reconciliation": count_reconciliation,
 
         "stored_count": (
             acquisition_result
@@ -837,6 +926,21 @@ def run_media_pipeline(
         skipped_count,
         total_failed_count,
     )
+
+    records_buffer = acquisition_result.records
+    close_buffer = getattr(records_buffer, "close", None)
+    if callable(close_buffer):
+        close_buffer()
+    for spool_file in (
+        getattr(acquisition_result, "processed_spool_path", None),
+        getattr(acquisition_result, "record_spool_manifest_path", None),
+        getattr(acquisition_result, "record_spool_path", None),
+    ):
+        if spool_file:
+            try:
+                Path(spool_file).unlink(missing_ok=True)
+            except OSError:
+                logger.exception("Failed to clean completed Media spool: %s", spool_file)
 
     return result
 

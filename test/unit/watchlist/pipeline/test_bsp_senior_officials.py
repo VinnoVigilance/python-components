@@ -105,9 +105,15 @@ def test_profile_layouts_keep_full_biography_and_distinct_attachment_roles(spide
     assert Path(record["detail_file_path"]).read_text(encoding="utf-8") == response.text
 
 
-def test_failed_profile_retains_listing_record_after_retries(spider):
+@pytest.mark.parametrize("failure_kind", ["minimal", "twisted"])
+def test_failed_profile_retains_listing_record_after_retries(spider, caplog, failure_kind):
     request = next(row for row in _listing(spider) if isinstance(row, Request))
     failure = SimpleNamespace(request=request, value=RuntimeError("Profile unavailable"))
+    if failure_kind == "twisted":
+        from twisted.python.failure import Failure
+
+        failure = Failure(failure.value)
+        failure.request = request
 
     record = next(spider._handle_optional_detail_failure(failure))
 
@@ -115,6 +121,10 @@ def test_failed_profile_retains_listing_record_after_retries(spider):
     assert record["detail"] == {}
     assert record["detail_url"] == request.url
     assert record["fetch_error"] == "Profile unavailable"
+    assert record["fetch_error_type"] == "RuntimeError"
+    assert record["fetch_error_category"] == "REQUEST_FAILED"
+    assert "Profile unavailable" in caplog.text
+    assert "error_category=REQUEST_FAILED" in caplog.text
     assert record in spider.records
 
 

@@ -24,6 +24,7 @@ from transforms.postNormalization import (
     deduplicate_all_arrays_handler,
     empty_dependency_handler,
     enum_normalize_handler,
+    normalize_body_text_handler,
     sanitize_html_handler,
     search_enrich_handler,
 )
@@ -416,7 +417,36 @@ class TestSanitizeHtmlHandler:
         assert entity == {"Names": []}
 
 
+class TestNormalizeBodyTextHandler:
+    def test_plain_text_cleanup_preserves_original_and_literal_content(self):
+        original = "  Cafe\u0301  <CASE_ID> &amp;\r\n\r\n\r\nNext\u200b  "
+        entity = {"Content": {"BodyOriginalValue": original, "BodyText": original}}
+        normalize_body_text_handler(entity, {})
+        assert entity["Content"]["BodyText"] == "Café <CASE_ID> &amp;\n\nNext"
+        assert entity["Content"]["BodyOriginalValue"] == original
+
+    def test_missing_and_null_body_are_preserved(self):
+        entity = {"Content": {"BodyOriginalValue": "original"}}
+        normalize_body_text_handler(entity, {})
+        assert "BodyText" not in entity["Content"]
+        entity["Content"]["BodyText"] = None
+        normalize_body_text_handler(entity, {})
+        assert entity["Content"]["BodyText"] is None
+
+    def test_invalid_body_type_is_rejected(self):
+        with pytest.raises(TypeError, match="BodyText"):
+            normalize_body_text_handler({"Content": {"BodyText": ["body"]}}, {})
+
+
 class TestEngineEndToEnd:
+    def test_body_cleanup_does_not_mutate_input(self):
+        rules = pd.DataFrame([{"rule_type": "NORMALIZE_BODY_TEXT"}])
+        engine = PostNormalizationEngine(rules, config={})
+        record = {"Content": {"BodyOriginalValue": "  raw  ", "BodyText": "  Case <CASE_ID> &amp;  "}}
+        result = engine.post_normalize_record(record)
+        assert result["Content"]["BodyText"] == "Case <CASE_ID> &amp;"
+        assert record["Content"]["BodyText"] == "  Case <CASE_ID> &amp;  "
+
     def test_workbook_comment_rules_use_canonical_field_names(self):
         rules_path = Path(__file__).resolve().parents[3] / "data" / "rules" / "postNormalization.xlsx"
         rules = pd.read_excel(rules_path)

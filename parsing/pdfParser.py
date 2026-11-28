@@ -8,6 +8,8 @@ class PdfParser:
     """
     PDF parser for tabular watchlist files, with a text mode
     (config ``parser: {mode: text}``) returning the whole document text.
+    Text mode can opt into ``ocr_fallback: {}`` for wholly blank native text.
+    ``ocr_empty_pages: true`` applies that fallback to individual empty pages.
     Explicit ``parser: {mode: ocr}`` delegates to the shared OCR parser.
     Explicit ``parser: {mode: image_cards}`` discovers bordered image/text cards.
     Explicit ``parser: {mode: labeled_blocks}`` reads repeated labelled columns.
@@ -70,13 +72,36 @@ class PdfParser:
         )
 
         if text_mode:
+            if settings.get("ocr_empty_pages", False):
+                if "ocr_fallback" not in settings:
+                    raise ValueError("ocr_empty_pages requires ocr_fallback settings")
+                pages = self._page_texts(pdf_path, keep_empty=True)
+                missing = [number for number, text in enumerate(pages, 1) if not text]
+                record = {}
+                if missing:
+                    recognized = self._ocr_text_record(pdf_path, settings["ocr_fallback"], missing)
+                    record["_ocr"] = recognized["_ocr"]
+                    for page in recognized["_ocr"]["pages"]:
+                        pages[page["page_number"] - 1] = "\n".join(line["text"] for line in page["lines"])
+                text = "\n\n".join(pages)
+                if settings.get("require_text", False) and not text.strip():
+                    raise ValueError("PDF native text and page OCR returned no text; original file is retained")
+                return [{**record, "BodyText": text or None}]
             text = "\n\n".join(
                 self._page_texts(pdf_path)
             )
+            record = {"BodyText": text or None}
+            if not text.strip() and "ocr_fallback" in settings:
+                record = self._ocr_text_record(pdf_path, settings["ocr_fallback"])
+                text = record["BodyText"] or ""
 
-            return [
-                {"BodyText": text or None}
-            ]
+            if settings.get("require_text", False) and not text.strip():
+                raise ValueError(
+                    "PDF text extraction returned no text, including any configured "
+                    "OCR fallback; original file is retained."
+                )
+
+            return [record]
 
         parser_config = config.get(
             "parser_config",
@@ -498,8 +523,32 @@ class PdfParser:
 
         return "\n".join(pages_text)
 
-    def _page_texts(self, pdf_path):
-        """Return the stripped, non-empty text of each page, in order."""
+    @staticmethod
+    def _ocr_text_record(pdf_path, fallback, page_numbers=None):
+        """Reuse document/page recognition without structured layout extraction.
+
+        No confidence threshold or semantic correction is applied. The complete
+        reader output is retained as evidence alongside one document BodyText.
+        Rendering/dependency/page failures propagate; partial text is not success.
+        """
+        if not isinstance(fallback, dict) or set(fallback) - {"engine", "document"}:
+            raise ValueError("parser.ocr_fallback must contain only engine/document settings")
+        from parsing.ocr.documentOcrReader import DocumentOcrReader, DocumentOcrSettings
+        from parsing.ocr.rapidOcrEngine import OcrSettings, RapidOcrEngine
+
+        reader = DocumentOcrReader(
+            RapidOcrEngine(OcrSettings(**fallback.get("engine", {}))),
+            DocumentOcrSettings(**fallback.get("document", {})),
+        )
+        document = reader.read(pdf_path, page_numbers=page_numbers)
+        text = "\n\n".join(
+            "\n".join(line["text"] for line in page["lines"])
+            for page in document["pages"]
+        )
+        return {"BodyText": text or None, "_ocr": document}
+
+    def _page_texts(self, pdf_path, *, keep_empty=False):
+        """Return stripped page text, optionally retaining empty page positions."""
 
         with pdfplumber.open(pdf_path) as pdf:
             page_texts = [
@@ -507,7 +556,7 @@ class PdfParser:
                 for page in pdf.pages
             ]
 
-        return [text for text in page_texts if text]
+        return page_texts if keep_empty else [text for text in page_texts if text]
 
     def _find_header_row(
         self,

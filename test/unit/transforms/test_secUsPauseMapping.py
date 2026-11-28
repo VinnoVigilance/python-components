@@ -97,7 +97,7 @@ class TestSecUsPauseMapping(unittest.TestCase):
         record = self.real('1st-american-securities')
         self.assertEqual(record['EntityType'], 'Entity')
         source = record['Sources'][0]
-        for field, value in {'SourceName': 'SEC-US', 'ListName': SOURCE,
+        for field, value in {'SourceName': 'SEC_US', 'ListName': SOURCE,
                              'SourceType': 'Official', 'DatasetCategory': 'Regulatory'}.items():
             self.assertEqual(source[field], value)
         self.assertEqual(source['SourceURL'], BASE + '/1st-american-securities')

@@ -156,3 +156,18 @@ def test_summary_distinguishes_source_end_from_threshold(
         "stop_reason": "SOURCE_EXHAUSTED",
         "completed_safely": True,
     }
+
+
+@pytest.mark.parametrize("failure", [None, "identity", "discovery"])
+def test_completed_range_is_safe_only_without_failures(monkeypatch, failure):
+    service = _service(monkeypatch, known_results=[], stop_after_known=False)
+    if failure == "identity":
+        service.record_identity_failure()
+    elif failure == "discovery":
+        service.mark_discovery_failure("FORM_SEARCH_INCOMPLETE")
+    service.stop_reason = "CONFIGURED_RANGE_COMPLETE"
+
+    summary = service.get_summary()
+
+    assert summary["completed_safely"] is (failure is None)
+    assert summary["reached_source_end"] is False

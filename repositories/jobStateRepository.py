@@ -60,6 +60,9 @@ def export_pending_csv(kind: str, path: Path) -> int:
                 "attempts": item.get("attempts", state.get("attempts")),
                 "error": item.get("error"),
                 "broken_on_source": bool(item.get("permanent")),
+                "error_category": item.get("error_category"),
+                "error_type": item.get("error_type"),
+                "http_status": item.get("http_status"),
             })
 
     if rows:

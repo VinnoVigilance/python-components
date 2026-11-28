@@ -49,6 +49,12 @@ def _sec_config() -> dict:
         return yaml.safe_load(handle)["sources"]["SEC_PH_ADVISORIES"]
 
 
+def test_sec_pdf_uses_native_text_then_ocr_when_empty():
+    assert _sec_config()["parser"] == {
+        "type": "pdf", "mode": "text", "require_text": True, "ocr_fallback": {}
+    }
+
+
 def _detail_page(viewer: str = "", button: str = "", body: str = "") -> HtmlResponse:
     html = f"""
     <html><head>
@@ -169,6 +175,29 @@ CONFIG = {
     "url_fields": ["PdfButtonUrl", "PdfViewerUrl"],
 }
 DOWNLOAD = "ingestion.crawler.spiders.savedHtmlMediaSpider.download"
+
+
+def test_existing_detail_pdf_replacement_is_written_to_disk_buffer(tmp_path):
+    from ingestion.crawler.storage import CrawlerStorage
+    from utils.jsonlRecordBuffer import JsonlRecordBuffer
+
+    spider = _spider(tmp_path, CONFIG)
+    spider.storage = CrawlerStorage("SEC_PH", "ADVISORIES", base_dir=str(tmp_path))
+    spider.records = JsonlRecordBuffer(tmp_path / "records.jsonl")
+    fetcher = _fetcher()
+    fetcher.fetch.return_value = iter([(
+        {"record_key": "entry", "is_known": False}, _detail_page(button=BUTTON),
+    )])
+    try:
+        with patch("ingestion.crawler.spiders.savedHtmlMediaSpider.BrowserDetailFetcher", return_value=fetcher), \
+                patch(DOWNLOAD, return_value="saved.pdf"):
+            results = list(spider._fetch_and_parse_details([{"record_key": "entry"}]))
+        [buffered] = list(spider.records)
+        assert buffered == results[0]
+        assert buffered["detail_file_path"] == "saved.pdf"
+        assert buffered["file_url"] == PDF_URL
+    finally:
+        spider.records.close()
 
 
 class TestDocumentDownload:

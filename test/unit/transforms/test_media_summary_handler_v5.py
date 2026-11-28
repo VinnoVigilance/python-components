@@ -11,7 +11,7 @@ from transforms.postNormalization import PostNormalizationEngine
 def test_normalization_leaves_summary_for_post_processing(source_summary, legacy_rule_present):
     rules = [{
         "rule_type": "NORMALIZE_BODY_TEXT",
-        "condition_path": "Content.BodyOriginalValue",
+        "condition_path": "Content.BodyText",
         "target_path": "Content.BodyText",
     }]
     if legacy_rule_present:
@@ -22,7 +22,7 @@ def test_normalization_leaves_summary_for_post_processing(source_summary, legacy
         })
 
     body = "The regulator announced an enforcement action. The company issued a response."
-    content = {"BodyOriginalValue": f"<p>{body}</p>"}
+    content = {"BodyOriginalValue": f"<p>{body}</p>", "BodyText": body}
     if source_summary is not None:
         content["Summary"] = source_summary
 

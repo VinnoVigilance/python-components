@@ -1,4 +1,9 @@
 global:
+  acquisition:
+    crawler_settings:
+      record_spool: true
+      raw_workers: 4
+
   mapping:
     file: data/rules/mediaMapping.xlsx
 
@@ -10,6 +15,785 @@ global:
 
 
 sources:
+
+  SANDIGANBAYAN_FLOOD_CONTROL_AND_INFRASTRUCTURE_CASES:
+    enabled: true
+    active: true
+    source_name: SANDIGANBAYAN
+    dataset_name: SANDIGANBAYAN_FLOOD_CONTROL_AND_INFRASTRUCTURE_CASES
+    dataset_category: Crime / Judicial Records
+    schedule: daily
+    date_order: MDY
+    url: https://sb.judiciary.gov.ph/flood-control-and-infrastructure-cases/
+    acquisition:
+      type: crawler
+      spider: media
+      fetch_strategy: saved_html
+      download_method: BYPASS
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_timeout: 900
+        retry_times: 3
+    bypass_config:
+      engine: stealth_browser
+      headless: true
+      navigation_mode: uc_open
+      timeout_seconds: 120
+      actions:
+      - action: wait
+        type: selector
+        selector: 'table[data-wpdatatable_id="183"] tbody tr'
+        timeout: 120
+      - action: execute_js
+        script: |
+          const table = jQuery('table[data-wpdatatable_id="183"]').DataTable();
+          if (table.settings()[0].oFeatures.bServerSide) {
+            throw new Error('This recipe requires a complete client-side table');
+          }
+          table.search('').columns().search('').page.len(-1).draw();
+          const displayed = document.querySelectorAll('table[data-wpdatatable_id="183"] tbody tr').length;
+          if (!displayed || displayed !== table.rows({search: 'applied'}).count()) {
+            throw new Error('The complete case table was not rendered');
+          }
+      - action: save_html
+        filename_pattern: '{source}_{list}_{timestamp}.html'
+      validation:
+        required_content: ['Date Filed', 'Case Number', 'Case Title', 'Offense', 'Division', 'Status', 'Next Hearing', 'Pleadings']
+        min_size_bytes: 15000
+    discovery:
+      strategy: list_only
+      policy: full_scan  # Filing date is not the date the row was last changed.
+      article:
+        selector_type: xpath
+        row_selector: //table[@data-wpdatatable_id='183'][thead/tr/th[normalize-space(.)='Date Filed'] and thead/tr/th[normalize-space(.)='Case Number'] and thead/tr/th[normalize-space(.)='Case Title'] and thead/tr/th[normalize-space(.)='Offense'] and thead/tr/th[normalize-space(.)='Division'] and thead/tr/th[normalize-space(.)='Status'] and thead/tr/th[normalize-space(.)='Next Hearing'] and thead/tr/th[normalize-space(.)='Pleadings']]/tbody/tr[td]
+        preserve_table_headers: true
+        fields:
+          CaseRowsText:
+            selector_type: xpath
+            selector: ./td
+            join_with: "\n"
+          DateFiled:
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Date Filed']/preceding-sibling::th)+1]
+            required: true
+          CaseNumber:
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Case Number']/preceding-sibling::th)+1]
+            required: true
+          Title:
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Case Title']/preceding-sibling::th)+1]
+            required: true
+          Offense:
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Offense']/preceding-sibling::th)+1]
+          Division:
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Division']/preceding-sibling::th)+1]
+          CaseStatus:
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Status']/preceding-sibling::th)+1]
+          NextHearing:
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Next Hearing']/preceding-sibling::th)+1]
+          Pleadings:
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Pleadings']/preceding-sibling::th)+1]
+          OriginalPDFURL:
+            max_matches: 1
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Pleadings']/preceding-sibling::th)+1]//a[@href]
+            output: attribute
+            attribute: href
+          PDFURL:
+            max_matches: 1
+            selector_type: xpath
+            selector: ./td[count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Pleadings']/preceding-sibling::th)+1]//a[@href]
+            output: attribute
+            attribute: href
+            extraction:
+              strategy: regex
+              pattern: '(?i)^(.+\.pdf)(?:%E2%80%9D|”|")?$'
+    document_download:
+      required: false
+      failure_policy: retain_metadata
+      manifest: true
+      transport: browser
+      type: pdf
+      url_fields: [PDFURL]
+      original_url_field: OriginalPDFURL
+      timeout_seconds: 900
+      retry: 3
+      max_size_bytes: 100000000
+      parser:
+        type: pdf
+        mode: text
+        require_text: true
+        ocr_empty_pages: true
+        ocr_fallback: {}
+    detail_browser:
+      headless: true
+      timeout_seconds: 120
+      navigation_mode: uc_open
+      wait_selector: 'table[data-wpdatatable_id="183"]'
+    parser:
+      type: json  # Portable row manifest; PDF attachments use their own parser above.
+    identity:
+      record_key:
+        hash: true
+        fields: [source_name, dataset_name, CaseNumber, NextHearing, Pleadings, PDFURL]
+
+  SANDIGANBAYAN_DECISIONS:
+    enabled: true
+    active: true
+    source_name: SANDIGANBAYAN
+    dataset_name: SANDIGANBAYAN_DECISIONS
+    dataset_category: Crime / Judicial Records
+    schedule: daily
+    date_order: DMY
+    source_page_url: https://sb.judiciary.gov.ph/recent-decisions/
+    url: https://sb.judiciary.gov.ph/recent-decisions/
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 1
+        retry_times: 3
+        download_timeout: 900  # Per HTTP attempt; local PDF/OCR parsing has no timer.
+    discovery:
+      policy: full_scan
+      strategy: form_search
+      form_search:
+      - &sb_recent
+        start_url: https://sb.judiciary.gov.ph/recent-decisions/
+        replay_parents: false
+        metadata:
+          DiscoveryMethod: recent_year_tables
+        stages: &sb_year_stages
+        - selector_type: xpath
+          row_selector: //*[@id='content']//a[@href][contains(@href, '/decisions-20') or contains(@href, '/decisions20')][number(substring(translate(substring-after(@href, '/decisions'), '-', ''), 1, 4)) >= 2010]
+          row_key: [IndexYear]
+          order_by:
+          - {field: IndexYear, type: integer, descending: true}
+          fields:
+            IndexYear:
+              selector: .
+              selector_type: xpath
+              output: attribute
+              attribute: href
+              required: true
+              extraction:
+                strategy: regex
+                pattern: 'decisions-?(20[1-9][0-9])'
+            YearURL:
+              selector: .
+              selector_type: xpath
+              output: attribute
+              attribute: href
+              required: true
+          action: {type: link, selector: ., selector_type: xpath, upgrade_https: true}
+        - selector_type: xpath
+          row_selector: //table[@data-wpdatatable_id]/tbody/tr[td]
+          row_key: [PDFURL, Title, date.originalValue]
+          order_by:
+          - {field: date.originalValue, type: date, format: '%d/%m/%Y', descending: true}
+          page_fields:
+            SourceURL: {source: response_url}
+            SourcePageTitle: {selector: title, required: true}
+          fields:
+            PDFURL:
+              selector: td a[href]
+              output: attribute
+              attribute: href
+              required: true
+            Title:
+              selector_type: xpath
+              selector: td[ancestor::table[1]/thead/tr/th[normalize-space(.)='Case Title' or normalize-space(.)='Caste Title']][position()=count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Case Title' or normalize-space(.)='Caste Title']/preceding-sibling::th)+1]
+              required: true
+            CaseNumber:
+              selector_type: xpath
+              selector: td[ancestor::table[1]/thead/tr/th[normalize-space(.)='Case Number']][position()=count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Case Number']/preceding-sibling::th)+1]
+            date.originalValue:
+              selector_type: xpath
+              selector: td[ancestor::table[1]/thead/tr/th[starts-with(normalize-space(.), 'Date Promulgated')]][position()=count(ancestor::table[1]/thead/tr/th[starts-with(normalize-space(.), 'Date Promulgated')]/preceding-sibling::th)+1]
+              required: true
+            Ponente:
+              selector_type: xpath
+              selector: td[ancestor::table[1]/thead/tr/th[normalize-space(.)='Ponente']][position()=count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Ponente']/preceding-sibling::th)+1]
+            Division:
+              selector_type: xpath
+              selector: td[ancestor::table[1]/thead/tr/th[normalize-space(.)='Division']][position()=count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Division']/preceding-sibling::th)+1]
+          action: {type: link, selector: 'td a[href]', upgrade_https: true}
+        document: &sb_document
+          type: pdf
+          identity_fields: [PDFURL, CaseNumber]
+          conflict_fields: [Title, date.originalValue, Ponente, Division, IndexYear, SourcePageTitle, FileHash]
+      - &sb_older
+        start_url: https://sb.judiciary.gov.ph/older-decisions/
+        replay_parents: false
+        metadata:
+          DiscoveryMethod: older_year_tables
+        stages: *sb_year_stages
+        document: *sb_document
+    discovery_by_mode:
+      INITIAL:
+        form_search: [*sb_recent, *sb_older]
+      INCREMENTAL:
+        form_search: [*sb_recent, *sb_older]
+    parser:
+      type: pdf
+      mode: text
+      require_text: true
+      ocr_empty_pages: true
+      ocr_fallback: {}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+        hash: true
+
+  SANDIGANBAYAN_RESOLUTIONS:
+    enabled: true
+    active: true
+    source_name: SANDIGANBAYAN
+    dataset_name: SANDIGANBAYAN_RESOLUTIONS
+    dataset_category: Crime / Judicial Records
+    schedule: daily
+    date_order: DMY
+    source_page_url: https://sb.judiciary.gov.ph/recent-resolutions/
+    url: https://sb.judiciary.gov.ph/recent-resolutions/
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 1
+        retry_times: 3
+        download_timeout: 900
+    discovery:
+      policy: full_scan
+      strategy: form_search
+      form_search:
+        start_url: https://sb.judiciary.gov.ph/recent-resolutions/
+        replay_parents: false
+        metadata:
+          DiscoveryMethod: recent_year_tables
+        stages:
+        - selector_type: xpath
+          row_selector: //*[@id='content']//a[@href][contains(@href, '/resolutions-20') or contains(@href, '/resolutions20')][number(substring(translate(substring-after(@href, '/resolutions'), '-', ''), 1, 4)) >= 2010]
+          row_key: [IndexYear]
+          order_by:
+          - {field: IndexYear, type: integer, descending: true}
+          fields:
+            IndexYear:
+              selector: .
+              selector_type: xpath
+              output: attribute
+              attribute: href
+              required: true
+              extraction:
+                strategy: regex
+                pattern: 'resolutions-?(20[1-9][0-9])'
+            YearURL:
+              selector: .
+              selector_type: xpath
+              output: attribute
+              attribute: href
+              required: true
+          action: {type: link, selector: ., selector_type: xpath, upgrade_https: true}
+        - selector_type: xpath
+          row_selector: //table[@data-wpdatatable_id]/tbody/tr[td]
+          row_key: [PDFURL, Title, date.originalValue]
+          allow_identical_rows: true
+          order_by:
+          - {field: date.originalValue, type: date, format: '%d/%m/%Y', descending: true}
+          page_fields:
+            SourceURL: {source: response_url}
+            SourcePageTitle: {selector: title, required: true}
+          fields:
+            PDFURL:
+              selector: td a[href]
+              output: attribute
+              attribute: href
+              required: true
+            Title:
+              selector_type: xpath
+              selector: td[ancestor::table[1]/thead/tr/th[normalize-space(.)='Case Title']][position()=count(ancestor::table[1]/thead/tr/th[normalize-space(.)='Case Title']/preceding-sibling::th)+1]
+              required: true
+            date.originalValue:
+              selector_type: xpath
+              selector: td[ancestor::table[1]/thead/tr/th[starts-with(normalize-space(.), 'Date Promulgated')]][position()=count(ancestor::table[1]/thead/tr/th[starts-with(normalize-space(.), 'Date Promulgated')]/preceding-sibling::th)+1]
+              required: true
+          action: {type: link, selector: 'td a[href]', upgrade_https: true}
+        document:
+          type: pdf
+          identity_fields: [PDFURL, Title, date.originalValue]
+          conflict_fields: [IndexYear, SourcePageTitle, FileHash]
+    parser:
+      type: pdf
+      mode: text
+      require_text: true
+      ocr_empty_pages: true
+      ocr_fallback: {}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+        hash: true
+
+
+  AL_JAZEERA_PHILIPPINES_NEWS:
+    enabled: true
+    active: true
+    source_name: AL_JAZEERA
+    dataset_name: AL_JAZEERA_PHILIPPINES_NEWS
+    dataset_category: Media
+    schedule: hourly
+    date_order: DMY
+    source_page_url: https://www.aljazeera.com/where/philippines/
+    url: https://www.aljazeera.com/where/philippines/
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        transport: chrome
+        concurrent_requests: 8
+        concurrent_requests_per_domain: 8
+        download_delay: 0.1
+        randomize_download_delay: false
+        retry_times: 3
+        retry_http_codes: [403, 408, 429, 500, 502, 503, 504]
+
+    discovery:
+      strategy: listing_groups
+      policy: full_scan
+      skip_known_details: true
+      article_base_url: https://www.aljazeera.com/
+      groups:
+        - url: https://www.aljazeera.com/where/philippines/
+          link_selector: 'a[href^="/news/202"]'
+          pagination: {type: next_link, selector: 'a[rel="next"], a[href*="?page="]'}
+
+    discovery_by_mode:
+      INITIAL: {policy: full_scan}
+      INCREMENTAL:
+        strategy: listing_groups
+        policy: stop_after_known
+        threshold: 10
+
+    extraction:
+      SourceURL: {source: response_url}
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          pattern: '^https://www\.aljazeera\.com/news/(\d{4}/\d{1,2}/\d{1,2}/[^/?#]+)'
+      Title: {selector: 'h1', required: true}
+      BodyText:
+        selector: '[data-testid="article-body"], .wysiwyg, article p'
+        required: true
+        join_with: "\n\n"
+      date.originalValue:
+        selector: 'meta[property="article:published_time"]'
+        output: attribute
+        attribute: content
+        required: false
+      AuthorName: {selector: 'meta[name="author"]', output: attribute, attribute: content}
+      Summary: {selector: 'meta[property="og:description"]', output: attribute, attribute: content}
+      FeaturedImageUrl: {selector: 'meta[property="og:image"]', output: attribute, attribute: content}
+      KeywordText: {selector: 'meta[name="keywords"]', output: attribute, attribute: content}
+
+    parser: {type: html}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
+  ABS_CBN_NEWS:
+    enabled: true
+    active: true
+    source_name: ABS_CBN
+    dataset_name: ABS_CBN_NEWS
+    dataset_category: Media
+    schedule: daily
+    date_order: YMD
+    source_page_url: https://www.abs-cbn.com/news
+    url: https://www.abs-cbn.com/news/nation
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        transport: chrome
+        concurrent_requests: 100
+        concurrent_requests_per_domain: 100
+        download_delay: 0
+        randomize_download_delay: false
+        retry_times: 3
+        retry_http_codes: [403, 408, 429, 500, 502, 503, 504]
+
+    discovery:
+      strategy: listing_groups
+      policy: full_scan
+      skip_known_details: true
+      start_url: https://od2-content-api.abs-cbn.com/prod/latest
+      params: {brand: NEWS, partner: imp-01}
+      items_path: listItem
+      url_path: slugline_url
+      sort_date_path: createdDateFull
+      article_base_url: https://www.abs-cbn.com/
+      pagination: {type: offset, page_size: 12, size_param: limit, offset_param: offset}
+      groups:
+        - params: {sectionId: nation}
+        - params: {pageCategory: pmss}
+        - params: {sectionId: business}
+        - params: {pageCategory: duterte-at-the-icc}
+        - params: {pageCategory: sara-duterte-impeachment-trial}
+        - url: https://www.abs-cbn.com/war-on-drugs
+          link_selector: 'a[href*="/war-on-drugs/part"]'
+          include_page: true
+
+    discovery_by_mode:
+      INITIAL:
+        policy: full_scan
+      INCREMENTAL:
+        policy: stop_after_known
+        threshold: 10
+
+    extraction:
+      SourceURL: {source: response_url}
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          # Listings contain both YYYY/M/D and older M/D/YY URLs across sections.
+          pattern: '^https://www\.abs-cbn\.com/((?:[^/?#]+/)*(?:\d{4}/\d{1,2}/\d{1,2}|\d{1,2}/\d{1,2}/\d{2})/[^/?#]+|war-on-drugs(?:/part\d+)?)/?(?:[?#].*)?$'
+      Title: {selector: 'h1', required: true}
+      BodyText:
+        selector: '#bodyTopPart p, #bodyBottomPart p'
+        required: true
+        join_with: "\n\n"
+      date.originalValue: {selector: 'meta[property="article:published_time"]', output: attribute, attribute: content, required: true}
+      AuthorName: {selector: 'meta[name="author"]', output: attribute, attribute: content}
+      Summary: {selector: 'meta[property="og:description"]', output: attribute, attribute: content}
+      FeaturedImageUrl: {selector: 'meta[property="og:image"]', output: attribute, attribute: content}
+    extraction_by_url:
+      - pattern: '/war-on-drugs(?:/|$)'
+        fields:
+          Title: {selector: 'title'}
+          date.originalValue: {required: false}
+          AuthorName: {selector: '.author-name'}
+          BodyText:
+            selector: '[role="main"] p, [role="main"] h2'
+            join_with: "\n\n"
+
+    parser: {type: html}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
+  PHILSTAR_NEWS:
+    enabled: true
+    active: true
+    source_name: PHILSTAR_NEWS
+    dataset_name: PHILSTAR_NEWS
+    dataset_category: Media
+    schedule: hourly
+    date_order: MDY
+    source_page_url: https://www.philstar.com/headlines
+    url: https://www.philstar.com/headlines
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        transport: chrome
+        concurrent_requests: 100
+        concurrent_requests_per_domain: 100
+        download_delay: 0
+        randomize_download_delay: false
+        retry_times: 3
+        retry_http_codes: [403, 408, 429, 500, 502, 503, 504]
+
+    discovery:
+      strategy: listing_groups
+      policy: full_scan
+      parallel_groups: true
+      skip_known_details: true
+      article_base_url: https://www.philstar.com/
+      groups:
+        - url: https://www.philstar.com/headlines
+          link_selector: 'a[href^="https://www.philstar.com/headlines/20"]'
+          pagination: {type: next_link, selector: 'div.next > a[href]'}
+        - url: https://www.philstar.com/nation
+          link_selector: 'a[href^="https://www.philstar.com/nation/20"]'
+          pagination: {type: next_link, selector: 'div.next > a[href]'}
+        - url: https://www.philstar.com/business
+          link_selector: 'a[href^="https://www.philstar.com/business/20"]'
+          pagination: {type: next_link, selector: 'div.next > a[href]'}
+        - url: https://www.philstar.com/business/banking
+          link_selector: 'a[href^="https://www.philstar.com/business/banking/20"]'
+          pagination: {type: next_link, selector: 'div.next > a[href]'}
+
+    discovery_by_mode:
+      INITIAL: {policy: full_scan}
+      INCREMENTAL:
+        strategy: rss
+        policy: full_scan
+        article_url_pattern: '^https://www\.philstar\.com/(?:headlines|nation|business(?:/banking)?|banking)/\d{4}/\d{2}/\d{2}/\d+/'
+        feed_urls:
+          - https://www.philstar.com/rss/headlines
+          - https://www.philstar.com/rss/nation
+          - https://www.philstar.com/rss/business
+          - https://www.philstar.com/rss/business/banking
+
+    extraction:
+      SourceURL: {source: response_url}
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          pattern: '^https://www\.philstar\.com/(?:headlines|nation|business(?:/banking)?|banking)/\d{4}/\d{2}/\d{2}/(\d+)/'
+      Title: {selector: 'h1', required: true}
+      BodyText: {selector: 'div.article__writeup', required: true}
+      CategoryName: {selector: '.article__section-name'}
+      date.originalValue:
+        selector: '.article__date-published'
+        required: true
+        extraction: {strategy: regex, pattern: '^([A-Za-z]+ \d{1,2}, \d{4})'}
+      AuthorName: {selector: 'meta[name="author"]', output: attribute, attribute: content}
+      Summary: {selector: 'meta[property="og:description"]', output: attribute, attribute: content}
+      FeaturedImageUrl: {selector: 'meta[property="og:image"]', output: attribute, attribute: content}
+      KeywordText: {selector: 'meta[name="keywords"]', output: attribute, attribute: content}
+
+    parser: {type: html}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
+  NCA_NEWS:
+    enabled: true
+    active: true
+    source_name: NCA
+    dataset_name: NCA_NEWS
+    dataset_category: Media
+    schedule: daily
+    date_order: DMY
+    source_page_url: https://www.nationalcrimeagency.gov.uk/news
+    url: https://www.nationalcrimeagency.gov.uk/news
+
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        transport: chrome
+        concurrent_requests_per_domain: 3
+        download_delay: 0.25
+        retry_times: 3
+        retry_http_codes: [403, 408, 429, 500, 502, 503, 504]
+
+    discovery:
+      strategy: rss
+      policy: full_scan
+      feed_urls:
+        - https://www.nationalcrimeagency.gov.uk/news?format=feed&type=rss
+      pagination: {type: offset, page_size: 20, offset_param: start, size_param: null}
+      use_item_pub_date: true
+
+    discovery_by_mode:
+      INITIAL: {policy: full_scan}
+      INCREMENTAL: {policy: stop_after_known, threshold: 10}
+
+    extraction:
+      SourceURL: {source: response_url}
+      SourceRecordId:
+        source: response_url
+        extraction:
+          strategy: regex
+          pattern: '^https://www\.nationalcrimeagency\.gov\.uk/news/([^/?#]+)'
+      Title: {selector: 'h1[itemprop="headline"]', required: true}
+      BodyText: {selector: '[itemprop="articleBody"]', required: true}
+      Summary: {selector: 'meta[property="og:description"]', output: attribute, attribute: content}
+      FeaturedImageUrl: {selector: 'meta[property="og:image"]', output: attribute, attribute: content}
+      TagNames: {selector: 'li[itemprop="keywords"] > a.label', multiple: true}
+      date.originalValue: {selector: '[itemprop="articleBody"] > p:last-of-type > strong'}
+
+    parser: {type: html}
+    identity:
+      external_id: {field: SourceRecordId}
+      record_key:
+        fields: [source_name, dataset_name, SourceRecordId]
+
+  COURT_OF_APPEALS_PH_DECISIONS_AND_RESOLUTIONS:
+    enabled: true
+    active: true
+    source_name: COURT_OF_APPEALS_PH
+    dataset_name: COURT_OF_APPEALS_PH_DECISIONS_AND_RESOLUTIONS
+    dataset_category: Crime / Judicial Records
+    schedule: daily
+    date_order: MDY
+    source_page_url: https://services.ca.judiciary.gov.ph/recentdecisions/
+    url: https://services.ca.judiciary.gov.ph/recentdecisions/
+    acquisition:
+      type: crawler
+      spider: media
+      download_method: CRAWLER
+      crawler_settings:
+        concurrent_requests_per_domain: 1
+        download_delay: 1
+        retry_times: 3
+    discovery:
+      policy: full_scan
+      strategy: form_search
+      form_search: &ca_recent
+        start_url: https://services.ca.judiciary.gov.ph/recentdecisions/
+        metadata:
+          DiscoveryMethod: recent
+        stages:
+        - selector_type: xpath
+          row_selector: //table[@id='tbl-table']/tbody/tr
+          row_key:
+          - Station
+          - CaseNumber
+          - date.originalValue
+          unsupported_pagination_selector: //*[contains(concat(' ', normalize-space(@class), ' '), ' ui-paginator ')]
+          fields:
+            CaseNumber:
+              selector: td:nth-child(1) span
+              required: true
+            Station:
+              selector: td:nth-child(2) .station-value
+              required: true
+              values:
+                MANILA: mnl
+                VISAYAS: ceb
+                CEBU: ceb
+                MINDANAO: cdo
+                CAGAYAN DE ORO: cdo
+            Title:
+              selector: td:nth-child(3) p
+              required: true
+            date.originalValue:
+              selector: td:nth-child(1)
+              required: true
+              extraction:
+                strategy: regex
+                pattern: \(([A-Za-z]+ \d{1,2}, \d{4})\)
+          action:
+            submit_selector: form a[onclick][id]
+        document:
+          type: pdf
+          identity_fields: &ca_document_identity
+          - Station
+          - CaseNumber
+          - date.originalValue
+          - FileHash
+    parser:
+      type: pdf
+      mode: text
+      require_text: true
+      ocr_fallback: {}
+    identity:
+      external_id:
+        field: SourceRecordId
+      record_key:
+        fields:
+        - source_name
+        - dataset_name
+        - SourceRecordId
+        hash: true
+    discovery_by_mode:
+      INITIAL:
+        form_search:
+        - &ca_historical
+          start_url: https://services.ca.judiciary.gov.ph/csisver3-war/
+          parameters:
+            station:
+              values:
+              - mnl
+            case_number:
+              range:
+                start: 1
+                end: 300000
+              format: 05d
+          parameter_fields:
+            Station: station
+          metadata:
+            DiscoveryMethod: historical
+          search_action:
+            form_xpath: //form[@id="searching"]
+            fields:
+              searching:radio-id: '{station}'
+              searching:dt-search-0: '{case_number}'
+              searching:search-button: ''
+          stages:
+          - selector_type: xpath
+            row_selector: //table[@id='tbl-table']/tbody/tr
+            row_key:
+            - CaseNumber
+            unsupported_pagination_selector: //*[contains(concat(' ', normalize-space(@class), ' '), ' ui-paginator ')]
+            fields:
+              CaseNumber:
+                selector: td:nth-child(1)
+                required: true
+              Title:
+                selector: td:nth-child(3) p
+                required: true
+              CaseStatus:
+                selector: td:nth-child(4)
+            action:
+              submit_selector: form a[onclick][id]
+            empty_source: html
+            empty_pattern: No record.*?Retrieved
+          - selector_type: xpath
+            row_selector: //table[@id='tbl-table']/tbody/tr
+            row_key:
+            - date.originalValue
+            unsupported_pagination_selector: //*[contains(concat(' ', normalize-space(@class), ' '), ' ui-paginator ')]
+            fields:
+              date.originalValue:
+                selector: td:nth-child(1)
+                required: true
+                extraction:
+                  strategy: regex
+                  pattern: ([A-Za-z]+ \d{1,2}, \d{4})
+            action:
+              submit_selector: form a[onclick][id]
+            empty_pattern: Decisions / Resolutions No data available\.
+            page_fields:
+              CaseDetailText:
+                selector_type: xpath
+                selector: //body
+          document:
+            type: pdf
+            identity_fields: *ca_document_identity
+        - <<: *ca_historical
+          parameters:
+            station:
+              values: [ceb]
+            case_number:
+              range: {start: 1, end: 40000}
+              format: 05d
+        - <<: *ca_historical
+          parameters:
+            station:
+              values: [cdo]
+            case_number:
+              range: {start: 1, end: 30000}
+              format: 05d
+        - *ca_recent
+      INCREMENTAL:
+        form_search: *ca_recent
 
   GMA_NEWS:
     enabled: true
@@ -1444,6 +2228,8 @@ sources:
     parser:
       type: pdf
       mode: text
+      require_text: true
+      ocr_fallback: {}
 
     identity:
       external_id:

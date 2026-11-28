@@ -72,6 +72,7 @@ class StealthBrowserEngine(BaseEngine):
         self.downloadPdfs = downloadPdfs
         self.downloadDirectory = None
         self._downloadTemp = None
+        self.last_navigation_error = None
     
     def __enter__(self):
         """Initialize StealthBot."""
@@ -152,6 +153,7 @@ class StealthBrowserEngine(BaseEngine):
             True if navigation succeeded
         """
         logger.info(f"Navigating to: {url}")
+        self.last_navigation_error = None
 
         try:
             if self.navigationMode == "uc_open":
@@ -179,6 +181,10 @@ class StealthBrowserEngine(BaseEngine):
                 logger.info("Browser download started during navigation: %s", type(e).__name__)
                 return True
             logger.error(f"Navigation failed: {type(e).__name__}: {e}")
+            self.last_navigation_error = {
+                "type": type(e).__name__,
+                "message": str(e),
+            }
             return False
     
     def getHtml(self) -> Optional[str]:

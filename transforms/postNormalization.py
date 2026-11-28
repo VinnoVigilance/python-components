@@ -7,7 +7,6 @@ import re
 import unicodedata
 from transforms.post_normalization.dateResolver import MAX_YEAR
 
-from inscriptis import get_text
 import logging
 
 
@@ -191,35 +190,28 @@ def date_component_handler(entity, rule, config=None):
 
 
 def normalize_body_text_handler(entity, rule, config=None):
-    """Create normalized plain text from Content.BodyOriginalValue."""
+    """Clean mapped plain text consistently, preserving the original source body."""
 
     content = entity.get("Content")
 
     if not isinstance(content, dict):
         return
 
-    if "BodyOriginalValue" not in content:
+    if "BodyText" not in content:
         return
 
-    original_value = content.get("BodyOriginalValue")
+    body_text = content.get("BodyText")
 
-    if original_value is None:
-        content["BodyText"] = None
+    if body_text is None:
         return
 
-    if not isinstance(original_value, str):
+    if not isinstance(body_text, str):
         raise TypeError(
-            "Content.BodyOriginalValue must be a string or None."
+            "Content.BodyText must be a string or None."
         )
 
-    # Decode encoded HTML such as &lt;p&gt; before parsing.
-    decoded_value = html.unescape(original_value)
-
-    # Convert HTML to plain text while preserving paragraph/list boundaries.
-    normalized_text = get_text(decoded_value)
-
     # Normalize Unicode characters.
-    normalized_text = unicodedata.normalize("NFC", normalized_text)
+    normalized_text = unicodedata.normalize("NFC", body_text)
 
     # Normalize special spaces and line endings.
     normalized_text = (

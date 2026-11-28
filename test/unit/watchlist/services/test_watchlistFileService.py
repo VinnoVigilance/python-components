@@ -32,6 +32,43 @@ from services.watchlistPipeline import watchlistFileService as fs  # noqa: E402
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("config_key,source_name,list_name", [
+    ("DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY", "DBM_PH", "DBM_PH_GOVERNMENT_OFFICIALS_DIRECTORY"),
+    ("BIS_DPL", "BIS", "BIS_DPL"),
+    ("SC_PH_INCUMBENT_JUSTICES", "SC_PH", "SC_PH_INCUMBENT_JUSTICES"),
+    ("SEC_US_PAUSE", "SEC_US", "SEC_US_PAUSE"),
+    ("CRIMESTOPPERS_UK_MOST_WANTED", "CRIMESTOPPERS_UK", "CRIMESTOPPERS_UK_MOST_WANTED"),
+])
+def test_config_resolves_registered_source_and_dataset(monkeypatch, config_key, source_name, list_name):
+    from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+
+    connection = MagicMock()
+    monkeypatch.setattr(fs.connection_pool, "getconn", lambda: connection)
+    release = MagicMock()
+    monkeypatch.setattr(fs.connection_pool, "putconn", release)
+    source_lookup = MagicMock(
+        side_effect=lambda *, cursor, source_name: 17 if source_name == expected_source else None
+    )
+    dataset_lookup = MagicMock(
+        side_effect=lambda *, cursor, source_id, list_name: (
+            23 if (source_id, list_name) == (17, expected_list) else None
+        )
+    )
+    monkeypatch.setattr(fs.watchlistFileRepository, "find_source_id", source_lookup)
+    monkeypatch.setattr(fs.watchlistFileRepository, "find_list_type_id", dataset_lookup)
+
+    expected_source, expected_list = source_name, list_name
+    result = fs.resolve_lookup_values(WATCHLIST_CONFIGS[config_key])
+
+    assert result == {"source_id": 17, "list_type_id": 23}
+    cursor = connection.cursor.return_value.__enter__.return_value
+    source_lookup.assert_called_once_with(cursor=cursor, source_name=source_name)
+    dataset_lookup.assert_called_once_with(
+        cursor=cursor, source_id=17, list_name=list_name
+    )
+    release.assert_called_once_with(connection)
+
+
 def test_meti_uses_existing_resolver_and_downloader(monkeypatch, tmp_path):
     config = {
         "source_name": "METI", "list_name": "METI_FOREIGN_END_USER_LIST",

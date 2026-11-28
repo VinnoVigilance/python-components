@@ -18,6 +18,29 @@ def load_items(dataset_name: str) -> list[dict[str, Any]]:
     return list((state or {}).get("items", {}).values())
 
 
+def queue_items(dataset_name: str, pending: list[dict[str, Any]]) -> None:
+    """Save pending acquisition or processing work without changing other items."""
+    state = jobStateRepository.load_state(MEDIA_TODO_KIND, dataset_name) or {
+        "dataset_name": dataset_name, "items": {},
+    }
+    for item in pending:
+        key = item["record_key"]
+        state["items"][key] = {**state["items"].get(key, {}), **item}
+    jobStateRepository.save_state(MEDIA_TODO_KIND, dataset_name, state)
+
+
+def remove_items(dataset_name: str, keys: list[str]) -> None:
+    """Complete acquisition work after its downloaded children are durable."""
+    state = jobStateRepository.load_state(MEDIA_TODO_KIND, dataset_name)
+    if state:
+        for key in keys:
+            state["items"].pop(key, None)
+        if state["items"]:
+            jobStateRepository.save_state(MEDIA_TODO_KIND, dataset_name, state)
+        else:
+            jobStateRepository.delete_state(MEDIA_TODO_KIND, dataset_name)
+
+
 def _candidate_keys(
     acquired: dict[str, Any],
     result: dict[str, Any],
@@ -37,17 +60,21 @@ def _candidate_keys(
 def _retry_item(acquired: dict[str, Any]) -> dict[str, Any] | None:
     """Keep what a later run needs to retry one failed item."""
 
+    if acquired.get("retry_listing"):
+        return {"kind": "list_only", "record_key": acquired["record_key"]}
+
     if acquired.get("discovery_retry_item"):
         return dict(acquired["discovery_retry_item"])
 
     detail_file_path = acquired.get("detail_file_path")
 
-    if detail_file_path and Path(detail_file_path).is_file():
+    if detail_file_path and (Path(detail_file_path).is_file() or acquired.get("discovery_context")):
         return {
             "kind": "process",
             "record_key": acquired.get("record_key"),
             "detail_file_path": detail_file_path,
             "extracted": acquired.get("extracted"),
+            **({"discovery_context": acquired["discovery_context"]} if acquired.get("discovery_context") else {}),
         }
 
     detail_url = acquired.get("detail_url") or (
@@ -102,7 +129,10 @@ def update_items(
     for acquired, result in zip(acquired_records, record_results):
         keys = _candidate_keys(acquired, result)
 
-        if result.get("status") in _DONE_STATUSES:
+        document_errors = result.get("document_errors")
+        if document_errors is None:
+            document_errors = (acquired.get("extracted") or {}).get("DocumentErrors")
+        if result.get("status") in _DONE_STATUSES and not document_errors:
             for key in keys:
                 if items.pop(key, None) is not None:
                     removed += 1
@@ -121,8 +151,8 @@ def update_items(
             attempts=previous.get("attempts", 0) + 1,
             first_failed_at=previous.get("first_failed_at", now),
             last_failed_at=now,
-            error=result.get("error"),
-            error_stage=result.get("error_stage"),
+            error=document_errors or result.get("error"),
+            error_stage="DOCUMENTS" if document_errors else result.get("error_stage"),
         )
         items[keys[0]] = item
         added += 0 if previous else 1
