@@ -1484,9 +1484,9 @@ class MediaSpider(scrapy.Spider):
                 "is required for list_only."
             )
 
-        rows = response.css(
-            row_selector
-        )
+        article = self.discovery_config.get("article", {})
+        select = response.xpath if article.get("selector_type") == "xpath" else response.css
+        rows = select(row_selector)
 
         if not rows:
             self.logger.error(
@@ -1499,8 +1499,9 @@ class MediaSpider(scrapy.Spider):
             return
 
         for row in rows:
-
             try:
+                fields = (self._extract_record(row, fields=article["fields"], base_url=response.url)
+                          if "fields" in article else {})
                 identity_fields = (
                     self._extract_identity_fields(
                         row
@@ -1512,6 +1513,7 @@ class MediaSpider(scrapy.Spider):
                     .build_record_key(
                         {
                             "SourceURL": response.url,
+                            **fields,
                             **identity_fields,
                         }
                     )
@@ -1556,9 +1558,15 @@ class MediaSpider(scrapy.Spider):
 
             self.discovery_service.record_detail_selected()
 
+            content = row.get()
+            if article.get("preserve_table_headers"):
+                headers = row.xpath("ancestor::table[1]/thead").get()
+                if not headers:
+                    raise ValueError("Listing row has no table headers to preserve")
+                content = f"<table>{headers}<tbody>{content}</tbody></table>"
             row_response = HtmlResponse(
                 url=response.url,
-                body=row.get(),
+                body=content,
                 encoding="utf-8",
             )
 
@@ -1568,6 +1576,7 @@ class MediaSpider(scrapy.Spider):
                 is_known=is_known,
                 source_record_id=None,
                 identity_fields=identity_fields,
+                extracted_record=fields if "fields" in article else None,
             )
 
             if should_stop:
@@ -1840,6 +1849,10 @@ class MediaSpider(scrapy.Spider):
 
             selected_nodes = (response.xpath(selector) if field_config.get("selector_type") == "xpath"
                               else response.css(selector))
+
+            if (field_config.get("max_matches") is not None
+                    and len(selected_nodes) > field_config["max_matches"]):
+                raise ValueError(f"Extraction matched more than max_matches: {selector}")
 
             if not selected_nodes:
                 if field_config.get("required"):
