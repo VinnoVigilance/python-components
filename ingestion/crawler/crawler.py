@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import json
 from pathlib import Path
@@ -448,6 +449,14 @@ def crawl_source(
     # =====================================================
 
     if crawler_settings:
+
+        if "download_timeout" in crawler_settings:
+            timeout = crawler_settings["download_timeout"]
+            if (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
+                    or not math.isfinite(timeout) or timeout <= 0):
+                raise ValueError("crawler_settings.download_timeout must be a finite positive number of seconds")
+            task.timeout = timeout
+            settings.set("DOWNLOAD_TIMEOUT", timeout)
 
         # ---------------------------------------------
         # Concurrent requests
