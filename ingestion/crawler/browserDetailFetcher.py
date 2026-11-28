@@ -133,6 +133,8 @@ class BrowserDetailFetcher:
                 detail_url = item.get(
                     "detail_url"
                 )
+                error_category = "BROWSER_FETCH_FAILED"
+                navigation_error = None
 
                 try:
                     if not detail_url:
@@ -183,9 +185,18 @@ class BrowserDetailFetcher:
                             0 if wait_selector else 5
                         ),
                     ):
+                        navigation_error = getattr(engine, "last_navigation_error", None)
+                        navigation_error_type = (navigation_error or {}).get("type", "")
+                        error_category = {
+                            "ChallengeNotSolvedError": "CHALLENGE_UNRESOLVED",
+                            "SuccessCriteriaNotMetError": "CONTENT_CHECK_FAILED",
+                            "TimeoutException": "NAVIGATION_TIMEOUT",
+                            "TimeoutError": "NAVIGATION_TIMEOUT",
+                        }.get(navigation_error_type, "NAVIGATION_FAILED")
                         raise RuntimeError(
-                            "Could not open detail page: "
-                            f"{detail_url}"
+                            "Detail page was not successfully read: "
+                            f"{detail_url}; reason="
+                            f"{(navigation_error or {}).get('message', 'navigation failed')}"
                         )
 
                     if (
@@ -195,6 +206,7 @@ class BrowserDetailFetcher:
                             timeout_seconds,
                         )
                     ):
+                        error_category = "CONTENT_NOT_READY"
                         raise RuntimeError(
                             "Detail page did not become "
                             f"ready: {detail_url}"
@@ -208,6 +220,7 @@ class BrowserDetailFetcher:
                     html = engine.getHtml()
 
                     if not html:
+                        error_category = "EMPTY_HTML"
                         raise RuntimeError(
                             "Detail page returned empty "
                             f"HTML: {detail_url}"
@@ -228,10 +241,11 @@ class BrowserDetailFetcher:
 
                 except Exception as error:
                     self.logger.exception(
-                        "Browser Media detail failed; "
+                        "Browser detail was not successfully read; "
                         "continuing with the next item. "
-                        "url=%s",
+                        "url=%s error_category=%s",
                         detail_url,
+                        error_category,
                     )
 
                     try:
@@ -248,8 +262,10 @@ class BrowserDetailFetcher:
                             **item,
                             "fetch_error": str(error),
                             "fetch_error_type": (
-                                type(error).__name__
+                                (navigation_error or {}).get("type")
+                                or type(error).__name__
                             ),
+                            "fetch_error_category": error_category,
                         },
                         None,
                     )

@@ -72,16 +72,29 @@ class GenericSpider(scrapy.Spider):
         request = failure.request
         status = getattr(getattr(failure.value, "response", None), "status", None)
         message = failure.getErrorMessage()
+        error_category = (
+            "HTTP_NOT_FOUND" if status == 404 else
+            "HTTP_GONE" if status == 410 else
+            "HTTP_ERROR" if status else
+            "REDIRECT_LIMIT" if "max redirections" in message.lower() else
+            "REQUEST_FAILED"
+        )
         item = self._expected_by_id.get(str(request.cb_kwargs.get("record_id")))
 
         if item is not None:
             item["error"] = f"HTTP {status}" if status else message
+            item["error_type"] = type(failure.value).__name__
+            item["error_category"] = error_category
+            item["http_status"] = status
             item["permanent"] = (
                 status in self.PERMANENT_HTTP_STATUSES
                 or "max redirections" in message.lower()
             )
 
-        self.logger.error("Detail page failed. url=%s error=%s", request.url, message)
+        self.logger.error(
+            "Detail request failed. url=%s error_category=%s http_status=%s error=%s",
+            request.url, error_category, status, message,
+        )
 
     def _uses_next_link_pagination(self):
         return str(

@@ -79,6 +79,33 @@ def test_navigation_pdf_configures_isolated_browser_downloads():
 ENGINE_TIME = "ingestion.bypassCollector.engines.stealthBrowserEngine.time"
 
 
+@pytest.mark.parametrize("mode", ["safe_get", "uc_open"])
+def test_navigation_retains_original_error_and_clears_it_on_success(mode):
+    engine = StealthBrowserEngine(navigationMode=mode)
+    engine._bot = MagicMock()
+    engine.sb = MagicMock()
+    navigate = engine._bot.safe_get if mode == "safe_get" else engine.sb.driver.uc_open
+    navigate.side_effect = [TimeoutError("page took too long"), None]
+
+    assert engine.last_navigation_error is None
+    assert engine.navigate("https://x/failed", settle_seconds=0) is False
+    assert engine.last_navigation_error == {"type": "TimeoutError", "message": "page took too long"}
+    assert engine.navigate("https://x/next", settle_seconds=0) is True
+    assert engine.last_navigation_error is None
+
+
+def test_navigation_download_success_does_not_leave_a_stale_error(tmp_path):
+    engine = StealthBrowserEngine()
+    engine._bot = MagicMock()
+    engine._bot.safe_get.side_effect = RuntimeError("download navigation interrupted")
+    engine.downloadDirectory = tmp_path
+    (tmp_path / "order.pdf").write_bytes(b"%PDF-example")
+    engine.last_navigation_error = {"type": "TimeoutError", "message": "previous page"}
+
+    assert engine.navigate("https://x/order.pdf", settle_seconds=0) is True
+    assert engine.last_navigation_error is None
+
+
 @pytest.mark.parametrize("settle, expected_sleeps", [(None, [5]), (0, [])])
 def test_navigate_sleeps_only_when_asked(settle, expected_sleeps):
     engine = StealthBrowserEngine()

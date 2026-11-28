@@ -36,6 +36,7 @@ def test_navigation_mode_reaches_existing_engine(mode):
 
 def test_detail_failure_does_not_block_remaining_items():
     first_engine = MagicMock()
+    first_engine.last_navigation_error = None
     first_engine.navigate.side_effect = [
         True,
         False,
@@ -78,9 +79,11 @@ def test_detail_failure_does_not_block_remaining_items():
     assert len(results) == 3
     assert results[0][1] is not None
     assert results[1][1] is None
-    assert "Could not open detail page" in (
+    assert "Detail page was not successfully read" in (
         results[1][0]["fetch_error"]
     )
+    assert results[1][0]["fetch_error_category"] == "NAVIGATION_FAILED"
+    assert results[1][0]["fetch_error_type"] == "RuntimeError"
     assert results[2][1] is not None
 
     # A failed browser session is discarded and the
@@ -96,6 +99,61 @@ def test_detail_failure_does_not_block_remaining_items():
         None,
         None,
     )
+
+
+@pytest.mark.parametrize("error_type,category", [
+    ("ChallengeNotSolvedError", "CHALLENGE_UNRESOLVED"),
+    ("SuccessCriteriaNotMetError", "CONTENT_CHECK_FAILED"),
+    ("TimeoutException", "NAVIGATION_TIMEOUT"),
+    ("TimeoutError", "NAVIGATION_TIMEOUT"),
+    ("UnexpectedBrowserError", "NAVIGATION_FAILED"),
+])
+def test_navigation_failure_preserves_original_cause(error_type, category):
+    engine = MagicMock()
+    engine.navigate.return_value = False
+    engine.last_navigation_error = {"type": error_type, "message": "original browser failure"}
+    item = {"record_id": "7", "detail_url": "https://x/7", "list_data": {"name": "Example"}}
+    fetcher = BrowserDetailFetcher(
+        browser_config={}, storage_config={"reuse_saved_detail_pages": False},
+        engine_factory=MagicMock(return_value=engine),
+    )
+
+    [(failed, response)] = list(fetcher.fetch([item]))
+
+    assert response is None
+    assert failed["fetch_error_category"] == category
+    assert failed["fetch_error_type"] == error_type
+    assert "original browser failure" in failed["fetch_error"]
+    assert failed["record_id"] == item["record_id"]
+    assert failed["list_data"] == item["list_data"]
+    assert "fetch_error" not in item
+    engine.getHtml.assert_not_called()
+
+
+@pytest.mark.parametrize("failure,category,error_type", [
+    ("selector", "CONTENT_NOT_READY", "RuntimeError"),
+    ("empty", "EMPTY_HTML", "RuntimeError"),
+    ("exception", "BROWSER_FETCH_FAILED", "ValueError"),
+])
+def test_browser_failure_categories_are_distinct(failure, category, error_type):
+    engine = MagicMock()
+    engine.navigate.return_value = True
+    engine.waitForElement.return_value = failure != "selector"
+    engine.getHtml.return_value = "" if failure == "empty" else "<html/>"
+    if failure == "exception":
+        engine.getHtml.side_effect = ValueError("cannot read DOM")
+    fetcher = BrowserDetailFetcher(
+        browser_config={"wait_selector": ".detail"},
+        storage_config={"reuse_saved_detail_pages": False},
+        engine_factory=MagicMock(return_value=engine),
+    )
+
+    [(failed, response)] = list(fetcher.fetch([{"detail_url": "https://x/7"}]))
+
+    assert response is None
+    assert failed["fetch_error_category"] == category
+    assert failed["fetch_error_type"] == error_type
+    engine.__exit__.assert_called_once_with(None, None, None)
 
 
 def _fetch_three(browser_config):

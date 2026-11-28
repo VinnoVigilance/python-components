@@ -48,7 +48,8 @@ def test_find_missing_details_compares_queued_pages_with_records():
 
 
 def test_broken_pages_become_list_only_records_and_are_not_missing():
-    gone = {**_item("2"), "permanent": True, "error": "HTTP 404"}
+    gone = {**_item("2"), "permanent": True, "error": "HTTP 404",
+            "error_category": "HTTP_NOT_FOUND", "error_type": "HttpError", "http_status": 404}
     slow = {**_item("3"), "permanent": False, "error": "timeout"}
     records = [{"source_record_id": "1"}]
 
@@ -59,6 +60,8 @@ def test_broken_pages_become_list_only_records_and_are_not_missing():
     assert records[1] == {
         "source_record_id": "2", "list": {"n": "2"}, "detail": {}, "attachments": [],
         "detail_url": "https://x/2", "detail_error": "HTTP 404",
+        "detail_error_category": "HTTP_NOT_FOUND", "detail_error_type": "HttpError",
+        "detail_http_status": 404,
     }
     assert missing == [slow]
 
@@ -103,14 +106,14 @@ class TestGenericSpider:
         assert [r.cb_kwargs["record_id"] for r in requests] == ["1", "2"]
         assert all(r.dont_filter for r in requests)
 
-    @pytest.mark.parametrize("status, message, permanent", [
-        (404, "Ignoring non-200 response", True),
-        (410, "Ignoring non-200 response", True),
-        (503, "Ignoring non-200 response", False),
-        (None, "Maximum number of redirections reached (max redirections)", True),
-        (None, "User timeout caused connection failure", False),
+    @pytest.mark.parametrize("status, message, permanent, category", [
+        (404, "Ignoring non-200 response", True, "HTTP_NOT_FOUND"),
+        (410, "Ignoring non-200 response", True, "HTTP_GONE"),
+        (503, "Ignoring non-200 response", False, "HTTP_ERROR"),
+        (None, "Maximum number of redirections reached (max redirections)", True, "REDIRECT_LIMIT"),
+        (None, "User timeout caused connection failure", False, "REQUEST_FAILED"),
     ])
-    def test_detail_failed_marks_broken_on_source(self, status, message, permanent):
+    def test_detail_failed_marks_broken_on_source(self, status, message, permanent, category):
         spider, expected = self._spider()
         spider._expect_detail("7", "https://x/7", {})
 
@@ -118,6 +121,9 @@ class TestGenericSpider:
 
         assert expected[0]["permanent"] is permanent
         assert expected[0]["error"] == (f"HTTP {status}" if status else message)
+        assert expected[0]["error_category"] == category
+        assert expected[0]["error_type"] == "SimpleNamespace"
+        assert expected[0]["http_status"] == status
 
 
 class TestSavedHtmlSpider:
@@ -133,7 +139,8 @@ class TestSavedHtmlSpider:
     def test_failed_browser_detail_is_skipped_and_marked(self):
         spider, expected = self._spider()
         spider._expect_detail("7", "https://x/7", {})
-        failed = {**_item("7"), "fetch_error": "navigation timeout"}
+        failed = {**_item("7"), "fetch_error": "navigation timeout",
+                  "fetch_error_type": "TimeoutError", "fetch_error_category": "NAVIGATION_TIMEOUT"}
         fetcher = MagicMock()
         fetcher.fetch.return_value = [(failed, None)]
 
@@ -143,6 +150,8 @@ class TestSavedHtmlSpider:
 
         assert results == []
         assert expected[0]["error"] == "navigation timeout"
+        assert expected[0]["error_type"] == "TimeoutError"
+        assert expected[0]["error_category"] == "NAVIGATION_TIMEOUT"
         assert expected[0]["permanent"] is False
 
     def test_detail_items_without_browser_yield_requests(self):
@@ -154,6 +163,48 @@ class TestSavedHtmlSpider:
         assert request.dont_filter
         assert request.errback == spider.detail_failed
         assert [item["record_id"] for item in expected] == ["4"]
+
+    def test_optional_browser_failure_keeps_listing_and_diagnostics(self):
+        spider, expected = self._spider()
+        spider.config["record_mode"] = "list_optional_detail"
+        failed = {**_item("7"), "fetch_error": "challenge blocked",
+                  "fetch_error_type": "ChallengeNotSolvedError",
+                  "fetch_error_category": "CHALLENGE_UNRESOLVED"}
+        fetcher = MagicMock()
+        fetcher.fetch.return_value = [(failed, None)]
+
+        with patch("ingestion.crawler.spiders.savedHtmlSpider.BrowserDetailFetcher",
+                   return_value=fetcher):
+            [record] = list(spider._fetch_browser_details([_item("7")]))
+
+        assert record["list"] == {"n": "7"}
+        assert record["detail"] == {}
+        assert record["fetch_error"] == "challenge blocked"
+        assert record["fetch_error_type"] == "ChallengeNotSolvedError"
+        assert record["fetch_error_category"] == "CHALLENGE_UNRESOLVED"
+        assert record["attachments"] == [{"type": "DETAIL_PAGE", "url": "https://x/7"}]
+        assert spider.records == [record]
+
+    @pytest.mark.parametrize("status,category", [
+        (404, "HTTP_NOT_FOUND"), (410, "HTTP_GONE"),
+        (503, "HTTP_ERROR"), (None, "REQUEST_FAILED"),
+    ])
+    def test_optional_http_failure_keeps_listing_and_diagnostics(self, status, category):
+        spider, _ = self._spider(strategy="direct")
+        failure = _failure("https://x/7", _item("7"), "request failed", status)
+
+        [record] = list(spider._handle_optional_detail_failure(failure))
+
+        assert record["source_record_id"] == "7"
+        assert record["list"] == {"n": "7"}
+        assert record["detail"] == {}
+        assert record["fetch_error_type"] == "SimpleNamespace"
+        assert record["fetch_error_category"] == category
+        if status is not None:
+            assert record["fetch_http_status"] == status
+        else:
+            assert "fetch_http_status" not in record
+        assert spider.records == [record]
 
 
 class TestMediaSpider:
