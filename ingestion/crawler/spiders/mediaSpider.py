@@ -2,6 +2,7 @@ import hashlib
 import itertools
 import json
 import re
+from collections.abc import Callable
 from datetime import date, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -1468,6 +1469,8 @@ class MediaSpider(scrapy.Spider):
     def parse_list_rows(
         self,
         response,
+        *,
+        prepare_record: Callable[[dict[str, Any]], None] | None = None,
     ):
         """Build one record per listing row for list_only sources (no detail pages)."""
 
@@ -1577,6 +1580,7 @@ class MediaSpider(scrapy.Spider):
                 source_record_id=None,
                 identity_fields=identity_fields,
                 extracted_record=fields if "fields" in article else None,
+                prepare_record=prepare_record,
             )
 
             if should_stop:
@@ -1593,6 +1597,7 @@ class MediaSpider(scrapy.Spider):
         identity_fields: dict[str, Any] | None = None,
         discovery_retry_key: str | None = None,
         extracted_record: dict[str, Any] | None = None,
+        prepare_record: Callable[[dict[str, Any]], None] | None = None,
     ):
         """
         Save original HTML first, then extract fields.
@@ -1602,6 +1607,8 @@ class MediaSpider(scrapy.Spider):
 
         Configured navigation may supply already extracted fields, preserving
         parent metadata without extracting the final page a second time.
+        Optional record preparation finishes before buffering, including for
+        buffers that serialize immediately rather than retaining object references.
         """
 
         file_name_id = self._build_file_name_id(
@@ -1670,6 +1677,9 @@ class MediaSpider(scrapy.Spider):
             "extracted": extracted_record,
             "discovery_retry_key": discovery_retry_key,
         }
+
+        if prepare_record is not None:
+            prepare_record(result)
 
         self.records.append(
             result

@@ -108,6 +108,28 @@ def _wire(monkeypatch, records, normalize_side_effect=None):
 
 class TestMediaPipelineWiring:
 
+    @pytest.mark.parametrize("normalization_fails", [False, True])
+    def test_attachment_errors_reach_retry_queue_without_mutating_acquired_record(self, tmp_path, monkeypatch, normalization_fails):
+        import json
+        from utils.jsonlRecordBuffer import JsonlRecordBuffer
+
+        records = JsonlRecordBuffer(tmp_path / "records.jsonl")
+        try:
+            records.append({"record_key": "entry", "media_file_id": 10, "retry_listing": True,
+                            "extracted": {"DocumentErrors": []}})
+            mocks = _wire(monkeypatch, records,
+                          normalize_side_effect=ValueError("mapping failed") if normalization_fails else None)
+            errors = [{"url": "https://court.example/order.pdf", "stage": "parse", "error": "OCR failed"}]
+            mocks.raw.process_acquired_record.side_effect = lambda **_: [{"DocumentErrors": errors}]
+            result = mp.run_media_pipeline("TEST_DATASET", mode="INCREMENTAL")
+            assert result["records"][0]["document_errors"] == errors
+            assert json.loads(records.path.read_text(encoding="utf-8"))["extracted"]["DocumentErrors"] == []
+            [pending] = mp.mediaTodoService.load_items("TEST_DATASET")
+            assert pending["kind"] == "list_only"
+            assert pending["error"] == errors
+        finally:
+            records.close()
+
     def test_unknown_dataset_raises(self, monkeypatch):
         monkeypatch.setattr(mp, "load_media_config", lambda: _config())
         monkeypatch.setattr(

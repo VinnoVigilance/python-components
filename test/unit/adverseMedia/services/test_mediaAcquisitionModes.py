@@ -349,7 +349,8 @@ def test_persistence_failure_keeps_navigation_context_for_recovery(monkeypatch):
     from services.adverseMediaPipeline import mediaAcquisitionService as module
 
     context = {"kind": "form_search", "record_key": "query"}
-    record = {"record_key": "publication", "detail_file_path": "decision.pdf", "discovery_context": context}
+    record = {"record_key": "publication", "detail_file_path": "decision.pdf", "discovery_context": context,
+              "retry_listing": True, "attachment_manifest": True, "discovery_retry_item": context}
     source = {**_crawler_config(), "discovery": {"policy": "full_scan"}}
     monkeypatch.setattr(MediaAcquisitionService, "_validate_source_config", lambda *_: None)
     monkeypatch.setattr(MediaAcquisitionService, "_resolve_lookup_values", lambda *_, **__: {"source_id": 1, "dataset_id": 2})
@@ -363,6 +364,29 @@ def test_persistence_failure_keeps_navigation_context_for_recovery(monkeypatch):
     assert failed["error_stage"] == "RAW_PERSISTENCE"
     assert failed["discovery_context"] == context
     assert failed["detail_file_path"] == "decision.pdf"
+    assert failed["retry_listing"] is True
+    assert failed["attachment_manifest"] is True
+    assert failed["discovery_retry_item"] == context
+
+
+def test_listing_retry_refreshes_index_instead_of_fetching_shared_url_as_detail(monkeypatch):
+    from services.adverseMediaPipeline import mediaAcquisitionService as module
+
+    source = {**_crawler_config(), "discovery": {"strategy": "list_only", "policy": "full_scan"}}
+    monkeypatch.setattr(MediaAcquisitionService, "_validate_source_config", lambda *_: None)
+    monkeypatch.setattr(MediaAcquisitionService, "_resolve_lookup_values", lambda *_, **__: {"source_id": 1, "dataset_id": 2})
+    monkeypatch.setattr(module.mediaTodoService, "load_items", lambda _: [{"kind": "list_only", "record_key": "entry"}])
+    acquire = MagicMock(return_value=module.MediaSourceAcquisitionResult())
+    todo_acquire = MagicMock()
+    monkeypatch.setattr(MediaAcquisitionService, "_acquire_source", acquire)
+    monkeypatch.setattr(MediaAcquisitionService, "_acquire_todo_items", todo_acquire)
+
+    MediaAcquisitionService().acquire(source, "RETRY")
+
+    todo_acquire.assert_not_called()
+    acquire.assert_called_once()
+    assert acquire.call_args.kwargs["mode"] == "INCREMENTAL"
+    assert acquire.call_args.kwargs["discovery_policy"] == "full_scan"
 
 
 def test_raw_persistence_logs_progress_every_100_records(monkeypatch, caplog):

@@ -149,3 +149,28 @@ def test_pipeline_success_removes_a_publication_queued_during_acquisition():
 
     assert counts["todo_removed_count"] == 1
     assert todo.load_items(DATASET) == []
+
+
+@pytest.mark.parametrize("status", ["INSERTED", "SKIPPED"])
+def test_metadata_success_keeps_attachment_failure_pending_until_documents_succeed(tmp_path, status):
+    from utils.jsonlRecordBuffer import JsonlRecordBuffer
+
+    records = JsonlRecordBuffer(tmp_path / "records.jsonl")
+    try:
+        records.append({"record_key": "entry", "retry_listing": True,
+                        "extracted": {"SourceURL": "https://court.example/index", "DocumentErrors": []}})
+        errors = [{"url": "https://court.example/order.pdf", "stage": "parse", "error": "OCR failed"}]
+        counts = todo.update_items(DATASET, records, [
+            {"record_key": "entry", "status": status, "document_errors": errors},
+        ])
+        [item] = todo.load_items(DATASET)
+        assert item["kind"] == "list_only"
+        assert item["error"] == errors
+        assert counts["todo_pending_count"] == 1
+        counts = todo.update_items(DATASET, records, [
+            {"record_key": "entry", "status": status, "document_errors": []},
+        ])
+        assert counts["todo_removed_count"] == 1
+        assert todo.load_items(DATASET) == []
+    finally:
+        records.close()

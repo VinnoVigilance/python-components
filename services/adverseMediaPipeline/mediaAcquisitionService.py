@@ -1,9 +1,12 @@
 import logging
+import hashlib
+import json
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from itertools import islice
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from time import perf_counter
 from typing import Any
 
@@ -306,7 +309,18 @@ class MediaAcquisitionService:
         # =================================================
 
         if mode == "RETRY":
-            source_result = self._acquire_todo_items(source_config=source_config)
+            if (source_config.get("discovery", {}).get("strategy") == "list_only"
+                    and any(item.get("kind") == "list_only"
+                            for item in mediaTodoService.load_items(dataset_name))):
+                # Row positions are not replayable URLs. Refresh the index using
+                # its normal acquisition path, including browser clearing.
+                source_result = self._acquire_source(
+                    source_config=source_config, acquisition_type=acquisition_type,
+                    source_id=source_id, dataset_id=dataset_id, mode="INCREMENTAL",
+                    discovery_policy="full_scan", known_threshold=known_threshold,
+                )
+            else:
+                source_result = self._acquire_todo_items(source_config=source_config)
 
         else:
             source_result = (
@@ -384,6 +398,9 @@ class MediaAcquisitionService:
                     "error_type": type(error).__name__,
                     "discovery_retry_key": record.get("discovery_retry_key"),
                     "discovery_context": record.get("discovery_context"),
+                    "discovery_retry_item": record.get("discovery_retry_item"),
+                    "retry_listing": record.get("retry_listing", False),
+                    "attachment_manifest": record.get("attachment_manifest", False),
                 }, "failed"
 
         executor = ThreadPoolExecutor(max_workers=raw_workers) if raw_workers > 1 else None
@@ -1210,8 +1227,46 @@ class MediaAcquisitionService:
             "extracted"
         )
 
+        if record.get("attachment_manifest") and extracted is not None:
+            # Register each original attachment through the existing durable-file
+            # path, then save a portable manifest as the row's primary original.
+            # Local filenames must never become the only attachment references.
+            for document in extracted.get("DocumentFiles", []):
+                try:
+                    metadata = MediaFileService.build_file_metadata(
+                        file_path=document["local_path"], file_url=document["url"])
+                    stored = MediaRawService.register_file(
+                        source_id=source_id, dataset_id=dataset_id,
+                        source_name=source_name, dataset_name=dataset_name,
+                        file_metadata=metadata, download_method=download_method,
+                    )
+                    document.update({key: stored[key] for key in
+                                     ("media_file_id", "file_hash", "storage_path")})
+                except Exception as error:
+                    extracted.setdefault("DocumentErrors", []).append(
+                        {"url": document.get("url"), "stage": "storage", "error": str(error)})
+            portable = {key: value for key, value in extracted.items()
+                        if key not in {"DocumentFiles", "DocumentFilePaths"}}
+            portable["SourceRowHTML"] = Path(detail_file_path).read_text(encoding="utf-8")
+            portable["DocumentFiles"] = [
+                {key: value for key, value in document.items() if key != "local_path"}
+                for document in extracted.get("DocumentFiles", [])]
+            payload = json.dumps(portable, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            manifest = Path(detail_file_path).with_name(hashlib.sha256(payload).hexdigest() + ".json")
+            temporary = None
+            try:
+                with NamedTemporaryFile(dir=manifest.parent, suffix=".tmp", delete=False) as output:
+                    temporary = Path(output.name)
+                    output.write(payload)
+                temporary.replace(manifest)
+            finally:
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
+            detail_file_path = str(manifest)
+
         source_url = (
-            record.get("file_url")
+            ((extracted or {}).get("SourceURL") if record.get("attachment_manifest") else None)
+            or record.get("file_url")
             or (extracted or {}).get("PDFURL")
             or (extracted or {}).get(
                 "SourceURL"
@@ -1293,6 +1348,7 @@ class MediaAcquisitionService:
             ),
 
             "failed": False,
+            "retry_listing": record.get("retry_listing", False),
             "discovery_retry_key": record.get("discovery_retry_key"),
             "discovery_context": record.get("discovery_context"),
             "discovery_retry_item": record.get("discovery_retry_item"),

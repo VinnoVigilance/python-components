@@ -24,6 +24,27 @@ from services.adverseMediaPipeline import (  # noqa: E402
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("load_fails", [False, True])
+def test_listing_replay_preserves_refresh_context_for_attachment_recovery(monkeypatch, load_fails):
+    monkeypatch.setattr(module.MediaReprocessingService, "_find_raw_files",
+                        lambda *_args, **_kwargs: (1, 2, [_raw_file(10, "entry")]))
+    monkeypatch.setattr(module.MediaReprocessingService, "_download_raw_file",
+                        MagicMock(side_effect=OSError("unavailable")) if load_fails else MagicMock(return_value="manifest.json"))
+    raw = MagicMock()
+    raw.extract.return_value = [{"CaseNumber": "C-1", "DocumentFiles": []}]
+    monkeypatch.setattr(module, "MediaRawRecordService", lambda: raw)
+
+    result = module.MediaReprocessingService().load({
+        "source_name": "COURT", "dataset_name": "ENTRIES",
+        "discovery": {"strategy": "list_only"}, "document_download": {"manifest": True},
+    })
+
+    [record] = result.records
+    assert record["retry_listing"] is True
+    assert record["failed"] is load_fails
+    raw.process_acquired_record.assert_not_called()
+
+
 def _raw_file(file_id, record_key):
     return {
         "id": file_id,

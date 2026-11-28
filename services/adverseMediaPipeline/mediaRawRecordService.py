@@ -1,4 +1,5 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from scrapy.http import HtmlResponse
@@ -6,6 +7,7 @@ from scrapy.http import HtmlResponse
 from ingestion.crawler.spiders.mediaSpider import MediaSpider
 from parsing.parserFactory import create_parser
 from transforms.preProcessingEngine import PreProcessingEngine
+from utils.hashing import calculate_file_hash
 
 
 class MediaRawRecordService:
@@ -40,25 +42,67 @@ class MediaRawRecordService:
         )
 
         if extracted is None:
-            return self.extract(
+            records = self.extract(
                 source_config=source_config,
                 source_file_path=file_path,
             )
+        else:
+            record = dict(extracted)
+            parser_type = str(
+                (source_config.get("parser") or {}).get("type", "")
+            ).strip().lower()
+            if parser_type == "pdf" and file_path:
+                for parsed in self.extract(
+                    source_config=source_config,
+                    source_file_path=file_path,
+                ):
+                    record.update(parsed)
+            records = [record]
 
-        record = dict(extracted)
+        for record in records:
+            self._parse_document_attachments(record, source_config)
+        return records
 
-        parser_type = str(
-            (source_config.get("parser") or {}).get("type", "")
-        ).strip().lower()
+    def _parse_document_attachments(self, record: dict[str, Any], source_config: dict[str, Any]) -> None:
+        """Add optional attachment text without turning one row into many publications.
 
-        if parser_type == "pdf" and file_path:
-            for parsed in self.extract(
-                source_config=source_config,
-                source_file_path=file_path,
-            ):
-                record.update(parsed)
-
-        return [record]
+        Portable manifests contain Seaweed references; local acquisition also has
+        local paths. Parser or retrieval failures retain metadata and remain visible.
+        """
+        settings = source_config.get("document_download", {})
+        parser_settings = settings.get("parser")
+        if not parser_settings:
+            return
+        text_parts = []
+        parsed_documents = []
+        errors = list(record.get("DocumentErrors") or [])
+        with TemporaryDirectory(prefix="media_attachments_") as temporary:
+            for index, document in enumerate(record.get("DocumentFiles") or []):
+                try:
+                    local_path = document.get("local_path")
+                    if not local_path or not Path(local_path).is_file():
+                        if not document.get("storage_path"):
+                            raise FileNotFoundError("Attachment has no local file or durable storage reference")
+                        from infrastructure.storage import seaweedClient
+                        local_path = seaweedClient.download_file(
+                            storage_path=document["storage_path"],
+                            destination_path=Path(temporary) / f"{index}.pdf",
+                        )
+                    if (document.get("file_hash")
+                            and calculate_file_hash(local_path) != document["file_hash"]):
+                        raise ValueError("Attachment bytes do not match the stored file hash")
+                    parsed = self.extract(
+                        source_config={"parser": parser_settings}, source_file_path=local_path)
+                    if len(parsed) != 1:
+                        raise ValueError("Attachment text mode must yield exactly one record")
+                    text = parsed[0].get("BodyText") or ""
+                    text_parts.append(f"Document: {document['url']}\n{text}")
+                    parsed_documents.append({"url": document["url"], **parsed[0]})
+                except Exception as error:
+                    errors.append({"url": document.get("url"), "stage": "parse", "error": str(error)})
+        record["DocumentTexts"] = parsed_documents
+        record["DocumentBodyText"] = "\n\n".join(text_parts)
+        record["DocumentErrors"] = errors
 
     def process(
         self,
@@ -74,6 +118,9 @@ class MediaRawRecordService:
             source_file_path=source_file_path,
             source_url=source_url,
         )
+
+        for record in raw_records:
+            self._parse_document_attachments(record, source_config)
 
         raw_records = self._run_preprocessing(
             source_config=source_config,

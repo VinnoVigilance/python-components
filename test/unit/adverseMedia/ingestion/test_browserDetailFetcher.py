@@ -11,6 +11,29 @@ from ingestion.crawler.browserDetailFetcher import (
 pytestmark = pytest.mark.unit
 
 
+def test_binary_download_reuses_open_browser_and_existing_transport():
+    engine = MagicMock()
+    fetcher = BrowserDetailFetcher(browser_config={})
+    fetcher._engine = engine
+    with patch("ingestion.bypassCollector.browserBinaryDownload.fetch_browser_binary",
+               return_value=(b"%PDF-original", {})) as transport:
+        payload = fetcher.download_binary("https://court.example/order.pdf",
+                                          page_url="https://court.example/cases/",
+                                          timeout_seconds=90, max_bytes=1000)
+    assert payload == b"%PDF-original"
+    transport.assert_called_once_with(engine, "https://court.example/order.pdf",
+                                      page_url="https://court.example/cases/",
+                                      timeout_seconds=90, max_bytes=1000)
+
+
+@pytest.mark.parametrize("mode", ["safe_get", "uc_open"])
+def test_navigation_mode_reaches_existing_engine(mode):
+    factory = MagicMock()
+    fetcher = BrowserDetailFetcher(browser_config={"navigation_mode": mode}, engine_factory=factory)
+    fetcher._ensure_engine()
+    assert factory.call_args.kwargs["navigationMode"] == mode
+
+
 def test_detail_failure_does_not_block_remaining_items():
     first_engine = MagicMock()
     first_engine.navigate.side_effect = [

@@ -262,6 +262,17 @@ class BrowserDetailFetcher:
 
         return self._ensure_engine().getSessionHeaders()
 
+    def download_binary(self, url: str, *, page_url: str, timeout_seconds: int,
+                        max_bytes: int) -> bytes:
+        """Download a same-origin attachment through the currently cleared session."""
+        from ingestion.bypassCollector.browserBinaryDownload import fetch_browser_binary
+
+        payload, _ = fetch_browser_binary(
+            self._ensure_engine(), url, page_url=page_url,
+            timeout_seconds=timeout_seconds, max_bytes=max_bytes,
+        )
+        return payload
+
     def _ensure_engine(self):
         """Start the shared browser session on first use."""
 
@@ -302,6 +313,7 @@ class BrowserDetailFetcher:
                     "binary_location"
                 )
             ),
+            navigationMode=self.browser_config.get("navigation_mode", "safe_get"),
         )
 
         engine.__enter__()
