@@ -470,7 +470,7 @@ class SavedHtmlSpider(GenericSpider):
         self.logger.warning(
             "Optional detail was not successfully read; keeping listing data. "
             "url=%s error_category=%s http_status=%s error=%s",
-            item.get("detail_url"), error_category, status, failure.getErrorMessage(),
+            item.get("detail_url"), error_category, status, record.get("fetch_error"),
         )
         self.records.append(record)
         yield record
