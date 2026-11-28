@@ -60,6 +60,9 @@ def _candidate_keys(
 def _retry_item(acquired: dict[str, Any]) -> dict[str, Any] | None:
     """Keep what a later run needs to retry one failed item."""
 
+    if acquired.get("retry_listing"):
+        return {"kind": "list_only", "record_key": acquired["record_key"]}
+
     if acquired.get("discovery_retry_item"):
         return dict(acquired["discovery_retry_item"])
 
@@ -126,7 +129,10 @@ def update_items(
     for acquired, result in zip(acquired_records, record_results):
         keys = _candidate_keys(acquired, result)
 
-        if result.get("status") in _DONE_STATUSES:
+        document_errors = result.get("document_errors")
+        if document_errors is None:
+            document_errors = (acquired.get("extracted") or {}).get("DocumentErrors")
+        if result.get("status") in _DONE_STATUSES and not document_errors:
             for key in keys:
                 if items.pop(key, None) is not None:
                     removed += 1
@@ -145,8 +151,8 @@ def update_items(
             attempts=previous.get("attempts", 0) + 1,
             first_failed_at=previous.get("first_failed_at", now),
             last_failed_at=now,
-            error=result.get("error"),
-            error_stage=result.get("error_stage"),
+            error=document_errors or result.get("error"),
+            error_stage="DOCUMENTS" if document_errors else result.get("error_stage"),
         )
         items[keys[0]] = item
         added += 0 if previous else 1

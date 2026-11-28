@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import json
 from pathlib import Path
@@ -161,8 +162,10 @@ def _keep_broken_as_list_only(
 
     for item in broken:
         logger.warning(
-            "Detail page broken on source, keeping list data only. url=%s error=%s",
+            "Detail unavailable under source fallback policy, keeping list data only. "
+            "url=%s error_category=%s error=%s",
             item["detail_url"],
+            item.get("error_category"),
             item.get("error"),
         )
         records.append(
@@ -173,6 +176,9 @@ def _keep_broken_as_list_only(
                 "attachments": [],
                 "detail_url": item["detail_url"],
                 "detail_error": item.get("error"),
+                "detail_error_category": item.get("error_category"),
+                "detail_error_type": item.get("error_type"),
+                "detail_http_status": item.get("http_status"),
             }
         )
 
@@ -448,6 +454,14 @@ def crawl_source(
     # =====================================================
 
     if crawler_settings:
+
+        if "download_timeout" in crawler_settings:
+            timeout = crawler_settings["download_timeout"]
+            if (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
+                    or not math.isfinite(timeout) or timeout <= 0):
+                raise ValueError("crawler_settings.download_timeout must be a finite positive number of seconds")
+            task.timeout = timeout
+            settings.set("DOWNLOAD_TIMEOUT", timeout)
 
         # ---------------------------------------------
         # Concurrent requests

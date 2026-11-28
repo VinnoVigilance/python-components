@@ -403,6 +403,7 @@ class SavedHtmlSpider(GenericSpider):
                         detail_url=item.get("detail_url"),
                         fetch_error=item.get("fetch_error"),
                         fetch_error_type=item.get("fetch_error_type"),
+                        fetch_error_category=item.get("fetch_error_category"),
                     )
                     self.records.append(record)
                     yield record
@@ -414,14 +415,17 @@ class SavedHtmlSpider(GenericSpider):
 
                 if expected is not None:
                     expected["error"] = item.get("fetch_error")
+                    expected["error_type"] = item.get("fetch_error_type")
+                    expected["error_category"] = item.get("fetch_error_category")
                     expected["permanent"] = False
 
                 self.logger.error(
-                    "Watchlist detail page failed; "
-                    "record will be missing. "
-                    "record_id=%s url=%s error=%s",
+                    "Watchlist detail was not successfully read; "
+                    "record remains pending. "
+                    "record_id=%s url=%s error_category=%s error=%s",
                     item.get("record_id"),
                     item.get("detail_url"),
+                    item.get("fetch_error_category"),
                     item.get("fetch_error"),
                 )
                 continue
@@ -447,12 +451,26 @@ class SavedHtmlSpider(GenericSpider):
         item = dict(
             getattr(failure.request, "cb_kwargs", {})
         )
+        status = getattr(getattr(failure.value, "response", None), "status", None)
+        error_category = (
+            "HTTP_NOT_FOUND" if status == 404 else
+            "HTTP_GONE" if status == 410 else
+            "HTTP_ERROR" if status else
+            "REQUEST_FAILED"
+        )
         record = self._build_optional_detail_record(
             list_data=item.get("list_data", {}),
             record_id=item.get("record_id"),
             detail_url=item.get("detail_url"),
             fetch_error=str(failure.value),
             fetch_error_type=type(failure.value).__name__,
+            fetch_error_category=error_category,
+            fetch_http_status=status,
+        )
+        self.logger.warning(
+            "Optional detail was not successfully read; keeping listing data. "
+            "url=%s error_category=%s http_status=%s error=%s",
+            item.get("detail_url"), error_category, status, record.get("fetch_error"),
         )
         self.records.append(record)
         yield record
@@ -469,6 +487,8 @@ class SavedHtmlSpider(GenericSpider):
         detail_url=None,
         fetch_error=None,
         fetch_error_type=None,
+        fetch_error_category=None,
+        fetch_http_status=None,
     ):
         attachments = []
 
@@ -505,6 +525,12 @@ class SavedHtmlSpider(GenericSpider):
 
         if fetch_error_type:
             record["fetch_error_type"] = fetch_error_type
+
+        if fetch_error_category:
+            record["fetch_error_category"] = fetch_error_category
+
+        if fetch_http_status is not None:
+            record["fetch_http_status"] = fetch_http_status
 
         return record
 

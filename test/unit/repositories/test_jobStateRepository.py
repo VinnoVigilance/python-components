@@ -61,6 +61,7 @@ def test_export_pending_csv_lists_watchlist_missing_pages(tmp_path):
     assert rows[0] == {
         "source": "NCA", "key": "7", "url": "https://x/7",
         "attempts": "2", "error": "timeout", "broken_on_source": "False",
+        "error_category": "", "error_type": "", "http_status": "",
     }
     assert rows[1]["broken_on_source"] == "True"
 
@@ -74,6 +75,24 @@ def test_export_pending_csv_lists_media_todo_items(tmp_path):
     assert repo.export_pending_csv("media", path) == 1
     assert _read_csv(path)[0]["key"] == "k1"
     assert _read_csv(path)[0]["attempts"] == "3"
+
+
+@pytest.mark.parametrize("kind", ["watchlist", "media"])
+def test_failure_diagnostics_survive_state_and_csv_export(tmp_path, kind):
+    item = {"record_id": "7", "record_key": "7", "detail_url": "https://x/7",
+            "error": "HTTP 404", "permanent": True, "error_category": "HTTP_NOT_FOUND",
+            "error_type": "HttpError", "http_status": 404, "attempts": 2}
+    state = {"missing": [item]} if kind == "watchlist" else {"items": {"7": item}}
+    repo.save_state(kind, "SOURCE", state)
+    assert repo.load_state(kind, "SOURCE") == state
+    path = tmp_path / "pending.csv"
+
+    assert repo.export_pending_csv(kind, path) == 1
+
+    [row] = _read_csv(path)
+    assert row == {"source": "SOURCE", "key": "7", "url": "https://x/7", "attempts": "2",
+                   "error": "HTTP 404", "broken_on_source": "True",
+                   "error_category": "HTTP_NOT_FOUND", "error_type": "HttpError", "http_status": "404"}
 
 
 def test_export_pending_csv_writes_nothing_when_empty(tmp_path):

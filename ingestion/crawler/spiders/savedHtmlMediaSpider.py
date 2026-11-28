@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+from itertools import islice
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urljoin, urlparse
 
@@ -96,7 +98,13 @@ class SavedHtmlMediaSpider(MediaSpider):
             )
 
             if list_only:
-                for result in self.parse_list_rows(listing_response):
+                if self.source_config.get("document_download"):
+                    first_record = len(self.records)
+                    await asyncio.to_thread(self._collect_listing_rows, listing_response)
+                    yield_from = islice(self.records, first_record, None)
+                else:
+                    yield_from = self.parse_list_rows(listing_response)
+                for result in yield_from:
                     yield result
                 continue
 
@@ -360,22 +368,65 @@ class SavedHtmlMediaSpider(MediaSpider):
                 identity_fields=item.get(
                     "identity_fields"
                 ),
+                prepare_record=lambda result: self._download_documents(
+                    result=result, fetcher=fetcher),
             )
 
-            for result in detail_results:
-                self._download_documents(
-                    result=result,
-                    fetcher=fetcher,
-                )
+            yield from detail_results
 
-                yield result
+    def _collect_listing_rows(self, response: HtmlResponse) -> None:
+        """Complete optional attachments before the normal row flow buffers a record."""
+        config = self.source_config["document_download"]
+        if config.get("manifest") and (
+                config.get("failure_policy") != "retain_metadata" or config.get("store_as_record_file")):
+            raise ValueError("Listing manifests require retain_metadata and cannot replace the row with a document")
+        fetcher = BrowserDetailFetcher(
+            browser_config=self.source_config.get("detail_browser", {}),
+            storage_config={"reuse_saved_detail_pages": False},
+            component_logger=self.logger,
+        )
+        pages = None
+        ready = None
+
+        def prepare(result):
+            nonlocal pages, ready
+            result["retry_listing"] = True
+            result["attachment_manifest"] = bool(config.get("manifest"))
+            extracted = result["extracted"]
+            self._download_documents(result=result, fetcher=fetcher, prepare_only=True)
+            if not extracted["DocumentUrls"]:
+                return
+            if pages is None:
+                pages = fetcher.fetch([{"detail_url": response.url}])
+                _, ready = next(pages)
+            if ready is None:
+                error = "Document browser could not open the index"
+                if config.get("failure_policy") == "retain_metadata":
+                    extracted["DocumentErrors"].append({"stage": "download", "error": error})
+                else:
+                    self._mark_document_failure(result, error)
+                return
+            self._download_documents(result=result, fetcher=fetcher)
+
+        try:
+            for _ in self.parse_list_rows(response, prepare_record=prepare):
+                pass
+        finally:
+            if pages is not None:
+                pages.close()
 
     def _download_documents(
         self,
         result: dict,
         fetcher: BrowserDetailFetcher,
+        *,
+        prepare_only: bool = False,
     ) -> None:
-        """Download files linked from the detail page, per `document_download` config."""
+        """Resolve/validate document links, then optionally download their files.
+
+        Listing publications prepare links first so rows without documents do
+        not start a browser. Both phases use the same URL and failure rules.
+        """
 
         document_config = self.source_config.get(
             "document_download"
@@ -413,6 +464,15 @@ class SavedHtmlMediaSpider(MediaSpider):
 
         extracted["DocumentUrls"] = document_urls
         extracted["DocumentFilePaths"] = []
+        retain_metadata = document_config.get("failure_policy") == "retain_metadata"
+        if retain_metadata:
+            extracted["DocumentFiles"] = []
+            extracted.setdefault("DocumentErrors", [])
+            original = extracted.get(document_config.get("original_url_field"))
+            if original and not any(extracted.get(name) for name in document_config.get("url_fields", [])):
+                error = {"url": original, "error": "Source document URL does not match the configured document format"}
+                if error not in extracted["DocumentErrors"]:
+                    extracted["DocumentErrors"].append(error)
 
         if not document_urls:
             if document_config.get("required", False):
@@ -420,6 +480,9 @@ class SavedHtmlMediaSpider(MediaSpider):
                     result,
                     "No document URL found on the detail page.",
                 )
+            return
+
+        if prepare_only:
             return
 
         file_name_id = self._build_file_name_id(
@@ -434,22 +497,54 @@ class SavedHtmlMediaSpider(MediaSpider):
             ).suffix.lower()
 
             try:
-                document_path = download(
-                    DownloadTask(
-                        url=document_url,
-                        source_name=self.task.source_name,
-                        list_name=self.task.list_name,
-                        download_dir=self.task.download_dir,
-                        filename=f"{file_name_id}_{index}{suffix}",
-                        headers=fetcher.session_headers(),
+                if document_config.get("transport") == "browser":
+                    cached = getattr(self, "_document_paths", {})
+                    document_path = cached.get(document_url)
+                    if not document_path:
+                        attempts = document_config.get("retry", 3)
+                        if type(attempts) is not int or attempts < 1:
+                            raise ValueError("document_download.retry must be a positive integer")
+                        for attempt in range(attempts):
+                            try:
+                                payload = fetcher.download_binary(
+                                    document_url, page_url=extracted["SourceURL"],
+                                    timeout_seconds=document_config.get("timeout_seconds", 900),
+                                    max_bytes=document_config.get("max_size_bytes", 100_000_000),
+                                )
+                                if document_config.get("type") != "pdf" or not payload.startswith(b"%PDF-"):
+                                    raise ValueError("Configured PDF attachment did not return PDF bytes")
+                                break
+                            except Exception:
+                                if attempt == attempts - 1:
+                                    raise
+                                self.logger.warning("Retrying attachment %s (%s/%s)",
+                                                    document_url, attempt + 2, attempts)
+                        document_path = self.storage.save_detail_file(
+                            hashlib.sha256(payload).hexdigest(), payload, "pdf")
+                        cached[document_url] = document_path
+                        self._document_paths = cached
+                else:
+                    document_path = download(
+                        DownloadTask(
+                            url=document_url,
+                            source_name=self.task.source_name,
+                            list_name=self.task.list_name,
+                            download_dir=self.task.download_dir,
+                            filename=f"{file_name_id}_{index}{suffix}",
+                            headers=fetcher.session_headers(),
+                            timeout=document_config.get("timeout_seconds", 30),
+                            retry=document_config.get("retry", 3),
+                        )
                     )
-                )
 
-            except Exception:
+            except Exception as error:
                 self.logger.exception(
                     "Media document download failed. url=%s",
                     document_url,
                 )
+                if retain_metadata:
+                    extracted["DocumentErrors"].append({"url": document_url, "error": str(error)})
+                    continue
                 self._mark_document_failure(
                     result,
                     f"Document download failed: {document_url}",
@@ -459,8 +554,10 @@ class SavedHtmlMediaSpider(MediaSpider):
             extracted["DocumentFilePaths"].append(
                 document_path
             )
+            if retain_metadata:
+                extracted["DocumentFiles"].append({"url": document_url, "local_path": document_path})
 
-        if document_config.get(
+        if extracted["DocumentFilePaths"] and document_config.get(
             "store_as_record_file",
             False,
         ):

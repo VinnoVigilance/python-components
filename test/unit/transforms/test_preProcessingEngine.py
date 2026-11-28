@@ -123,6 +123,42 @@ class TestGenerateAtcUniqueId:
 
 
 class TestGenerateCompositeId:
+    def test_bis_renamed_config_preserves_identity_fields(self, engine):
+        from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+
+        rules = WATCHLIST_CONFIGS["BIS_DPL"]["preprocessing"]
+        raw = {"Name_and_Address": "Example Person, London", "Effective_Date": "01/02/2026"}
+
+        def identity(record, preprocessing=rules):
+            return engine.preprocess([dict(record)], preprocessing)[0]["source_record_id"]
+
+        current = identity(raw)
+        assert current.startswith("BIS_DPL-")
+        assert identity(raw) == current
+        for field, value in (("Name_and_Address", "Another Person, London"),
+                             ("Effective_Date", "01/03/2026")):
+            assert identity({**raw, field: value}) != current
+        assert identity({**raw, "unrelated_field": "changed"}) == current
+
+        from copy import deepcopy
+        previous_rules = deepcopy(rules)
+        previous_rules[0]["config"]["prefix"] = "BIS-DPL"
+        previous = identity(raw, previous_rules)
+        assert previous != current
+        assert previous.removeprefix("BIS-DPL-") == current.removeprefix("BIS_DPL-")
+
+    @pytest.mark.parametrize("config_key,raw,prefix", [
+        ("SEC_US_PAUSE", {"detail_url": "https://example.test/alert"}, "SEC-US-PAUSE-"),
+        ("SC_PH_INCUMBENT_JUSTICES", {"primary_name": "Example Justice"}, "SC-PH-JUSTICE-"),
+    ])
+    def test_source_rename_retains_existing_identity_prefix(self, engine, config_key, raw, prefix):
+        from pipelines.watchlistConfigs import WATCHLIST_CONFIGS
+
+        rules = [rule for rule in WATCHLIST_CONFIGS[config_key]["preprocessing"]
+                 if rule["handler"] == "generate_composite_id"]
+        result = engine.preprocess([dict(raw)], rules)[0]
+        assert result["source_record_id"].startswith(prefix)
+
     def test_reads_nested_dotted_fields(self, engine):
         record = {
             "source_record_id": "aaron-durnell-williams",

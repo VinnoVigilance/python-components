@@ -2,6 +2,7 @@ import hashlib
 import itertools
 import json
 import re
+from collections.abc import Callable
 from datetime import date, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -1468,6 +1469,8 @@ class MediaSpider(scrapy.Spider):
     def parse_list_rows(
         self,
         response,
+        *,
+        prepare_record: Callable[[dict[str, Any]], None] | None = None,
     ):
         """Build one record per listing row for list_only sources (no detail pages)."""
 
@@ -1484,9 +1487,9 @@ class MediaSpider(scrapy.Spider):
                 "is required for list_only."
             )
 
-        rows = response.css(
-            row_selector
-        )
+        article = self.discovery_config.get("article", {})
+        select = response.xpath if article.get("selector_type") == "xpath" else response.css
+        rows = select(row_selector)
 
         if not rows:
             self.logger.error(
@@ -1499,8 +1502,9 @@ class MediaSpider(scrapy.Spider):
             return
 
         for row in rows:
-
             try:
+                fields = (self._extract_record(row, fields=article["fields"], base_url=response.url)
+                          if "fields" in article else {})
                 identity_fields = (
                     self._extract_identity_fields(
                         row
@@ -1512,6 +1516,7 @@ class MediaSpider(scrapy.Spider):
                     .build_record_key(
                         {
                             "SourceURL": response.url,
+                            **fields,
                             **identity_fields,
                         }
                     )
@@ -1556,9 +1561,15 @@ class MediaSpider(scrapy.Spider):
 
             self.discovery_service.record_detail_selected()
 
+            content = row.get()
+            if article.get("preserve_table_headers"):
+                headers = row.xpath("ancestor::table[1]/thead").get()
+                if not headers:
+                    raise ValueError("Listing row has no table headers to preserve")
+                content = f"<table>{headers}<tbody>{content}</tbody></table>"
             row_response = HtmlResponse(
                 url=response.url,
-                body=row.get(),
+                body=content,
                 encoding="utf-8",
             )
 
@@ -1568,6 +1579,8 @@ class MediaSpider(scrapy.Spider):
                 is_known=is_known,
                 source_record_id=None,
                 identity_fields=identity_fields,
+                extracted_record=fields if "fields" in article else None,
+                prepare_record=prepare_record,
             )
 
             if should_stop:
@@ -1584,6 +1597,7 @@ class MediaSpider(scrapy.Spider):
         identity_fields: dict[str, Any] | None = None,
         discovery_retry_key: str | None = None,
         extracted_record: dict[str, Any] | None = None,
+        prepare_record: Callable[[dict[str, Any]], None] | None = None,
     ):
         """
         Save original HTML first, then extract fields.
@@ -1593,6 +1607,8 @@ class MediaSpider(scrapy.Spider):
 
         Configured navigation may supply already extracted fields, preserving
         parent metadata without extracting the final page a second time.
+        Optional record preparation finishes before buffering, including for
+        buffers that serialize immediately rather than retaining object references.
         """
 
         file_name_id = self._build_file_name_id(
@@ -1661,6 +1677,9 @@ class MediaSpider(scrapy.Spider):
             "extracted": extracted_record,
             "discovery_retry_key": discovery_retry_key,
         }
+
+        if prepare_record is not None:
+            prepare_record(result)
 
         self.records.append(
             result
@@ -1840,6 +1859,10 @@ class MediaSpider(scrapy.Spider):
 
             selected_nodes = (response.xpath(selector) if field_config.get("selector_type") == "xpath"
                               else response.css(selector))
+
+            if (field_config.get("max_matches") is not None
+                    and len(selected_nodes) > field_config["max_matches"]):
+                raise ValueError(f"Extraction matched more than max_matches: {selector}")
 
             if not selected_nodes:
                 if field_config.get("required"):

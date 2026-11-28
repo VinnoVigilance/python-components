@@ -382,6 +382,8 @@ def run_media_pipeline(
             )
         )
 
+        document_errors = (acquired_record.get("extracted") or {}).get("DocumentErrors", [])
+
         try:
 
             if acquired_record.get("discovery_retry_complete"):
@@ -463,6 +465,7 @@ def run_media_pipeline(
             raw_record = (
                 raw_records[0]
             )
+            document_errors = raw_record.get("DocumentErrors", [])
 
             # -------------------------------------------------
             # Normalization
@@ -577,6 +580,7 @@ def run_media_pipeline(
                     "status": (
                         status
                     ),
+                    "document_errors": document_errors,
                     "content_hash": (
                         core_result[
                             "content_hash"
@@ -640,6 +644,7 @@ def run_media_pipeline(
                         str(error)
                     ),
                     "error_stage": "PROCESSING",
+                    "document_errors": document_errors,
                     "error_type": type(error).__name__,
                 }
             )

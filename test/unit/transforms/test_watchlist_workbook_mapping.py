@@ -16,6 +16,23 @@ RULES = Path(__file__).resolve().parents[3] / "data" / "rules"
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("config_key,source_name,list_name,entity_type", [
+    ("BIS_DPL", "BIS", "BIS_DPL", "Individual"),
+    ("BIS_DPL", "BIS", "BIS_DPL", "Entity"),
+    ("SC_PH_INCUMBENT_JUSTICES", "SC_PH", "SC_PH_INCUMBENT_JUSTICES", "Individual"),
+    ("SEC_US_PAUSE", "SEC_US", "SEC_US_PAUSE", "Entity"),
+    ("CRIMESTOPPERS_UK_MOST_WANTED", "CRIMESTOPPERS_UK", "CRIMESTOPPERS_UK_MOST_WANTED", "Individual"),
+])
+def test_renamed_sources_match_config_and_workbook(config_key, source_name, list_name, entity_type):
+    config = WATCHLIST_CONFIGS[config_key]
+    mapper = MappingEngine(load_rules(RULES / "mapping.xlsx", config["list_name"]))
+    result = mapper.map_record({"entity_type": entity_type})
+
+    source = result["Sources"][0]
+    assert source["SourceName"] == config["source_name"] == source_name
+    assert source["ListName"] == config["list_name"] == list_name
+
+
 @pytest.fixture(scope="module")
 def pre_normalizer():
     return PreNormalizationEngine(
