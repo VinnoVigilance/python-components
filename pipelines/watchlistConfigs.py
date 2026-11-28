@@ -1856,9 +1856,9 @@ WATCHLIST_CONFIGS = {
         ],
     },
 
-    "BIS-DPL": {
+    "BIS_DPL": {
         "source_name": "BIS",
-        "list_name": "BIS-DPL",
+        "list_name": "BIS_DPL",
         "date_order": "MDY",
         "download_method": "HTTPS",
         "url": (
@@ -1887,7 +1887,7 @@ WATCHLIST_CONFIGS = {
                         "Effective_Date",
                     ],
                     "output_field": "source_record_id",
-                    "prefix": "BIS-DPL",
+                    "prefix": "BIS_DPL",
                 },
             },
             {
@@ -2250,7 +2250,7 @@ WATCHLIST_CONFIGS = {
 ],
     },
     "SC_PH_INCUMBENT_JUSTICES": {
-        "source_name": "SC-PH",
+        "source_name": "SC_PH",
         "list_name": "SC_PH_INCUMBENT_JUSTICES",
         "date_order": "MDY",
         "download_method": "BYPASS",
@@ -2360,7 +2360,7 @@ WATCHLIST_CONFIGS = {
     },
 
     "SEC_US_PAUSE": {
-        "source_name": "SEC-US",
+        "source_name": "SEC_US",
         "list_name": "SEC_US_PAUSE",
         "date_order": "MDY",
         "download_method": "CRAWLER",
@@ -2457,7 +2457,7 @@ WATCHLIST_CONFIGS = {
     },
 
     "CRIMESTOPPERS_UK_MOST_WANTED": {
-        "source_name": "CRIMESTOPPERS-UK",
+        "source_name": "CRIMESTOPPERS_UK",
         "list_name": "CRIMESTOPPERS_UK_MOST_WANTED",
         "download_method": "CRAWLER",
         "url": (
